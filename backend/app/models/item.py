@@ -18,6 +18,7 @@ class ItemModel(Base):
     quantidade: Mapped[float | None] = mapped_column(Float, nullable=True)
     unidade: Mapped[str | None] = mapped_column(String, nullable=True)
     especificacoes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    marcas_fabricantes: Mapped[str | None] = mapped_column(Text, nullable=True)
     status_pesquisa: Mapped[str] = mapped_column(String, nullable=False, default="aguardando")
     preco_medio: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[str] = mapped_column(

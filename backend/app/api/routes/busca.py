@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db_session
 from app.schemas.busca import BuscaLicitacoesResponse
-from app.services.pncp_service import PncpService
+from app.services.busca_service import BuscaService
 
 router = APIRouter(tags=["busca"])
 
@@ -25,9 +25,10 @@ async def buscar_licitacoes(
     data_inicio: str | None = Query(default=None),
     data_fim: str | None = Query(default=None),
     pagina: int = Query(default=1, ge=1),
+    page_size: int = Query(default=10, ge=1, le=50),
     db: Session = Depends(get_db_session),
 ) -> BuscaLicitacoesResponse:
-    service = PncpService(db)
+    service = BuscaService(db)
     try:
         return await service.buscar_licitacoes(
             q=buscar_por or q,
@@ -45,6 +46,7 @@ async def buscar_licitacoes(
             data_inicio=data_inicio,
             data_fim=data_fim,
             pagina=pagina,
+            page_size=page_size,
         )
     except RuntimeError as exc:
         raise HTTPException(

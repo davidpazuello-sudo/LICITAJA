@@ -9,12 +9,14 @@ import { Card } from "../components/ui/Card";
 import { Spinner } from "../components/ui/Spinner";
 import { Tabs } from "../components/ui/Tabs";
 import { useItens } from "../hooks/useItens";
+import { useLicitacaoChat } from "../hooks/useLicitacaoChat";
 import { usePerfilLicitacao } from "../hooks/usePerfilLicitacao";
 import { formatCurrency, formatDateTime } from "../utils/formatters";
 
 const profileTabs = [
   { id: "visao-geral", label: "Visao Geral" },
   { id: "itens", label: "Itens" },
+  { id: "chat-ia", label: "Chat IA" },
 ];
 
 const STATUS_META: Record<string, { label: string; variant: "blue" | "green" | "amber" | "slate" }> = {
@@ -31,20 +33,21 @@ function PerfilLicitacao() {
   const licitacaoId = id ? Number(id) : null;
   const {
     errorMessage,
+    gerarResumoIA,
+    isGeneratingSummary,
     isRemoving,
-    observacoes,
     perfil,
     reloadPerfil,
     removePerfil,
-    saveIndicator,
-    setObservacoes,
     status,
   } = usePerfilLicitacao(licitacaoId);
   const [activeTab, setActiveTab] = useState("visao-geral");
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const {
     errorMessage: itensErrorMessage,
+    exportarTabela,
     isExtracting,
+    isExporting,
     isSearchingAll,
     isUploading,
     items,
@@ -53,6 +56,7 @@ function PerfilLicitacao() {
     enviarEdital,
     iniciarExtracao,
     pesquisarItemPorId,
+    pesquisarMercadoPorId,
     pesquisarTodos,
     searchingItemIds,
     status: itensStatus,
@@ -61,6 +65,15 @@ function PerfilLicitacao() {
     perfil,
     onRefreshPerfil: reloadPerfil,
   });
+  const {
+    draft: chatDraft,
+    errorMessage: chatErrorMessage,
+    enviarMensagem,
+    isSending: isSendingChat,
+    messages: chatMessages,
+    setDraft: setChatDraft,
+    status: chatStatus,
+  } = useLicitacaoChat(licitacaoId);
 
   const statusMeta = useMemo(() => {
     if (!perfil) {
@@ -69,6 +82,14 @@ function PerfilLicitacao() {
 
     return STATUS_META[perfil.status] ?? STATUS_META.nova;
   }, [perfil]);
+
+  const canExtractAutomatically = useMemo(() => {
+    if (!perfil) {
+      return false;
+    }
+
+    return Boolean(latestEdital || perfil.link_edital || perfil.link_site);
+  }, [latestEdital, perfil]);
 
   const overviewItems = perfil
     ? [
@@ -126,9 +147,6 @@ function PerfilLicitacao() {
         <>
           <header className="flex items-start justify-between gap-6 border-b border-line px-6 pb-5 pt-6 sm:px-8">
             <div className="min-w-0 space-y-1.5">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent/80">
-                Perfil da licitacao
-              </p>
               <div className="flex flex-wrap items-center gap-2.5">
                 <h1 className="font-heading text-2xl font-extrabold text-ink">{perfil.orgao}</h1>
                 <Badge variant={statusMeta.variant}>{statusMeta.label}</Badge>
@@ -156,9 +174,6 @@ function PerfilLicitacao() {
                 <Card className="p-6">
                   <div className="space-y-6">
                     <div className="space-y-2">
-                      <p className="text-sm font-semibold uppercase tracking-[0.16em] text-accent/80">
-                        Dados gerais
-                      </p>
                       <h2 className="font-heading text-2xl font-extrabold text-ink">Visao Geral</h2>
                     </div>
 
@@ -200,26 +215,29 @@ function PerfilLicitacao() {
                   <Card className="p-6">
                     <div className="space-y-4">
                       <div className="flex items-center justify-between gap-3">
-                        <h2 className="font-heading text-xl font-extrabold text-ink">Observacoes</h2>
-                        {saveIndicator === "saving" ? (
-                          <span className="text-xs font-semibold text-amber-700">Salvando...</span>
-                        ) : null}
-                        {saveIndicator === "saved" ? (
-                          <span className="text-xs font-semibold text-emerald-700">Salvo</span>
-                        ) : null}
+                        <h2 className="font-heading text-xl font-extrabold text-ink">Resumo com IA</h2>
+                        {perfil.resumo_ia ? <Badge variant="green">Resumo salvo</Badge> : null}
                       </div>
 
-                      <textarea
-                        value={observacoes}
-                        onChange={(event) => setObservacoes(event.target.value)}
-                        placeholder="Adicione observacoes sobre esta oportunidade, riscos ou proximos passos."
-                        className="min-h-[190px] w-full rounded-2xl border border-line bg-panel px-4 py-4 text-sm leading-7 text-ink outline-none transition focus:border-accent/40 focus:ring-4 focus:ring-accent/10"
-                      />
+                      {perfil.resumo_ia ? (
+                        <div className="rounded-2xl border border-line bg-panel px-4 py-4">
+                          <p className="whitespace-pre-line text-sm leading-7 text-ink">{perfil.resumo_ia}</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <div className="rounded-2xl border border-dashed border-line bg-panel/70 px-4 py-5 text-sm leading-7 text-slate">
+                            Gere um resumo executivo desta oportunidade com a IA ativa. O resultado fica salvo e pode ser reutilizado depois.
+                          </div>
+                          <Button isLoading={isGeneratingSummary} onClick={gerarResumoIA}>
+                            Gerar resumo com IA
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </Card>
                 </div>
               </div>
-            ) : (
+            ) : activeTab === "itens" ? (
               <div className="space-y-6">
                 {items.length > 0 ? (
                   <div className="flex flex-wrap items-center justify-between gap-4">
@@ -236,13 +254,13 @@ function PerfilLicitacao() {
                       <div>
                         <h2 className="font-heading text-2xl font-extrabold text-ink">Edital e extracao</h2>
                         <p className="mt-2 text-sm text-slate">
-                          Envie o PDF do edital e use a IA para extrair os itens automaticamente.
+                          Use o edital principal do portal para extrair os itens automaticamente. O upload manual fica opcional.
                         </p>
                       </div>
 
                       <div className="flex flex-wrap gap-3">
                         <label className="inline-flex cursor-pointer items-center justify-center rounded-2xl border border-line px-5 py-3 text-sm font-semibold text-ink transition hover:border-accent/30">
-                          {isUploading ? "Enviando PDF..." : "Enviar edital em PDF"}
+                          {isUploading ? "Enviando PDF..." : "Enviar outro PDF (opcional)"}
                           <input
                             type="file"
                             accept="application/pdf"
@@ -259,8 +277,20 @@ function PerfilLicitacao() {
                             }}
                           />
                         </label>
-                        <Button isLoading={isExtracting} disabled={!latestEdital || isUploading} onClick={iniciarExtracao}>
+                        <Button
+                          isLoading={isExtracting}
+                          disabled={!canExtractAutomatically || isUploading}
+                          onClick={iniciarExtracao}
+                        >
                           Extrair itens do edital com IA
+                        </Button>
+                        <Button
+                          variant="outline"
+                          isLoading={isExporting}
+                          disabled={items.length === 0 || isExtracting || isUploading}
+                          onClick={exportarTabela}
+                        >
+                          Exportar tabela de itens
                         </Button>
                       </div>
                     </div>
@@ -277,9 +307,27 @@ function PerfilLicitacao() {
                           <p className="mt-1 text-rose-700">{latestEdital.erro_mensagem}</p>
                         ) : null}
                       </div>
+                    ) : perfil.link_edital ? (
+                      <div className="rounded-2xl bg-panel p-4 text-sm text-slate">
+                        <p>
+                          <strong>Edital principal disponivel:</strong> o sistema vai baixar automaticamente o PDF do portal quando voce iniciar a extracao.
+                        </p>
+                        <p className="mt-1">
+                          <strong>Fonte:</strong> {perfil.link_edital}
+                        </p>
+                      </div>
+                    ) : perfil.link_site ? (
+                      <div className="rounded-2xl bg-panel p-4 text-sm text-slate">
+                        <p>
+                          <strong>Link da licitacao disponivel:</strong> o sistema vai tentar localizar automaticamente o edital principal a partir da pagina do portal quando voce iniciar a extracao.
+                        </p>
+                        <p className="mt-1">
+                          <strong>Fonte:</strong> {perfil.link_site}
+                        </p>
+                      </div>
                     ) : (
                       <div className="rounded-2xl border border-dashed border-line bg-panel/70 p-5 text-sm text-slate">
-                        Nenhum edital enviado ainda. Envie um PDF para habilitar a extracao com IA.
+                        Esta licitacao ainda nao tem um edital principal acessivel. Envie um PDF manualmente para habilitar a extracao com IA.
                       </div>
                     )}
 
@@ -324,10 +372,80 @@ function PerfilLicitacao() {
                         item={item}
                         isSearching={searchingItemIds.includes(item.id)}
                         onPesquisar={() => pesquisarItemPorId(item.id)}
+                        onPesquisarMercado={() => pesquisarMercadoPorId(item.id)}
                       />
                     ))}
                   </div>
                 ) : null}
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <Card className="p-6">
+                  <div className="space-y-5">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <h2 className="font-heading text-2xl font-extrabold text-ink">Chat IA da licitacao</h2>
+                      </div>
+                      <Badge variant="blue">{chatMessages.length} mensagens</Badge>
+                    </div>
+
+                    {chatErrorMessage ? (
+                      <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                        {chatErrorMessage}
+                      </div>
+                    ) : null}
+
+                    <div className="space-y-3 rounded-[28px] border border-line bg-panel/50 p-4">
+                      {chatStatus === "loading" ? (
+                        <div className="flex items-center gap-3 py-6">
+                          <Spinner className="text-accent" />
+                          <p className="text-sm text-slate">Carregando historico do chat...</p>
+                        </div>
+                      ) : null}
+
+                      {chatMessages.map((message) => {
+                        const isUser = message.role === "user";
+                        return (
+                          <div
+                            key={message.id}
+                            className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+                          >
+                            <div
+                              className={`max-w-[85%] rounded-[24px] px-4 py-3 text-sm leading-7 ${
+                                isUser
+                                  ? "bg-accent text-white"
+                                  : "border border-line bg-white text-ink"
+                              }`}
+                            >
+                              <p className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] opacity-80">
+                                {isUser ? "Voce" : "IA"}
+                              </p>
+                              <p className="whitespace-pre-line">{message.content}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="space-y-3">
+                      <textarea
+                        value={chatDraft}
+                        onChange={(event) => setChatDraft(event.target.value)}
+                        placeholder="Digite sua pergunta sobre esta licitacao..."
+                        className="min-h-[140px] w-full rounded-[24px] border border-line bg-white px-4 py-4 text-sm leading-7 text-ink outline-none transition focus:border-accent/40 focus:ring-4 focus:ring-accent/10"
+                      />
+                      <div className="flex justify-end">
+                        <Button
+                          isLoading={isSendingChat}
+                          disabled={!chatDraft.trim()}
+                          onClick={enviarMensagem}
+                        >
+                          Enviar pergunta
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
               </div>
             )}
           </div>

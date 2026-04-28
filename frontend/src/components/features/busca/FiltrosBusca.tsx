@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 
 import type { BuscaLicitacaoFilters } from "../../../types/licitacao.types";
+import type { PortalFilterSupportState } from "../../../utils/portalFilterSupport";
 import {
   EMPRESA_OPTIONS,
   FAMILIA_FORNECIMENTO_TREE,
@@ -16,6 +17,7 @@ import { Input } from "../../ui/Input";
 
 interface FiltrosBuscaProps {
   filters: BuscaLicitacaoFilters;
+  filterSupport: PortalFilterSupportState;
   isLoading: boolean;
   companySuggestions?: string[];
   portalOptions: Array<{ id: string; label: string }>;
@@ -80,12 +82,14 @@ function SelectField(props: {
   onChange: (value: string) => void;
   placeholder: string;
   options: readonly string[];
+  disabled?: boolean;
 }) {
-  const { value, onChange, placeholder, options } = props;
+  const { value, onChange, placeholder, options, disabled = false } = props;
 
   return (
     <label className="flex h-12 items-center rounded-2xl border border-line bg-white px-4 text-sm text-slate shadow-sm transition focus-within:border-accent/40 focus-within:ring-4 focus-within:ring-accent/10">
       <select
+        disabled={disabled}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className="w-full appearance-none border-none bg-transparent outline-none"
@@ -105,15 +109,17 @@ function ToggleChip(props: {
   checked: boolean;
   label: string;
   onClick: () => void;
+  disabled?: boolean;
 }) {
-  const { checked, label, onClick } = props;
+  const { checked, label, onClick, disabled = false } = props;
 
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       className={cn(
-        "inline-flex h-11 items-center rounded-2xl border px-4 text-sm font-semibold transition",
+        "inline-flex h-11 items-center rounded-2xl border px-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50",
         checked
           ? "border-accent bg-softBlue text-accent"
           : "border-line bg-white text-slate hover:border-accent/30 hover:text-ink",
@@ -185,6 +191,7 @@ function collectNodeIds(node: FamiliaTreeNode): string[] {
 
 function FiltrosBusca({
   filters,
+  filterSupport,
   isLoading,
   companySuggestions = [],
   portalOptions,
@@ -199,6 +206,8 @@ function FiltrosBusca({
     () => Array.from(new Set([...EMPRESA_OPTIONS, ...companySuggestions])).sort(),
     [companySuggestions],
   );
+  const supportsField = (field: keyof BuscaLicitacaoFilters) =>
+    filterSupport.supportedFields.includes(field as never);
 
   const activeFiltersCount = useMemo(() => {
     const scalarFilters = [
@@ -319,6 +328,9 @@ function FiltrosBusca({
               <p className="mt-1 text-sm text-slate">
                 Refine a busca por numero, empresa, periodo, tipo de fornecimento e familias.
               </p>
+              <p className="mt-2 max-w-3xl text-sm text-slate">
+                {filterSupport.guidance}
+              </p>
             </div>
 
             <button
@@ -331,69 +343,87 @@ function FiltrosBusca({
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <Input
-              placeholder="Numero da oportunidade"
-              value={filters.numero_oportunidade}
-              onChange={(event) => onChange("numero_oportunidade", event.target.value)}
-            />
-            <Input
-              placeholder="Objeto da licitacao"
-              value={filters.objeto_licitacao}
-              onChange={(event) => onChange("objeto_licitacao", event.target.value)}
-            />
-            <Input
-              placeholder="Filtrar por orgao"
-              value={filters.orgao}
-              onChange={(event) => onChange("orgao", event.target.value)}
-            />
-            <div>
+            {supportsField("numero_oportunidade") ? (
               <Input
-                list="empresa-options"
-                placeholder="Empresa"
-                value={filters.empresa}
-                onChange={(event) => onChange("empresa", event.target.value)}
+                placeholder="Numero da oportunidade"
+                value={filters.numero_oportunidade}
+                onChange={(event) => onChange("numero_oportunidade", event.target.value)}
               />
-              <datalist id="empresa-options">
-                {empresaOptions.map((option) => (
-                  <option key={option} value={option} />
-                ))}
-              </datalist>
-            </div>
-            <SelectField
-              value={filters.sub_status}
-              onChange={(value) => onChange("sub_status", value)}
-              placeholder="Sub-status"
-              options={SUB_STATUS_OPTIONS}
-            />
-            <SelectField
-              value={filters.estado}
-              onChange={(value) => onChange("estado", value)}
-              placeholder="Estado (UF)"
-              options={UF_OPTIONS}
-            />
-            <SelectField
-              value={filters.modalidade}
-              onChange={(value) => onChange("modalidade", value)}
-              placeholder="Modalidade"
-              options={MODALIDADE_OPTIONS}
-            />
-            <label className="space-y-2">
-              <span className="text-sm font-semibold text-ink">Data inicial</span>
+            ) : null}
+            {supportsField("objeto_licitacao") ? (
               <Input
-                type="date"
-                value={filters.data_inicio ?? ""}
-                onChange={(event) => onChange("data_inicio", event.target.value)}
+                placeholder="Objeto da licitacao"
+                value={filters.objeto_licitacao}
+                onChange={(event) => onChange("objeto_licitacao", event.target.value)}
               />
-            </label>
-            <label className="space-y-2">
-              <span className="text-sm font-semibold text-ink">Data final</span>
+            ) : null}
+            {supportsField("orgao") ? (
               <Input
-                type="date"
-                min={filters.data_inicio || undefined}
-                value={filters.data_fim ?? ""}
-                onChange={(event) => onChange("data_fim", event.target.value)}
+                placeholder="Filtrar por orgao"
+                value={filters.orgao}
+                onChange={(event) => onChange("orgao", event.target.value)}
               />
-            </label>
+            ) : null}
+            {supportsField("empresa") ? (
+              <div>
+                <Input
+                  list="empresa-options"
+                  placeholder="Empresa"
+                  value={filters.empresa}
+                  onChange={(event) => onChange("empresa", event.target.value)}
+                />
+                <datalist id="empresa-options">
+                  {empresaOptions.map((option) => (
+                    <option key={option} value={option} />
+                  ))}
+                </datalist>
+              </div>
+            ) : null}
+            {supportsField("sub_status") ? (
+              <SelectField
+                value={filters.sub_status}
+                onChange={(value) => onChange("sub_status", value)}
+                placeholder="Sub-status"
+                options={SUB_STATUS_OPTIONS}
+              />
+            ) : null}
+            {supportsField("estado") ? (
+              <SelectField
+                value={filters.estado}
+                onChange={(value) => onChange("estado", value)}
+                placeholder="Estado (UF)"
+                options={UF_OPTIONS}
+              />
+            ) : null}
+            {supportsField("modalidade") ? (
+              <SelectField
+                value={filters.modalidade}
+                onChange={(value) => onChange("modalidade", value)}
+                placeholder="Modalidade"
+                options={MODALIDADE_OPTIONS}
+              />
+            ) : null}
+            {supportsField("data_inicio") ? (
+              <label className="space-y-2">
+                <span className="text-sm font-semibold text-ink">Data inicial</span>
+                <Input
+                  type="date"
+                  value={filters.data_inicio ?? ""}
+                  onChange={(event) => onChange("data_inicio", event.target.value)}
+                />
+              </label>
+            ) : null}
+            {supportsField("data_fim") ? (
+              <label className="space-y-2">
+                <span className="text-sm font-semibold text-ink">Data final</span>
+                <Input
+                  type="date"
+                  min={filters.data_inicio || undefined}
+                  value={filters.data_fim ?? ""}
+                  onChange={(event) => onChange("data_fim", event.target.value)}
+                />
+              </label>
+            ) : null}
           </div>
 
           <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
@@ -434,42 +464,46 @@ function FiltrosBusca({
                 ) : null}
               </div>
 
-              <div className="rounded-[24px] border border-line bg-white p-5">
-                <h3 className="font-heading text-lg font-extrabold text-ink">Tipo de fornecimento</h3>
-                <p className="mt-1 text-sm text-slate">Selecione uma ou mais categorias para afunilar o resultado.</p>
+              {supportsField("tipo_fornecimento") ? (
+                <div className="rounded-[24px] border border-line bg-white p-5">
+                  <h3 className="font-heading text-lg font-extrabold text-ink">Tipo de fornecimento</h3>
+                  <p className="mt-1 text-sm text-slate">Selecione uma ou mais categorias para afunilar o resultado.</p>
 
-                <div className="mt-4 flex flex-wrap gap-3">
-                  {TIPO_FORNECIMENTO_OPTIONS.map((option) => (
-                    <ToggleChip
-                      key={option.id}
-                      checked={filters.tipo_fornecimento.includes(option.id)}
-                      label={option.label}
-                      onClick={() => toggleTipoFornecimento(option.id)}
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    {TIPO_FORNECIMENTO_OPTIONS.map((option) => (
+                      <ToggleChip
+                        key={option.id}
+                        checked={filters.tipo_fornecimento.includes(option.id)}
+                        label={option.label}
+                        onClick={() => toggleTipoFornecimento(option.id)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+            {supportsField("familia_fornecimento") ? (
+              <div className="rounded-[24px] border border-line bg-white p-5">
+                <h3 className="font-heading text-lg font-extrabold text-ink">Familia de fornecimento</h3>
+                <p className="mt-1 text-sm text-slate">
+                  Estrutura hierarquica sugerida para agrupar materiais e servicos durante a busca.
+                </p>
+
+                <div className="mt-4 space-y-4">
+                  {FAMILIA_FORNECIMENTO_TREE.map((node) => (
+                    <FamilyNode
+                      key={node.id}
+                      node={node}
+                      selectedIds={filters.familia_fornecimento}
+                      onToggle={toggleFamilyNode}
+                      expandedIds={expandedFamilyIds}
+                      onToggleExpanded={toggleExpandedFamily}
                     />
                   ))}
                 </div>
               </div>
-            </div>
-
-            <div className="rounded-[24px] border border-line bg-white p-5">
-              <h3 className="font-heading text-lg font-extrabold text-ink">Familia de fornecimento</h3>
-              <p className="mt-1 text-sm text-slate">
-                Estrutura hierarquica sugerida para agrupar materiais e servicos durante a busca.
-              </p>
-
-              <div className="mt-4 space-y-4">
-                {FAMILIA_FORNECIMENTO_TREE.map((node) => (
-                  <FamilyNode
-                    key={node.id}
-                    node={node}
-                    selectedIds={filters.familia_fornecimento}
-                    onToggle={toggleFamilyNode}
-                    expandedIds={expandedFamilyIds}
-                    onToggleExpanded={toggleExpandedFamily}
-                  />
-                ))}
-              </div>
-            </div>
+            ) : null}
           </div>
         </div>
       </div>

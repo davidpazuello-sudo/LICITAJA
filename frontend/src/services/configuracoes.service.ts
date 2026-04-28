@@ -20,6 +20,13 @@ export async function updatePncpUrl(url_base: string): Promise<PncpConfig> {
   });
 }
 
+export async function updatePncpStatus(status: "ativa" | "inativa"): Promise<PncpConfig> {
+  return apiRequest<PncpConfig>("/configuracoes/pncp/status", {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
+}
+
 export async function testarPncp(): Promise<PncpTesteResult> {
   return apiRequest<PncpTesteResult>("/configuracoes/pncp/testar", {
     method: "POST",
@@ -51,5 +58,15 @@ export async function createPortalIntegracao(body: PortalIntegracaoCreateInput):
   return apiRequest<PortalIntegracaoType>("/configuracoes/portais", {
     method: "POST",
     body: JSON.stringify(body),
+  });
+}
+
+export async function updatePortalIntegracaoStatus(
+  portalId: number,
+  status: "ativa" | "inativa",
+): Promise<PortalIntegracaoType> {
+  return apiRequest<PortalIntegracaoType>(`/configuracoes/portais/${portalId}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
   });
 }

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import {
   atualizarLicitacao,
   excluirLicitacao,
+  gerarResumoIALicitacao,
   obterLicitacao,
 } from "../services/licitacoes.service";
 import type { LicitacaoDetailType } from "../types/licitacao.types";
@@ -17,6 +18,7 @@ export function usePerfilLicitacao(licitacaoId: number | null) {
   const [observacoes, setObservacoes] = useState("");
   const [saveIndicator, setSaveIndicator] = useState<SaveIndicator>("idle");
   const [isRemoving, setIsRemoving] = useState(false);
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
 
   useEffect(() => {
     if (!licitacaoId) {
@@ -108,8 +110,31 @@ export function usePerfilLicitacao(licitacaoId: number | null) {
     }
   };
 
+  const gerarResumoIA = async () => {
+    if (!perfil || perfil.resumo_ia) {
+      return;
+    }
+
+    setIsGeneratingSummary(true);
+    try {
+      const updated = await gerarResumoIALicitacao(perfil.id);
+      setPerfil((current) => (current ? { ...current, ...updated } : current));
+      setErrorMessage("");
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Nao foi possivel gerar o resumo com IA agora.",
+      );
+    } finally {
+      setIsGeneratingSummary(false);
+    }
+  };
+
   return {
     errorMessage,
+    gerarResumoIA,
+    isGeneratingSummary,
     isRemoving,
     observacoes,
     perfil,

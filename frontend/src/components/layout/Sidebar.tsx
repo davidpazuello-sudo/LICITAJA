@@ -65,12 +65,12 @@ function Sidebar() {
               to={item.to}
               className={({ isActive }) =>
                 cn(
-                  "flex items-center gap-3 rounded-2xl px-4 py-4 text-lg font-medium text-white/70 transition duration-200 hover:bg-white/8 hover:text-white",
+                  "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-white/70 transition duration-200 hover:bg-white/8 hover:text-white",
                   isActive && "bg-[#30457D] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]",
                 )
               }
             >
-              <span>{item.icon}</span>
+              <span className="shrink-0">{item.icon}</span>
               <span>{item.label}</span>
             </NavLink>
           ))}
@@ -117,4 +117,3 @@ function Sidebar() {
 }
 
 export { Sidebar };
-

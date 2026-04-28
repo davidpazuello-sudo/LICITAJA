@@ -12,13 +12,16 @@ IA_PROVIDER_KEY_PREFIX = "ia_provider_"
 
 DEFAULT_PROMPT_EXTRACAO = (
     "Voce e um especialista em licitacoes publicas brasileiras.\n"
-    "Analise o texto do edital a seguir e extraia TODOS os itens listados.\n"
+    "Analise o texto do edital a seguir e extraia APENAS os itens da licitacao.\n"
+    "Considere como item apenas produto, material, equipamento ou servico efetivamente contratado.\n"
+    "NAO extraia declaracoes, exigencias de habilitacao, clausulas juridicas, documentos, anexos administrativos, criterios de julgamento, condicoes de pagamento, obrigacoes do licitante ou textos de minuta contratual.\n"
     "Para cada item, retorne um JSON com os campos:\n"
     "- numero_item (inteiro)\n"
     "- descricao (string: descricao completa do item)\n"
     "- quantidade (numero)\n"
     "- unidade (string: unidade de medida, ex: \"unidade\", \"resma\", \"caixa\")\n"
-    "- especificacoes (array de strings: especificacoes tecnicas minimas exigidas)\n\n"
+    "- especificacoes (array de strings: especificacoes tecnicas minimas exigidas)\n"
+    "- marcas_fabricantes (array de strings: possiveis marcas ou fabricantes que produzam este item; se nao fizer sentido, retorne array vazio)\n\n"
     "Retorne APENAS um array JSON valido, sem texto adicional.\n"
     "Seja preciso e nao omita nenhum item do edital.\n\n"
     "TEXTO DO EDITAL:\n{texto_edital}"
@@ -46,8 +49,24 @@ SUPPORTED_IA_PROVIDERS = {
         "vendor": "gemini",
         "nome": "Google Gemini",
         "descricao": "Opcao do Google com suporte a resposta JSON estruturada via API Gemini.",
-        "modelo_padrao": "gemini-2.0-flash",
+        "modelo_padrao": "gemini-2.0-flash-lite",
         "api_key_env": "gemini_api_key",
+    },
+    "deepseek": {
+        "id": "deepseek",
+        "vendor": "deepseek",
+        "nome": "DeepSeek",
+        "descricao": "IA de alto custo-beneficio com suporte nativo a JSON (funciona via SDK OpenAI).",
+        "modelo_padrao": "deepseek-chat",
+        "api_key_env": "deepseek_api_key",
+    },
+    "groq": {
+        "id": "groq",
+        "vendor": "groq",
+        "nome": "Groq",
+        "descricao": "API ultra-rapida e gratuita com os modelos open-source mais potentes (ex: Llama 3.3).",
+        "modelo_padrao": "llama-3.3-70b-versatile",
+        "api_key_env": "groq_api_key",
     },
 }
 

@@ -20,6 +20,7 @@ export interface BuscaLicitacaoFilters {
 export interface BuscaLicitacaoItemType {
   numero_controle: string;
   numero_compra: string | null;
+  sub_status: string | null;
   numero_processo: string | null;
   orgao: string;
   uasg: string | null;
@@ -45,6 +46,14 @@ export interface BuscaLicitacoesResponseType {
   numero_pagina: number;
   paginas_restantes: number;
   origem: string;
+  fontes?: Array<{
+    id: string;
+    nome: string;
+    status: string;
+    total_registros: number;
+    filtros_suportados: string[];
+    erro_mensagem: string | null;
+  }>;
 }
 
 export interface LicitacaoType {
@@ -62,6 +71,7 @@ export interface LicitacaoType {
   link_edital: string | null;
   link_site: string | null;
   observacoes: string | null;
+  resumo_ia: string | null;
   status: string;
   fonte: string;
   dados_brutos: string | null;

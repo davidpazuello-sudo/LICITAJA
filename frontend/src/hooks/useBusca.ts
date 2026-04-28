@@ -11,10 +11,11 @@ import type {
 const EMPTY_RESPONSE: BuscaLicitacoesResponseType = {
   items: [],
   total_registros: 0,
-  total_paginas: 0,
+  total_paginas: 1,
   numero_pagina: 1,
   paginas_restantes: 0,
   origem: "pncp",
+  fontes: [],
 };
 
 const INITIAL_FILTERS: BuscaLicitacaoFilters = {
@@ -43,6 +44,7 @@ export function useBusca() {
   const [savingIds, setSavingIds] = useState<string[]>([]);
   const requestIdRef = useRef(0);
   const debounceReadyRef = useRef(false);
+  const skipNextEffectRef = useRef(false);
 
   const runSearch = async (nextFilters: BuscaLicitacaoFilters) => {
     const validationMessage = validateBuscaFilters(nextFilters);
@@ -89,6 +91,11 @@ export function useBusca() {
       return;
     }
 
+    if (skipNextEffectRef.current) {
+      skipNextEffectRef.current = false;
+      return;
+    }
+
     const timeoutId = window.setTimeout(() => {
       void runSearch(filters);
     }, 300);
@@ -109,7 +116,21 @@ export function useBusca() {
 
   const submitSearch = async () => {
     setHasSearched(true);
-    await runSearch({ ...filters, pagina: 1 });
+    const nextFilters = { ...filters, pagina: 1 };
+    skipNextEffectRef.current = true;
+    setFilters(nextFilters);
+    await runSearch(nextFilters);
+  };
+
+  const goToPage = async (pagina: number) => {
+    const nextPage = Math.max(1, pagina);
+    const nextFilters = { ...filters, pagina: nextPage };
+    skipNextEffectRef.current = true;
+    setFilters(nextFilters);
+    if (!hasSearched) {
+      return;
+    }
+    await runSearch(nextFilters);
   };
 
   const saveResult = async (item: BuscaLicitacaoItemType) => {
@@ -164,6 +185,7 @@ export function useBusca() {
     setFilters,
     submitSearch,
     updateFilter,
+    goToPage,
   };
 }
 

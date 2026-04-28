@@ -21,6 +21,7 @@ export async function buscarLicitacoes(
       data_inicio: filters.data_inicio,
       data_fim: filters.data_fim,
       pagina: filters.pagina ?? 1,
+      page_size: 10,
     },
   });
 }

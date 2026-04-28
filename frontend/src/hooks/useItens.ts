@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { extrairItens, listarItens, pesquisarItem, pesquisarTodosItens, uploadEdital } from "../services/itens.service";
+import {
+  exportarTabelaItens,
+  extrairItens,
+  listarItens,
+  pesquisarItem,
+  pesquisarMercado,
+  pesquisarTodosItens,
+  uploadEdital,
+} from "../services/itens.service";
 import type { ItemType } from "../types/item.types";
 import type { EditalType, LicitacaoDetailType } from "../types/licitacao.types";
 
@@ -18,6 +26,7 @@ export function useItens(params: {
   const [isUploading, setIsUploading] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isSearchingAll, setIsSearchingAll] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [searchingItemIds, setSearchingItemIds] = useState<number[]>([]);
 
   useEffect(() => {
@@ -141,6 +150,29 @@ export function useItens(params: {
     }
   };
 
+  const pesquisarMercadoPorId = async (itemId: number) => {
+    setSearchingItemIds((current) => [...current, itemId]);
+    setItems((current) =>
+      current.map((item) => (item.id === itemId ? { ...item, status_pesquisa: "pesquisando" } : item)),
+    );
+
+    try {
+      const response = await pesquisarMercado(itemId);
+      setItems((current) => current.map((item) => (item.id === itemId ? response : item)));
+      setErrorMessage("");
+      await onRefreshPerfil();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Nao foi possivel pesquisar fornecedores de mercado para este item.",
+      );
+      setItems((current) =>
+        current.map((item) => (item.id === itemId ? { ...item, status_pesquisa: "erro" } : item)),
+      );
+    } finally {
+      setSearchingItemIds((current) => current.filter((currentId) => currentId !== itemId));
+    }
+  };
+
   const pesquisarTodos = async () => {
     if (!licitacaoId) {
       return;
@@ -162,9 +194,37 @@ export function useItens(params: {
     }
   };
 
+  const exportarTabela = async () => {
+    if (!licitacaoId) {
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      const blob = await exportarTabelaItens(licitacaoId);
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `licitacao_${licitacaoId}_itens.csv`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(url);
+      setErrorMessage("");
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Nao foi possivel exportar a tabela de itens.",
+      );
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return {
     errorMessage,
+    exportarTabela,
     isExtracting,
+    isExporting,
     isSearchingAll,
     isUploading,
     items,
@@ -173,6 +233,7 @@ export function useItens(params: {
     enviarEdital,
     iniciarExtracao,
     pesquisarItemPorId,
+    pesquisarMercadoPorId,
     pesquisarTodos,
     searchingItemIds,
     status,

@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     anthropic_api_key: str = ""
     gemini_api_key: str = ""
+    deepseek_api_key: str = ""
+    groq_api_key: str = ""
     pncp_base_url: str = "https://pncp.gov.br/api/consulta/v1"
     uploads_dir: str = "uploads"
 

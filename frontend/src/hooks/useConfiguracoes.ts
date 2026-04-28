@@ -8,6 +8,8 @@ import {
   getPncpConfig,
   testarPncp,
   updateConfiguracaoIA,
+  updatePortalIntegracaoStatus,
+  updatePncpStatus,
   updatePncpUrl,
 } from "../services/configuracoes.service";
 import type {
@@ -29,6 +31,7 @@ export function usePncp() {
   const [isTesting, setIsTesting] = useState(false);
   const [testeResult, setTesteResult] = useState<PncpTesteResult | null>(null);
   const [isSavingUrl, setIsSavingUrl] = useState(false);
+  const [isTogglingStatus, setIsTogglingStatus] = useState(false);
 
   useEffect(() => {
     setStatus("loading");
@@ -72,7 +75,18 @@ export function usePncp() {
     }
   };
 
-  return { config, status, errorMessage, isTesting, testeResult, isSavingUrl, testar, salvarUrl };
+  const alternarStatus = async (nextStatus: "ativa" | "inativa") => {
+    setIsTogglingStatus(true);
+    try {
+      const updated = await updatePncpStatus(nextStatus);
+      setConfig(updated);
+      return updated;
+    } finally {
+      setIsTogglingStatus(false);
+    }
+  };
+
+  return { config, status, errorMessage, isTesting, testeResult, isSavingUrl, isTogglingStatus, testar, salvarUrl, alternarStatus };
 }
 
 export function useConfiguracaoIA() {
@@ -172,6 +186,7 @@ export function usePortalIntegracoes() {
   const [status, setStatus] = useState<LoadStatus>("idle");
   const [errorMessage, setErrorMessage] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [togglingPortalId, setTogglingPortalId] = useState<number | null>(null);
 
   useEffect(() => {
     setStatus("loading");
@@ -197,5 +212,16 @@ export function usePortalIntegracoes() {
     }
   };
 
-  return { items, status, errorMessage, isCreating, criarPortal };
+  const alternarPortal = async (portalId: number, nextStatus: "ativa" | "inativa") => {
+    setTogglingPortalId(portalId);
+    try {
+      const updated = await updatePortalIntegracaoStatus(portalId, nextStatus);
+      setItems((current) => current.map((item) => (item.id === portalId ? updated : item)));
+      return updated;
+    } finally {
+      setTogglingPortalId(null);
+    }
+  };
+
+  return { items, status, errorMessage, isCreating, togglingPortalId, criarPortal, alternarPortal };
 }

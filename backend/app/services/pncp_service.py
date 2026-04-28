@@ -1,5 +1,6 @@
 import json
 import unicodedata
+import asyncio
 from datetime import UTC, datetime, timedelta
 
 import httpx
@@ -26,7 +27,8 @@ MODALIDADE_CODES = {
     "Leilao - Presencial": 13,
 }
 
-FALLBACK_PUBLICACAO_CODES = [6, 8, 4]
+FALLBACK_PUBLICACAO_CODES = [6, 4, 12]
+MAX_TARGETED_SCAN_PAGES = 2
 
 FAMILY_KEYWORDS = {
     "bens": ["aquisicao", "fornecimento", "material", "equipamento", "bem", "bens"],
@@ -85,7 +87,6 @@ class PncpService:
         self,
         q: str | None,
         buscar_por: str | None,
-        portais: list[str],
         numero_oportunidade: str | None,
         objeto_licitacao: str | None,
         orgao: str | None,
@@ -98,16 +99,9 @@ class PncpService:
         data_inicio: str | None,
         data_fim: str | None,
         pagina: int,
+        page_size: int = 10,
     ) -> BuscaLicitacoesResponse:
-        if portais and "pncp" not in set(portais):
-            return self._build_response(
-                [],
-                total_registros=0,
-                numero_pagina=max(pagina, 1),
-                total_paginas=1,
-            )
-
-        needs_targeted_search = any([q, buscar_por, numero_oportunidade, objeto_licitacao, orgao, empresa])
+        needs_targeted_search = any([q, buscar_por, numero_oportunidade, objeto_licitacao, orgao])
 
         if needs_targeted_search:
             return await self._buscar_publicacoes_direcionadas(
@@ -115,7 +109,7 @@ class PncpService:
                 numero_oportunidade=numero_oportunidade,
                 objeto_licitacao=objeto_licitacao,
                 orgao=orgao,
-                empresa=empresa,
+                empresa=None,
                 sub_status=sub_status,
                 estado=estado,
                 modalidade=modalidade,
@@ -123,6 +117,8 @@ class PncpService:
                 familia_fornecimento=familia_fornecimento,
                 data_inicio=data_inicio,
                 data_fim=data_fim,
+                pagina=pagina,
+                page_size=page_size,
             )
 
         current_page = max(pagina, 1)
@@ -175,7 +171,7 @@ class PncpService:
             matched_items.extend(filtered)
             collected += len(data)
 
-            if len(matched_items) >= 15:
+            if len(matched_items) >= page_size:
                 break
 
             if api_page >= total_paginas:
@@ -184,7 +180,12 @@ class PncpService:
             if collected >= 400 and matched_items:
                 break
 
-        return self._build_response(matched_items[:15], total_registros=total_registros, numero_pagina=current_page, total_paginas=total_paginas)
+        return self._build_response(
+            matched_items[:page_size],
+            total_registros=total_registros,
+            numero_pagina=current_page,
+            total_paginas=total_paginas,
+        )
 
     async def _buscar_publicacoes_direcionadas(
         self,
@@ -200,41 +201,57 @@ class PncpService:
         familia_fornecimento: list[str],
         data_inicio: str | None,
         data_fim: str | None,
+        pagina: int,
+        page_size: int,
     ) -> BuscaLicitacoesResponse:
         exact_matches: dict[str, dict] = {}
         approximate_matches: dict[str, dict] = {}
         target_codes = [self._resolve_modalidade_code(modalidade)] if modalidade else FALLBACK_PUBLICACAO_CODES
+        effective_modalidade = modalidade if modalidade else None
+        codes_to_query = [value for value in target_codes if value]
+        required_count = max(pagina, 1) * page_size
+        provider_errors: list[Exception] = []
+        query_hint = self._resolve_targeted_query_hint(
+            buscar_por=buscar_por,
+            numero_oportunidade=numero_oportunidade,
+            objeto_licitacao=objeto_licitacao,
+            orgao=orgao,
+        )
 
-        for code in [value for value in target_codes if value]:
-            modalidade_nome = self._resolve_modalidade_nome_by_code(code)
-
-            for page in range(1, 2):
-                try:
-                    payload = await self._fetch_page(
-                        pagina=page,
+        for api_page in range(1, MAX_TARGETED_SCAN_PAGES + 1):
+            results = await asyncio.gather(
+                *(
+                    self._fetch_targeted_publicacao_page(
+                        code=code,
+                        pagina=api_page,
                         data_inicio=data_inicio,
                         data_fim=data_fim,
                         estado=estado,
-                        modalidade=modalidade_nome,
-                        strategy="publicacao",
-                        q=buscar_por or numero_oportunidade or objeto_licitacao,
+                        q=query_hint,
+                        tamanho_pagina=100,
                     )
-                except RuntimeError:
+                    for code in codes_to_query
+                ),
+                return_exceptions=True,
+            )
+
+            for result in results:
+                if isinstance(result, Exception):
+                    provider_errors.append(result)
                     continue
 
-                for item in payload.get("data", []):
+                for item in result.get("data", []):
                     numero_controle = item.get("numeroControlePNCP")
                     if not numero_controle:
                         continue
 
-                    effective_modalidade = modalidade if modalidade else modalidade_nome
                     matches = self._matches_filters(
                         item=item,
                         buscar_por=buscar_por,
                         numero_oportunidade=numero_oportunidade,
                         objeto_licitacao=objeto_licitacao,
                         orgao=orgao,
-                        empresa=empresa,
+                        empresa=None,
                         sub_status=sub_status,
                         estado=estado,
                         modalidade=effective_modalidade,
@@ -254,7 +271,7 @@ class PncpService:
                         numero_oportunidade=None,
                         objeto_licitacao=None,
                         orgao=orgao,
-                        empresa=empresa,
+                        empresa=None,
                         sub_status=sub_status,
                         estado=estado,
                         modalidade=effective_modalidade,
@@ -265,14 +282,62 @@ class PncpService:
                     ):
                         approximate_matches[numero_controle] = item
 
-                if len(exact_matches) >= 15:
-                    break
-
-            if len(exact_matches) >= 15:
+            if len(exact_matches) >= required_count or (not exact_matches and len(approximate_matches) >= required_count):
                 break
 
-        chosen_items = list(exact_matches.values())[:15] if exact_matches else list(approximate_matches.values())[:15]
-        return self._build_response(chosen_items, total_registros=len(chosen_items), numero_pagina=1, total_paginas=1)
+        if not exact_matches and not approximate_matches and provider_errors and len(provider_errors) >= len(codes_to_query):
+            raise RuntimeError("O PNCP demorou mais que o esperado para responder. Tente novamente.")
+
+        chosen_items = (
+            list(exact_matches.values())[:page_size]
+            if exact_matches
+            else list(approximate_matches.values())[:page_size]
+        )
+        total_registros = len(exact_matches) if exact_matches else len(approximate_matches)
+        total_paginas = max((total_registros + page_size - 1) // page_size, 1)
+        return self._build_response(
+            chosen_items,
+            total_registros=total_registros,
+            numero_pagina=max(pagina, 1),
+            total_paginas=total_paginas,
+        )
+
+    def _resolve_targeted_query_hint(
+        self,
+        *,
+        buscar_por: str | None,
+        numero_oportunidade: str | None,
+        objeto_licitacao: str | None,
+        orgao: str | None,
+    ) -> str | None:
+        for candidate in [buscar_por, numero_oportunidade, objeto_licitacao, orgao]:
+            if candidate and candidate.strip():
+                return candidate.strip()[:120]
+        return None
+
+    async def _fetch_targeted_publicacao_page(
+        self,
+        *,
+        code: int,
+        pagina: int,
+        data_inicio: str | None,
+        data_fim: str | None,
+        estado: str | None,
+        q: str | None,
+        tamanho_pagina: int,
+    ) -> dict:
+        modalidade_nome = self._resolve_modalidade_nome_by_code(code)
+        return await self._fetch_page(
+            pagina=pagina,
+            data_inicio=data_inicio,
+            data_fim=data_fim,
+            estado=estado,
+            modalidade=modalidade_nome,
+            strategy="publicacao",
+            q=q,
+            tamanho_pagina=tamanho_pagina,
+            timeout_seconds=15.0,
+        )
 
     async def _fetch_page(
         self,
@@ -283,6 +348,8 @@ class PncpService:
         modalidade: str | None,
         strategy: str,
         q: str | None = None,
+        tamanho_pagina: int | None = None,
+        timeout_seconds: float = 12.0,
     ) -> dict:
         if strategy == "publicacao":
             endpoint = "publicacao"
@@ -291,7 +358,7 @@ class PncpService:
                 "dataInicial": self._resolve_data_inicial(data_inicio),
                 "dataFinal": self._resolve_data_final(data_fim),
                 "codigoModalidadeContratacao": self._resolve_modalidade_code(modalidade),
-                "tamanhoPagina": 20 if estado else 30,
+                "tamanhoPagina": tamanho_pagina or (20 if estado else 30),
             }
             if q:
                 params["q"] = q
@@ -300,7 +367,7 @@ class PncpService:
             params = {
                 "pagina": pagina,
                 "dataFinal": self._resolve_data_final(data_fim),
-                "tamanhoPagina": 20 if estado else 50,
+                "tamanhoPagina": tamanho_pagina or (20 if estado else 50),
             }
             modalidade_code = self._resolve_modalidade_code(modalidade)
             if modalidade_code:
@@ -312,7 +379,7 @@ class PncpService:
         base_url = f"{self.settings.pncp_base_url}/contratacoes/{endpoint}"
 
         try:
-            async with httpx.AsyncClient(timeout=45.0) as client:
+            async with httpx.AsyncClient(timeout=timeout_seconds) as client:
                 response = await client.get(base_url, params=params)
                 response.raise_for_status()
                 payload = response.json()
@@ -344,7 +411,7 @@ class PncpService:
         orgao_nome = ((item.get("orgaoEntidade") or {}).get("razaoSocial")) or ""
         unidade = item.get("unidadeOrgao") or {}
         estado_sigla = (unidade.get("ufSigla") or "").upper()
-        modalidade_nome = item.get("modalidadeNome") or ""
+        modalidade_nome = self._normalize_modalidade_nome(item.get("modalidadeNome"))
         data_abertura = item.get("dataAberturaProposta") or item.get("dataPublicacaoPncp")
         item_sub_status = self._extract_sub_status(item)
         supply_type = self._infer_supply_type(item)
@@ -381,9 +448,6 @@ class PncpService:
         if orgao and self._normalize_text(orgao) not in self._normalize_text(orgao_nome):
             return False
 
-        if empresa and self._normalize_text(empresa) not in self._normalize_text(orgao_nome):
-            return False
-
         if sub_status and self._normalize_text(sub_status) not in self._normalize_text(item_sub_status):
             return False
 
@@ -401,6 +465,14 @@ class PncpService:
 
         if data_inicio or data_fim:
             if not self._is_date_within_range(data_abertura, data_inicio, data_fim):
+                return False
+
+        # Exclude licitações whose proposal period has already closed
+        data_encerramento = item.get("dataEncerramentoProposta")
+        if data_encerramento and isinstance(data_encerramento, str) and len(data_encerramento) >= 10:
+            encerramento_iso = data_encerramento[:10]
+            hoje_iso = datetime.now().strftime("%Y-%m-%d")
+            if encerramento_iso < hoje_iso:
                 return False
 
         return True
@@ -443,11 +515,12 @@ class PncpService:
         return {
             "numero_controle": item.get("numeroControlePNCP"),
             "numero_compra": self._compose_numero_compra(item),
+            "sub_status": self._extract_sub_status(item) or None,
             "numero_processo": item.get("processo"),
             "orgao": ((item.get("orgaoEntidade") or {}).get("razaoSocial")) or "Orgao nao informado",
             "uasg": unidade.get("codigoUnidade"),
             "objeto": item.get("objetoCompra") or "Objeto nao informado",
-            "modalidade": item.get("modalidadeNome"),
+            "modalidade": self._normalize_modalidade_nome(item.get("modalidadeNome")),
             "valor_estimado": item.get("valorTotalEstimado"),
             "data_abertura": item.get("dataAberturaProposta"),
             "data_encerramento": item.get("dataEncerramentoProposta"),
@@ -480,7 +553,7 @@ class PncpService:
         if data_inicio:
             return data_inicio.replace("-", "")
 
-        return (datetime.now(UTC) - timedelta(days=180)).strftime("%Y%m%d")
+        return (datetime.now(UTC) - timedelta(days=90)).strftime("%Y%m%d")
 
     def _compose_numero_compra(self, item: dict) -> str | None:
         numero_compra = item.get("numeroCompra")
@@ -522,6 +595,17 @@ class PncpService:
                 return label
 
         return None
+
+    def _normalize_modalidade_nome(self, modalidade: str | None) -> str | None:
+        if not modalidade:
+            return None
+
+        normalized = self._normalize_text(modalidade)
+        for label in MODALIDADE_CODES:
+            if self._normalize_text(label) == normalized:
+                return label
+
+        return modalidade
 
     def _extract_sub_status(self, item: dict) -> str:
         values: list[str] = []

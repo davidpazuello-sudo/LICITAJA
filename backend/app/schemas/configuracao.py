@@ -6,11 +6,16 @@ class PncpConfigRead(BaseModel):
     descricao: str
     requer_autenticacao: bool
     status: str          # "conectado" | "erro" | "nao_testado"
+    integracao_status: str
     erro_mensagem: str
 
 
 class PncpUrlUpdate(BaseModel):
     url_base: str
+
+
+class PncpStatusUpdate(BaseModel):
+    status: str
 
 
 class PncpTesteResult(BaseModel):
@@ -35,6 +40,10 @@ class PortalIntegracaoCreate(BaseModel):
     tipo_auth: str = "none"
     credencial: str = ""
     status: str = "ativa"
+
+
+class PortalIntegracaoStatusUpdate(BaseModel):
+    status: str
 
 
 class PortalIntegracoesListRead(BaseModel):

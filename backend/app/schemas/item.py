@@ -9,6 +9,7 @@ class ItemBase(BaseModel):
     quantidade: float | None = None
     unidade: str | None = None
     especificacoes: str | None = None
+    marcas_fabricantes: str | None = None
     status_pesquisa: str = "aguardando"
     preco_medio: float | None = None
 

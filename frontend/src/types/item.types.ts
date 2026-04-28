@@ -9,6 +9,7 @@ export interface ItemType {
   quantidade: number | null;
   unidade: string | null;
   especificacoes: string | null;
+  marcas_fabricantes: string | null;
   status_pesquisa: string;
   preco_medio: number | null;
   created_at: string;

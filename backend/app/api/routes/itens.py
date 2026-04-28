@@ -1,6 +1,9 @@
+import csv
 from datetime import UTC, datetime
+from io import StringIO
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
@@ -63,6 +66,60 @@ async def listar_itens_licitacao(
     return ItemListResponse(items=[ItemRead.model_validate(item) for item in items])
 
 
+@router.get("/licitacoes/{licitacao_id}/itens/exportar")
+async def exportar_tabela_itens(
+    licitacao_id: int,
+    db: Session = Depends(get_db_session),
+) -> StreamingResponse:
+    licitacao = db.get(LicitacaoModel, licitacao_id)
+    if licitacao is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Licitacao nao encontrada.")
+
+    items = db.scalars(
+        select(ItemModel)
+        .where(ItemModel.licitacao_id == licitacao_id)
+        .order_by(ItemModel.numero_item.asc(), ItemModel.id.asc()),
+    ).all()
+    if not items:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nao ha itens extraidos para exportar.")
+
+    csv_buffer = StringIO()
+    writer = csv.writer(csv_buffer, delimiter=";")
+    writer.writerow(
+        [
+            "numero_item",
+            "nome_simplificado",
+            "tipo",
+            "quantidade",
+            "descricao",
+            "preco_unitario",
+            "preco_total",
+        ]
+    )
+
+    for item in items:
+        preco_unitario = item.preco_medio
+        quantidade = item.quantidade
+        preco_total = preco_unitario * quantidade if preco_unitario is not None and quantidade is not None else None
+
+        writer.writerow(
+            [
+                item.numero_item,
+                _nome_simplificado_item(item.descricao),
+                _tipo_item(item.descricao),
+                _format_number_csv(quantidade),
+                item.descricao,
+                _format_number_csv(preco_unitario),
+                _format_number_csv(preco_total),
+            ]
+        )
+
+    csv_buffer.seek(0)
+    nome_arquivo = f"licitacao_{licitacao_id}_itens.csv"
+    headers = {"Content-Disposition": f'attachment; filename="{nome_arquivo}"'}
+    return StreamingResponse(iter([csv_buffer.getvalue()]), media_type="text/csv; charset=utf-8", headers=headers)
+
+
 @router.get("/itens/{item_id}", response_model=ItemRead)
 async def obter_item(
     item_id: int,
@@ -89,11 +146,29 @@ async def extrair_itens_licitacao(
         .where(EditalModel.licitacao_id == licitacao_id)
         .order_by(EditalModel.created_at.desc(), EditalModel.id.desc()),
     )
+    service = IaService(db)
     if edital is None or not edital.arquivo_path:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Envie um edital em PDF antes de iniciar a extracao.",
+        if not licitacao.link_edital:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Esta licitacao nao possui edital principal disponivel no portal e tambem nao recebeu upload manual.",
+            )
+
+        try:
+            arquivo_path, arquivo_nome = await service.baixar_edital_principal(licitacao)
+        except ExtracaoItensError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+        edital = EditalModel(
+            licitacao_id=licitacao_id,
+            arquivo_nome=arquivo_nome,
+            arquivo_path=str(arquivo_path),
+            status_extracao="pendente",
+            erro_mensagem=None,
         )
+        db.add(edital)
+        db.commit()
+        db.refresh(edital)
 
     edital.status_extracao = "processando"
     edital.erro_mensagem = None
@@ -102,7 +177,6 @@ async def extrair_itens_licitacao(
     db.add(licitacao)
     db.commit()
 
-    service = IaService(db)
     try:
         extraidos = await service.extrair_itens_do_edital(edital.arquivo_path)
     except ExtracaoItensError as exc:
@@ -125,6 +199,7 @@ async def extrair_itens_licitacao(
             quantidade=item_data.quantidade,
             unidade=item_data.unidade,
             especificacoes=item_data.especificacoes_json(),
+            marcas_fabricantes=item_data.marcas_fabricantes_json(),
             status_pesquisa="aguardando",
             preco_medio=None,
         )
@@ -172,6 +247,10 @@ async def pesquisar_item(
             CotacaoModel(
                 item_id=item.id,
                 fornecedor_nome=quote.fornecedor_nome,
+                fornecedor_tipo=quote.fonte_nome if quote.preco_unitario is None and quote.fonte_nome in {"Industria", "Atacado", "Distribuidor", "Varejo"} else None,
+                fornecedor_estado=None,
+                fornecedor_cidade=None,
+                evidencia_item=quote.descricao_referencia or None,
                 preco_unitario=quote.preco_unitario,
                 fonte_url=quote.fonte_url,
                 fonte_nome=quote.fonte_nome,
@@ -187,6 +266,56 @@ async def pesquisar_item(
 
     _atualizar_status_licitacao_pesquisa(db, licitacao.id)
     db.refresh(item)
+    return ItemRead.model_validate(item)
+
+
+@router.post("/itens/{item_id}/pesquisar-mercado", response_model=ItemRead)
+async def pesquisar_item_mercado(
+    item_id: int,
+    db: Session = Depends(get_db_session),
+) -> ItemRead:
+    item = db.get(ItemModel, item_id)
+    if item is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item nao encontrado.")
+
+    licitacao = db.get(LicitacaoModel, item.licitacao_id)
+    if licitacao is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Licitacao nao encontrada.")
+
+    item.status_pesquisa = "pesquisando"
+    db.add(item)
+    db.commit()
+
+    service = PesquisaService()
+    # Chama o novo metodo de mercado que usa IA/Busca para achar industrias e atacados
+    resultado = await service.pesquisar_fornecedores_mercado(item=item, licitacao=licitacao)
+
+    db.execute(delete(CotacaoModel).where(CotacaoModel.item_id == item.id))
+    db.commit()
+
+    for quote in resultado.cotacoes:
+        db.add(
+            CotacaoModel(
+                item_id=item.id,
+                fornecedor_nome=quote.fornecedor_nome,
+                fornecedor_tipo=getattr(quote, "fornecedor_tipo", None),
+                fornecedor_estado=getattr(quote, "fornecedor_estado", None),
+                fornecedor_cidade=getattr(quote, "fornecedor_cidade", None),
+                evidencia_item=quote.descricao_referencia or None,
+                preco_unitario=quote.preco_unitario,
+                fonte_url=quote.fonte_url,
+                fonte_nome=quote.fonte_nome,
+                data_cotacao=quote.data_cotacao or datetime.now(UTC).strftime("%Y-%m-%d"),
+            ),
+        )
+
+    item.status_pesquisa = resultado.status_pesquisa
+    item.preco_medio = resultado.preco_medio
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+
+    _atualizar_status_licitacao_pesquisa(db, licitacao.id)
     return ItemRead.model_validate(item)
 
 
@@ -258,3 +387,56 @@ def _atualizar_status_licitacao_pesquisa(db: Session, licitacao_id: int) -> None
         licitacao.status = "fornecedores_encontrados"
         db.add(licitacao)
         db.commit()
+
+
+def _nome_simplificado_item(descricao: str) -> str:
+    texto = " ".join((descricao or "").replace("\n", " ").split())
+    if not texto:
+        return "Item sem descricao"
+
+    primeira_parte = None
+    for separador in [",", ";", " - ", " — ", ": "]:
+        if separador in texto:
+            primeira_parte = texto.split(separador, 1)[0].strip(" .,-")
+            break
+
+    base = primeira_parte or texto
+    palavras = base.split()
+    if len(palavras) > 10:
+        base = " ".join(palavras[:10]).strip(" .,-")
+
+    return base or texto[:80]
+
+
+def _tipo_item(descricao: str) -> str:
+    texto = (descricao or "").lower()
+    service_keywords = [
+        "servico",
+        "serviços",
+        "prestacao",
+        "prestação",
+        "manutencao",
+        "manutenção",
+        "locacao",
+        "locação",
+        "consultoria",
+        "instalacao",
+        "instalação",
+        "obra",
+        "engenharia",
+        "limpeza",
+        "vigilancia",
+        "vigilância",
+        "transporte",
+    ]
+    if any(keyword in texto for keyword in service_keywords):
+        return "Servico"
+    return "Produto"
+
+
+def _format_number_csv(value: float | None) -> str:
+    if value is None:
+        return ""
+    if float(value).is_integer():
+        return str(int(value))
+    return f"{value:.2f}".replace(".", ",")

@@ -8,6 +8,8 @@ function TabelaFornecedores({ cotacoes }: { cotacoes: CotacaoType[] }) {
         <thead className="bg-panel text-left text-slate">
           <tr>
             <th className="px-4 py-3 font-semibold">Fornecedor</th>
+            <th className="px-4 py-3 font-semibold">Perfil</th>
+            <th className="px-4 py-3 font-semibold">UF</th>
             <th className="px-4 py-3 font-semibold">Preco unitario</th>
             <th className="px-4 py-3 font-semibold">Fonte</th>
           </tr>
@@ -15,7 +17,25 @@ function TabelaFornecedores({ cotacoes }: { cotacoes: CotacaoType[] }) {
         <tbody className="divide-y divide-line bg-white">
           {cotacoes.map((cotacao) => (
             <tr key={cotacao.id}>
-              <td className="px-4 py-3 text-ink">{cotacao.fornecedor_nome}</td>
+              <td className="px-4 py-3 text-ink">
+                <div className="space-y-1">
+                  <p className="font-medium text-ink">{cotacao.fornecedor_nome}</p>
+                  {cotacao.evidencia_item ? (
+                    <p className="max-w-xl text-xs leading-5 text-slate">{cotacao.evidencia_item}</p>
+                  ) : null}
+                </div>
+              </td>
+              <td className="px-4 py-3 text-ink">
+                <div className="space-y-1 text-xs text-slate">
+                  <p className="text-sm font-medium text-ink">{cotacao.fornecedor_tipo ?? cotacao.fonte_nome ?? "Fornecedor"}</p>
+                  {cotacao.fornecedor_cidade ? (
+                    <p>{cotacao.fornecedor_cidade}</p>
+                  ) : null}
+                </div>
+              </td>
+              <td className="px-4 py-3 text-sm text-ink">
+                {cotacao.fornecedor_estado ?? <span className="text-slate">—</span>}
+              </td>
               <td className="px-4 py-3 text-ink">
                 {cotacao.preco_unitario !== null ? formatCurrency(cotacao.preco_unitario) : "Nao informado"}
               </td>

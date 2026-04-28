@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 import unicodedata
 
 from app.core.database import get_db_session
+from app.models.chat_message import ChatMessageModel
 from app.models.licitacao import LicitacaoModel
+from app.schemas.chat import ChatConversationResponse, ChatMessageCreate, ChatMessageRead
 from app.schemas.licitacao import (
     LicitacaoCreate,
     LicitacaoDetail,
@@ -13,6 +15,7 @@ from app.schemas.licitacao import (
     LicitacoesListResponse,
     LicitacaoUpdate,
 )
+from app.services.ia_service import ExtracaoItensError, IaService
 
 router = APIRouter(tags=["licitacoes"])
 
@@ -96,6 +99,25 @@ async def obter_licitacao(
     return LicitacaoDetail.model_validate(licitacao)
 
 
+@router.get("/licitacoes/{licitacao_id}/chat", response_model=ChatConversationResponse)
+async def listar_chat_licitacao(
+    licitacao_id: int,
+    db: Session = Depends(get_db_session),
+) -> ChatConversationResponse:
+    licitacao = db.get(LicitacaoModel, licitacao_id)
+
+    if licitacao is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Licitacao nao encontrada.")
+
+    messages = db.scalars(
+        select(ChatMessageModel)
+        .where(ChatMessageModel.licitacao_id == licitacao_id)
+        .order_by(ChatMessageModel.created_at.asc(), ChatMessageModel.id.asc()),
+    ).all()
+
+    return ChatConversationResponse(messages=[ChatMessageRead.model_validate(message) for message in messages])
+
+
 @router.patch("/licitacoes/{licitacao_id}", response_model=LicitacaoRead)
 async def atualizar_licitacao(
     licitacao_id: int,
@@ -116,6 +138,89 @@ async def atualizar_licitacao(
     db.commit()
     db.refresh(licitacao)
     return LicitacaoRead.model_validate(licitacao)
+
+
+@router.post("/licitacoes/{licitacao_id}/resumo-ia", response_model=LicitacaoRead)
+async def gerar_resumo_ia_licitacao(
+    licitacao_id: int,
+    db: Session = Depends(get_db_session),
+) -> LicitacaoRead:
+    licitacao = db.get(LicitacaoModel, licitacao_id)
+
+    if licitacao is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Licitacao nao encontrada.")
+
+    if licitacao.resumo_ia:
+        return LicitacaoRead.model_validate(licitacao)
+
+    service = IaService(db)
+    try:
+        resumo = await service.gerar_resumo_licitacao(licitacao)
+    except ExtracaoItensError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    licitacao.resumo_ia = resumo
+    db.add(licitacao)
+    db.commit()
+    db.refresh(licitacao)
+    return LicitacaoRead.model_validate(licitacao)
+
+
+@router.post("/licitacoes/{licitacao_id}/chat", response_model=ChatConversationResponse)
+async def enviar_mensagem_chat_licitacao(
+    licitacao_id: int,
+    payload: ChatMessageCreate,
+    db: Session = Depends(get_db_session),
+) -> ChatConversationResponse:
+    licitacao = db.scalar(
+        select(LicitacaoModel)
+        .options(selectinload(LicitacaoModel.itens), selectinload(LicitacaoModel.editais))
+        .where(LicitacaoModel.id == licitacao_id),
+    )
+
+    if licitacao is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Licitacao nao encontrada.")
+
+    existing_messages = db.scalars(
+        select(ChatMessageModel)
+        .where(ChatMessageModel.licitacao_id == licitacao_id)
+        .order_by(ChatMessageModel.created_at.asc(), ChatMessageModel.id.asc()),
+    ).all()
+
+    user_message = ChatMessageModel(
+        licitacao_id=licitacao_id,
+        role="user",
+        content=payload.message.strip(),
+    )
+    db.add(user_message)
+    db.commit()
+    db.refresh(user_message)
+
+    service = IaService(db)
+    try:
+        resposta = await service.responder_chat_licitacao(
+            licitacao,
+            [(message.role, message.content) for message in existing_messages],
+            payload.message.strip(),
+        )
+    except ExtracaoItensError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    assistant_message = ChatMessageModel(
+        licitacao_id=licitacao_id,
+        role="assistant",
+        content=resposta,
+    )
+    db.add(assistant_message)
+    db.commit()
+    db.refresh(assistant_message)
+
+    all_messages = db.scalars(
+        select(ChatMessageModel)
+        .where(ChatMessageModel.licitacao_id == licitacao_id)
+        .order_by(ChatMessageModel.created_at.asc(), ChatMessageModel.id.asc()),
+    ).all()
+    return ChatConversationResponse(messages=[ChatMessageRead.model_validate(message) for message in all_messages])
 
 
 @router.delete("/licitacoes/{licitacao_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -9,6 +9,45 @@ import { Modal } from "../components/ui/Modal";
 import { Spinner } from "../components/ui/Spinner";
 import { Tabs } from "../components/ui/Tabs";
 
+// Modelos predefinidos por provedor de IA.
+// Adicione novos modelos aqui conforme forem lançados.
+const MODELOS_POR_PROVIDER: Record<string, Array<{ value: string; label: string }>> = {
+  openai: [
+    { value: "gpt-4o", label: "GPT-4o" },
+    { value: "gpt-4o-mini", label: "GPT-4o mini" },
+    { value: "gpt-4.1", label: "GPT-4.1" },
+    { value: "gpt-4.1-mini", label: "GPT-4.1 mini" },
+    { value: "gpt-4.1-nano", label: "GPT-4.1 nano" },
+    { value: "o3", label: "o3" },
+    { value: "o4-mini", label: "o4-mini" },
+  ],
+  anthropic: [
+    { value: "claude-3-5-sonnet-latest", label: "Claude 3.5 Sonnet" },
+    { value: "claude-3-5-haiku-latest", label: "Claude 3.5 Haiku" },
+    { value: "claude-3-7-sonnet-latest", label: "Claude 3.7 Sonnet" },
+    { value: "claude-opus-4-5", label: "Claude Opus 4.5" },
+  ],
+  gemini: [
+    { value: "gemini-2.5-flash-preview-04-17", label: "Gemini 2.5 Flash (preview)" },
+    { value: "gemini-2.5-pro-preview-03-25", label: "Gemini 2.5 Pro (preview)" },
+    { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
+    { value: "gemini-2.0-flash-lite", label: "Gemini 2.0 Flash Lite" },
+    { value: "gemini-1.5-pro", label: "Gemini 1.5 Pro" },
+    { value: "gemini-1.5-flash", label: "Gemini 1.5 Flash" },
+  ],
+  deepseek: [
+    { value: "deepseek-chat", label: "DeepSeek Chat (V3)" },
+    { value: "deepseek-reasoner", label: "DeepSeek Reasoner (R1)" },
+  ],
+  groq: [
+    { value: "llama-3.3-70b-versatile", label: "Llama 3.3 70B (Versatile)" },
+    { value: "llama-3.1-8b-instant", label: "Llama 3.1 8B (Instant)" },
+    { value: "mixtral-8x7b-32768", label: "Mixtral 8x7B" },
+  ],
+};
+
+const MODELO_PERSONALIZADO = "__personalizado__";
+
 const configTabs = [
   { id: "portais", label: "Portais de Licitacao" },
   { id: "ia", label: "Inteligencia Artificial" },
@@ -88,6 +127,7 @@ function PlusIcon() {
 const portalAuthOptions: Array<{ value: PortalIntegracaoCreateInput["tipo_auth"]; label: string }> = [
   { value: "none", label: "Sem autenticacao" },
   { value: "token", label: "Token / API Key" },
+  { value: "x-api-key", label: "Header X-API-KEY" },
   { value: "basic", label: "Usuario e senha" },
 ];
 
@@ -96,7 +136,48 @@ const portalStatusOptions: Array<{ value: PortalIntegracaoCreateInput["status"];
   { value: "inativa", label: "Inativa" },
 ];
 
-function PortalCard({ portal }: { portal: PortalIntegracaoType }) {
+function PortalStatusSwitch(props: {
+  checked: boolean;
+  isLoading?: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  const { checked, isLoading = false, onChange } = props;
+
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={checked ? "Desativar integracao" : "Ativar integracao"}
+      disabled={isLoading}
+      onClick={(event) => {
+        event.stopPropagation();
+        onChange(!checked);
+      }}
+      className={`relative inline-flex h-8 w-[68px] shrink-0 items-center rounded-full border transition ${
+        checked ? "border-emerald-400 bg-emerald-400" : "border-rose-400 bg-rose-500"
+      } ${isLoading ? "cursor-wait opacity-70" : "hover:opacity-90"}`}
+    >
+      <span
+        className={`absolute flex h-7 w-7 items-center justify-center rounded-full bg-white text-sm shadow transition-transform ${
+          checked ? "translate-x-[38px] text-emerald-500" : "translate-x-[2px] text-rose-500"
+        }`}
+      >
+        {checked ? "✓" : "×"}
+      </span>
+    </button>
+  );
+}
+
+function PortalCard({
+  portal,
+  isToggling,
+  onToggleStatus,
+}: {
+  portal: PortalIntegracaoType;
+  isToggling: boolean;
+  onToggleStatus: (portalId: number, nextStatus: "ativa" | "inativa") => Promise<void>;
+}) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -123,6 +204,11 @@ function PortalCard({ portal }: { portal: PortalIntegracaoType }) {
           </div>
 
           <div className="flex items-center gap-3">
+            <PortalStatusSwitch
+              checked={portal.status === "ativa"}
+              isLoading={isToggling}
+              onChange={(checked) => onToggleStatus(portal.id, checked ? "ativa" : "inativa")}
+            />
             <Badge variant={portal.status === "ativa" ? "green" : "slate"}>
               {portal.status === "ativa" ? "Ativo" : "Inativo"}
             </Badge>
@@ -141,7 +227,7 @@ function PortalCard({ portal }: { portal: PortalIntegracaoType }) {
               <p className="mt-2 text-sm text-ink">
                 {portal.tipo_auth === "none"
                   ? "Sem autenticacao"
-                  : portal.tipo_auth === "token"
+                  : portal.tipo_auth === "token" || portal.tipo_auth === "api_key" || portal.tipo_auth === "x-api-key"
                     ? "Token / API Key"
                     : "Usuario e senha"}
               </p>
@@ -157,13 +243,15 @@ function PortalCard({ portal }: { portal: PortalIntegracaoType }) {
 }
 
 function TabPortais() {
-  const { config, status, errorMessage, isTesting, testeResult, isSavingUrl, testar, salvarUrl } = usePncp();
+  const { config, status, errorMessage, isTesting, testeResult, isSavingUrl, isTogglingStatus, testar, salvarUrl, alternarStatus } = usePncp();
   const {
     items: portalItems,
     status: portalStatus,
     errorMessage: portalErrorMessage,
     isCreating,
+    togglingPortalId,
     criarPortal,
+    alternarPortal,
   } = usePortalIntegracoes();
   const [editingUrl, setEditingUrl] = useState(false);
   const [urlInput, setUrlInput] = useState("");
@@ -224,6 +312,24 @@ function TabPortais() {
       setShowCreateModal(false);
     } catch (err) {
       setCreateErrorMessage(err instanceof Error ? err.message : "Nao foi possivel criar a integracao.");
+    }
+  };
+
+  const handleTogglePncp = async (nextStatus: "ativa" | "inativa") => {
+    setCreateErrorMessage("");
+    try {
+      await alternarStatus(nextStatus);
+    } catch (err) {
+      setCreateErrorMessage(err instanceof Error ? err.message : "Nao foi possivel atualizar o PNCP.");
+    }
+  };
+
+  const handleTogglePortal = async (portalId: number, nextStatus: "ativa" | "inativa") => {
+    setCreateErrorMessage("");
+    try {
+      await alternarPortal(portalId, nextStatus);
+    } catch (err) {
+      setCreateErrorMessage(err instanceof Error ? err.message : "Nao foi possivel atualizar a integracao.");
     }
   };
 
@@ -290,7 +396,14 @@ function TabPortais() {
             </div>
 
             <div className="flex items-center gap-3">
-              <PortalActiveBadge status={config.status} />
+              <PortalStatusSwitch
+                checked={config.integracao_status === "ativa"}
+                isLoading={isTogglingStatus}
+                onChange={(checked) => handleTogglePncp(checked ? "ativa" : "inativa")}
+              />
+              <Badge variant={config.integracao_status === "ativa" ? "green" : "slate"}>
+                {config.integracao_status === "ativa" ? "Ativo" : "Inativo"}
+              </Badge>
               <ChevronIcon isOpen={showPortalDetails} />
             </div>
           </button>
@@ -407,7 +520,12 @@ function TabPortais() {
       {portalItems.length ? (
         <div className="space-y-4">
           {portalItems.map((portal) => (
-            <PortalCard key={portal.id} portal={portal} />
+            <PortalCard
+              key={portal.id}
+              portal={portal}
+              isToggling={togglingPortalId === portal.id}
+              onToggleStatus={handleTogglePortal}
+            />
           ))}
         </div>
       ) : null}
@@ -529,14 +647,22 @@ function IAProviderCard({
   onActivate,
   onPromptChange,
 }: IAProviderCardProps) {
+  const modelosPredefinidos = MODELOS_POR_PROVIDER[provider.id] ?? [];
+  const isModeloPredefinido = modelosPredefinidos.some((m) => m.value === provider.modelo);
+
+  const [selectValue, setSelectValue] = useState(
+    isModeloPredefinido ? provider.modelo : modelosPredefinidos.length > 0 ? MODELO_PERSONALIZADO : provider.modelo,
+  );
   const [modelo, setModelo] = useState(provider.modelo);
   const [apiKey, setApiKey] = useState("");
   const [showKey, setShowKey] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
+    const predefinido = modelosPredefinidos.some((m) => m.value === provider.modelo);
+    setSelectValue(predefinido ? provider.modelo : modelosPredefinidos.length > 0 ? MODELO_PERSONALIZADO : provider.modelo);
     setModelo(provider.modelo);
-  }, [provider.modelo]);
+  }, [provider.modelo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <Card className={`p-6 ${provider.ativo ? "border-accent/30 shadow-soft" : ""}`}>
@@ -580,14 +706,44 @@ function IAProviderCard({
             </div>
 
             <div className="grid gap-4 lg:grid-cols-2">
-              <label className="block">
+              <div className="block">
                 <span className="mb-1.5 block text-sm font-semibold text-ink">Modelo</span>
-                <input
-                  value={modelo}
-                  onChange={(event) => setModelo(event.target.value)}
-                  className="h-12 w-full rounded-2xl border border-line bg-panel px-4 text-sm text-ink outline-none transition focus:border-accent/40 focus:ring-4 focus:ring-accent/10"
-                />
-              </label>
+                {modelosPredefinidos.length > 0 ? (
+                  <>
+                    <select
+                      value={selectValue}
+                      onChange={(event) => {
+                        const val = event.target.value;
+                        setSelectValue(val);
+                        if (val !== MODELO_PERSONALIZADO) setModelo(val);
+                        else setModelo("");
+                      }}
+                      className="h-12 w-full rounded-2xl border border-line bg-panel px-4 text-sm text-ink outline-none transition focus:border-accent/40 focus:ring-4 focus:ring-accent/10"
+                    >
+                      {modelosPredefinidos.map((m) => (
+                        <option key={m.value} value={m.value}>
+                          {m.label}
+                        </option>
+                      ))}
+                      <option value={MODELO_PERSONALIZADO}>Personalizado...</option>
+                    </select>
+                    {selectValue === MODELO_PERSONALIZADO ? (
+                      <input
+                        value={modelo}
+                        onChange={(event) => setModelo(event.target.value)}
+                        placeholder="Digite o identificador do modelo"
+                        className="mt-2 h-12 w-full rounded-2xl border border-line bg-panel px-4 text-sm text-ink outline-none transition focus:border-accent/40 focus:ring-4 focus:ring-accent/10"
+                      />
+                    ) : null}
+                  </>
+                ) : (
+                  <input
+                    value={modelo}
+                    onChange={(event) => setModelo(event.target.value)}
+                    className="h-12 w-full rounded-2xl border border-line bg-panel px-4 text-sm text-ink outline-none transition focus:border-accent/40 focus:ring-4 focus:ring-accent/10"
+                  />
+                )}
+              </div>
 
               <label className="block">
                 <span className="mb-1.5 block text-sm font-semibold text-ink">API Key</span>

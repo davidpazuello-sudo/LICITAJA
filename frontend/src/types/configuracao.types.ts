@@ -3,6 +3,7 @@ export interface PncpConfig {
   descricao: string;
   requer_autenticacao: boolean;
   status: "conectado" | "erro" | "nao_testado";
+  integracao_status: "ativa" | "inativa";
   erro_mensagem: string;
 }
 
@@ -16,7 +17,7 @@ export interface PortalIntegracaoType {
   id: number;
   nome: string;
   url_base: string;
-  tipo_auth: "none" | "token" | "basic" | string;
+  tipo_auth: "none" | "token" | "basic" | "api_key" | "x-api-key" | string;
   credencial_masked: string;
   status: "ativa" | "inativa" | string;
   criado_em: string;
@@ -29,7 +30,7 @@ export interface PortalIntegracoesListType {
 export interface PortalIntegracaoCreateInput {
   nome: string;
   url_base: string;
-  tipo_auth: "none" | "token" | "basic";
+  tipo_auth: "none" | "token" | "basic" | "api_key" | "x-api-key";
   credencial: string;
   status: "ativa" | "inativa";
 }

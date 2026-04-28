@@ -13,6 +13,7 @@ interface ResultadoBuscaProps {
 
 function ResultadoBusca({ item, isSaving, onSave }: ResultadoBuscaProps) {
   const badgeVariant = item.modalidade ? MODALIDADE_BADGE_VARIANT[item.modalidade] ?? "slate" : "slate";
+  const subStatusVariant = getSubStatusVariant(item.sub_status);
 
   return (
     <Card className="overflow-hidden">
@@ -20,7 +21,8 @@ function ResultadoBusca({ item, isSaving, onSave }: ResultadoBuscaProps) {
         <div className="space-y-5">
           <div className="flex flex-wrap items-center gap-3">
             <Badge variant={badgeVariant}>{item.modalidade ?? "Modalidade nao informada"}</Badge>
-            {item.numero_compra ? <Badge variant="slate">{item.numero_compra}</Badge> : null}
+            {item.sub_status ? <Badge variant={subStatusVariant}>{item.sub_status}</Badge> : null}
+            <Badge variant="slate">Portal: {item.fonte}</Badge>
             <span className="text-sm font-medium text-slate">{item.orgao}</span>
           </div>
 
@@ -62,6 +64,24 @@ function ResultadoBusca({ item, isSaving, onSave }: ResultadoBuscaProps) {
       </div>
     </Card>
   );
+}
+
+function getSubStatusVariant(subStatus: string | null): "blue" | "green" | "amber" | "slate" {
+  const normalized = (subStatus ?? "").toLowerCase();
+
+  if (normalized.includes("aberta") || normalized.includes("aberto") || normalized.includes("andamento")) {
+    return "green";
+  }
+
+  if (normalized.includes("suspensa") || normalized.includes("revogada")) {
+    return "amber";
+  }
+
+  if (normalized.includes("cancelada") || normalized.includes("concluida") || normalized.includes("encerrada")) {
+    return "slate";
+  }
+
+  return "blue";
 }
 
 export { ResultadoBusca };

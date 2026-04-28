@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import type { LicitacaoType } from "../../../types/licitacao.types";
 import { cn } from "../../../utils/cn";
@@ -84,13 +84,17 @@ function getDeadlineMeta(dataAbertura: string | null) {
 }
 
 function CardLicitacao({ licitacao, isRemoving = false, onRemove }: CardLicitacaoProps) {
+  const navigate = useNavigate();
   const modalidadeSigla = getModalidadeSigla(licitacao.modalidade);
   const statusMeta = STATUS_META[licitacao.status] ?? STATUS_META.nova;
   const deadlineMeta = getDeadlineMeta(licitacao.data_abertura);
   const local = [licitacao.cidade, licitacao.estado].filter(Boolean).join(" - ");
 
   return (
-    <Card className="relative overflow-hidden">
+    <Card
+      className="relative overflow-hidden transition hover:border-accent/20 hover:shadow-card"
+      onClick={() => navigate(`/licitacoes/${licitacao.id}`)}
+    >
       <div className={cn("absolute inset-y-5 left-0 w-1 rounded-r-full", deadlineMeta.stripeClass)} />
       <div className="flex flex-col gap-5 p-6 lg:flex-row lg:items-center lg:justify-between lg:pl-10">
         <div className="space-y-3">
@@ -125,7 +129,15 @@ function CardLicitacao({ licitacao, isRemoving = false, onRemove }: CardLicitaca
           </Link>
 
           {onRemove ? (
-            <Button variant="outline" size="sm" isLoading={isRemoving} onClick={() => onRemove(licitacao.id)}>
+            <Button
+              variant="outline"
+              size="sm"
+              isLoading={isRemoving}
+              onClick={(event) => {
+                event.stopPropagation();
+                void onRemove(licitacao.id);
+              }}
+            >
               Remover
             </Button>
           ) : null}

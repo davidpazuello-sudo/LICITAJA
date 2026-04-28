@@ -12,7 +12,9 @@ from app.schemas.configuracao import (
     PortalIntegracaoCreate,
     PortalIntegracoesListRead,
     PortalIntegracaoRead,
+    PortalIntegracaoStatusUpdate,
     PncpConfigRead,
+    PncpStatusUpdate,
     PncpTesteResult,
     PncpUrlUpdate,
 )
@@ -74,6 +76,27 @@ def _set_pncp_url(db: Session, url_base: str) -> None:
         db.add(ConfiguracaoModel(chave="pncp_base_url", valor=url_base))
 
 
+def _get_pncp_integracao_status(db: Session) -> str:
+    from app.models.configuracao import ConfiguracaoModel
+    from sqlalchemy import select
+
+    row = db.scalar(select(ConfiguracaoModel).where(ConfiguracaoModel.chave == "pncp_integracao_status"))
+    if row and row.valor in {"ativa", "inativa"}:
+        return row.valor
+    return "ativa"
+
+
+def _set_pncp_integracao_status(db: Session, status: str) -> None:
+    from app.models.configuracao import ConfiguracaoModel
+    from sqlalchemy import select
+
+    row = db.scalar(select(ConfiguracaoModel).where(ConfiguracaoModel.chave == "pncp_integracao_status"))
+    if row:
+        row.valor = status
+    else:
+        db.add(ConfiguracaoModel(chave="pncp_integracao_status", valor=status))
+
+
 def _mask_credencial(value: str) -> str:
     if not value:
         return ""
@@ -102,6 +125,7 @@ def get_pncp_config(db: Session = Depends(get_db_session)) -> PncpConfigRead:
         descricao=PNCP_DESCRICAO,
         requer_autenticacao=False,
         status=status,
+        integracao_status=_get_pncp_integracao_status(db),
         erro_mensagem=erro,
     )
 
@@ -110,6 +134,17 @@ def get_pncp_config(db: Session = Depends(get_db_session)) -> PncpConfigRead:
 def update_pncp_url(body: PncpUrlUpdate, db: Session = Depends(get_db_session)) -> PncpConfigRead:
     _set_pncp_url(db, body.url_base.rstrip("/"))
     _set_pncp_status_payload(db, status="nao_testado", erro="")
+    db.commit()
+    return get_pncp_config(db)
+
+
+@router.patch("/pncp/status", response_model=PncpConfigRead)
+def update_pncp_status(body: PncpStatusUpdate, db: Session = Depends(get_db_session)) -> PncpConfigRead:
+    status = body.status.strip().lower()
+    if status not in {"ativa", "inativa"}:
+        raise HTTPException(status_code=400, detail="Status invalido.")
+
+    _set_pncp_integracao_status(db, status)
     db.commit()
     return get_pncp_config(db)
 
@@ -213,7 +248,7 @@ def create_portal(body: PortalIntegracaoCreate, db: Session = Depends(get_db_ses
     if not url_base:
         raise HTTPException(status_code=400, detail="Informe a URL base do portal.")
 
-    if tipo_auth not in {"none", "token", "basic"}:
+    if tipo_auth not in {"none", "token", "basic", "api_key", "x-api-key"}:
         raise HTTPException(status_code=400, detail="Tipo de autenticacao invalido.")
 
     if status not in {"ativa", "inativa"}:
@@ -231,4 +266,28 @@ def create_portal(body: PortalIntegracaoCreate, db: Session = Depends(get_db_ses
     db.commit()
     db.refresh(portal)
 
+    return _serialize_portal_integracao(portal)
+
+
+@router.patch("/portais/{portal_id}/status", response_model=PortalIntegracaoRead)
+def update_portal_status(
+    portal_id: int,
+    body: PortalIntegracaoStatusUpdate,
+    db: Session = Depends(get_db_session),
+) -> PortalIntegracaoRead:
+    from sqlalchemy import select
+
+    from app.models.portal_integracao import PortalIntegracaoModel
+
+    status = body.status.strip().lower()
+    if status not in {"ativa", "inativa"}:
+        raise HTTPException(status_code=400, detail="Status invalido.")
+
+    portal = db.scalar(select(PortalIntegracaoModel).where(PortalIntegracaoModel.id == portal_id))
+    if portal is None:
+        raise HTTPException(status_code=404, detail="Integracao nao encontrada.")
+
+    portal.status = status
+    db.commit()
+    db.refresh(portal)
     return _serialize_portal_integracao(portal)

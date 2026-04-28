@@ -1,4 +1,4 @@
-import { apiRequest } from "./api";
+import { API_BASE_URL, apiRequest } from "./api";
 import type { ItemListResponseType, ItemType } from "../types/item.types";
 import type { EditalType } from "../types/licitacao.types";
 
@@ -32,8 +32,27 @@ export async function pesquisarItem(itemId: number): Promise<ItemType> {
   });
 }
 
+export async function pesquisarMercado(itemId: number): Promise<ItemType> {
+  return apiRequest<ItemType>(`/itens/${itemId}/pesquisar-mercado`, {
+    method: "POST",
+  });
+}
+
 export async function pesquisarTodosItens(licitacaoId: number): Promise<ItemListResponseType> {
   return apiRequest<ItemListResponseType>(`/licitacoes/${licitacaoId}/itens/pesquisar-todos`, {
     method: "POST",
   });
+}
+
+export async function exportarTabelaItens(licitacaoId: number): Promise<Blob> {
+  const response = await fetch(`${API_BASE_URL}/licitacoes/${licitacaoId}/itens/exportar`, {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(detail || "Nao foi possivel exportar a tabela de itens.");
+  }
+
+  return response.blob();
 }

@@ -2,6 +2,10 @@ export interface CotacaoType {
   id: number;
   item_id: number;
   fornecedor_nome: string;
+  fornecedor_tipo: string | null;
+  fornecedor_estado: string | null;
+  fornecedor_cidade: string | null;
+  evidencia_item: string | null;
   preco_unitario: number | null;
   fonte_url: string | null;
   fonte_nome: string | null;

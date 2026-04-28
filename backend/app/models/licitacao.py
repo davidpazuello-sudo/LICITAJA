@@ -21,6 +21,7 @@ class LicitacaoModel(Base):
     link_edital: Mapped[str | None] = mapped_column(Text, nullable=True)
     link_site: Mapped[str | None] = mapped_column(Text, nullable=True)
     observacoes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    resumo_ia: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String, nullable=False, default="nova")
     fonte: Mapped[str] = mapped_column(String, nullable=False, default="pncp")
     dados_brutos: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -38,3 +39,4 @@ class LicitacaoModel(Base):
 
     editais = relationship("EditalModel", back_populates="licitacao", cascade="all, delete-orphan")
     itens = relationship("ItemModel", back_populates="licitacao", cascade="all, delete-orphan")
+    chat_messages = relationship("ChatMessageModel", back_populates="licitacao", cascade="all, delete-orphan")

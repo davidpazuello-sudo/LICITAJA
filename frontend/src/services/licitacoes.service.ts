@@ -1,4 +1,5 @@
 import { apiRequest } from "./api";
+import type { ChatConversationResponseType } from "../types/chat.types";
 import type {
   AtualizarLicitacaoPayload,
   LicitacaoDetailType,
@@ -47,3 +48,22 @@ export async function atualizarLicitacao(
   });
 }
 
+export async function gerarResumoIALicitacao(licitacaoId: number): Promise<LicitacaoType> {
+  return apiRequest<LicitacaoType>(`/licitacoes/${licitacaoId}/resumo-ia`, {
+    method: "POST",
+  });
+}
+
+export async function listarChatLicitacao(licitacaoId: number): Promise<ChatConversationResponseType> {
+  return apiRequest<ChatConversationResponseType>(`/licitacoes/${licitacaoId}/chat`);
+}
+
+export async function enviarMensagemChatLicitacao(
+  licitacaoId: number,
+  message: string,
+): Promise<ChatConversationResponseType> {
+  return apiRequest<ChatConversationResponseType>(`/licitacoes/${licitacaoId}/chat`, {
+    method: "POST",
+    body: JSON.stringify({ message }),
+  });
+}
