@@ -35,7 +35,7 @@ function AreaEmpresasDetalhe() {
           <Link to="/areas-e-empresas" className="transition hover:text-accent">
             Areas e Empresas
           </Link>
-          <span className="mx-2 text-line">&gt;</span>
+          <span className="mx-2 text-slate/70">&gt;</span>
           <span className="text-ink">Area nao encontrada</span>
         </div>
 
@@ -62,7 +62,7 @@ function AreaEmpresasDetalhe() {
         <Link to="/areas-e-empresas" className="transition hover:text-accent">
           Areas e Empresas
         </Link>
-        <span className="mx-2 text-line">&gt;</span>
+        <span className="mx-2 text-slate/70">&gt;</span>
         <span className="text-ink">{area.setor}</span>
       </div>
 

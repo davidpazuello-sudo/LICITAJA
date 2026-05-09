@@ -8,7 +8,15 @@ export interface BuscaLicitacaoFilters {
   orgao: string;
   empresa: string;
   sub_status: string;
+  tipo_instrumento_convocatorio: string;
+  unidade: string;
   estado: string;
+  municipio: string;
+  esfera: string;
+  poder: string;
+  fonte_orcamentaria: string;
+  margem_preferencia: string;
+  conteudo_nacional: string;
   modalidade: string;
   tipo_fornecimento: string[];
   familia_fornecimento: string[];

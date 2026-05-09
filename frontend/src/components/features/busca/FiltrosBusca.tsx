@@ -1,25 +1,29 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 
 import type { BuscaLicitacaoFilters } from "../../../types/licitacao.types";
-import type { PortalFilterSupportState } from "../../../utils/portalFilterSupport";
 import {
-  EMPRESA_OPTIONS,
-  FAMILIA_FORNECIMENTO_TREE,
+  CONTEUDO_NACIONAL_OPTIONS,
+  ESFERA_OPTIONS,
+  MARGEM_PREFERENCIA_OPTIONS,
   MODALIDADE_OPTIONS,
-  SUB_STATUS_OPTIONS,
-  TIPO_FORNECIMENTO_OPTIONS,
-  type FamiliaTreeNode,
+  PNCP_STATUS_OPTIONS,
+  PODER_OPTIONS,
+  TIPO_INSTRUMENTO_OPTIONS,
   UF_OPTIONS,
 } from "../../../utils/constants";
 import { cn } from "../../../utils/cn";
+import type { PortalFilterSupportState } from "../../../utils/portalFilterSupport";
 import { Button } from "../../ui/Button";
-import { Input } from "../../ui/Input";
 
 interface FiltrosBuscaProps {
   filters: BuscaLicitacaoFilters;
   filterSupport: PortalFilterSupportState;
   isLoading: boolean;
-  companySuggestions?: string[];
+  suggestions?: {
+    orgaos?: string[];
+    unidades?: string[];
+    municipios?: string[];
+  };
   portalOptions: Array<{ id: string; label: string }>;
   onChange: <Key extends keyof BuscaLicitacaoFilters>(
     field: Key,
@@ -46,7 +50,7 @@ function FilterIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
       <path
-        d="M4 6h16M7 12h10M10 18h4"
+        d="M4 7h16M4 12h16M4 17h16M8 7v3m8 2v3m-4 2v3"
         stroke="currentColor"
         strokeWidth="1.8"
         strokeLinecap="round"
@@ -56,170 +60,187 @@ function FilterIcon() {
   );
 }
 
-function ChevronIcon(props: { isOpen: boolean }) {
-  const { isOpen } = props;
-
+function InfoIcon() {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      className={cn("h-4 w-4 transition-transform", isOpen ? "rotate-180" : "rotate-0")}
-      aria-hidden="true"
-    >
-      <path
-        d="m6 9 6 6 6-6"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+    <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M12 10v6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="12" cy="7" r="1" fill="currentColor" />
     </svg>
   );
 }
 
-function SelectField(props: {
+function FieldLabel(props: { children: string }) {
+  return <span className="text-sm font-semibold text-ink">{props.children}</span>;
+}
+
+function TextField(props: {
+  label: string;
   value: string;
-  onChange: (value: string) => void;
   placeholder: string;
-  options: readonly string[];
-  disabled?: boolean;
+  onChange: (value: string) => void;
+  onEnter: () => void | Promise<void>;
+  listId?: string;
+  options?: string[];
 }) {
-  const { value, onChange, placeholder, options, disabled = false } = props;
+  const { label, value, placeholder, onChange, onEnter, listId, options = [] } = props;
 
   return (
-    <label className="flex h-12 items-center rounded-2xl border border-line bg-white px-4 text-sm text-slate shadow-sm transition focus-within:border-accent/40 focus-within:ring-4 focus-within:ring-accent/10">
-      <select
-        disabled={disabled}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="w-full appearance-none border-none bg-transparent outline-none"
-      >
-        <option value="">{placeholder}</option>
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
+    <label className="space-y-3">
+      <FieldLabel>{label}</FieldLabel>
+      <div className="rounded-[14px] border border-line bg-white shadow-sm transition focus-within:border-accent/40 focus-within:ring-4 focus-within:ring-accent/10">
+        <input
+          list={listId}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") void onEnter();
+          }}
+          placeholder={placeholder}
+          className="h-12 w-full rounded-[14px] border-none bg-transparent px-4 text-sm text-ink outline-none placeholder:text-slate/90"
+        />
+      </div>
+      {listId && options.length > 0 ? (
+        <datalist id={listId}>
+          {options.map((option) => (
+            <option key={option} value={option} />
+          ))}
+        </datalist>
+      ) : null}
     </label>
   );
 }
 
-function ToggleChip(props: {
-  checked: boolean;
+function SelectField(props: {
   label: string;
-  onClick: () => void;
-  disabled?: boolean;
+  value: string;
+  placeholder: string;
+  options: readonly string[];
+  onChange: (value: string) => void;
 }) {
-  const { checked, label, onClick, disabled = false } = props;
+  const { label, value, placeholder, options, onChange } = props;
+
+  return (
+    <label className="space-y-3">
+      <FieldLabel>{label}</FieldLabel>
+      <div className="relative rounded-[14px] border border-line bg-white shadow-sm transition focus-within:border-accent/40 focus-within:ring-4 focus-within:ring-accent/10">
+        <select
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className="h-12 w-full appearance-none rounded-[14px] border-none bg-transparent px-4 pr-12 text-sm text-ink outline-none"
+        >
+          <option value="">{placeholder}</option>
+          {options.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+
+        <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-slate">
+          <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+            <path
+              d="m6 9 6 6 6-6"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </span>
+      </div>
+    </label>
+  );
+}
+
+function StatusOption(props: {
+  label: string;
+  checked: boolean;
+  onClick: () => void;
+}) {
+  const { label, checked, onClick } = props;
 
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={disabled}
       className={cn(
-        "inline-flex h-11 items-center rounded-2xl border px-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50",
+        "flex min-h-[58px] items-start gap-3 rounded-[18px] border px-4 py-3 text-left transition",
         checked
-          ? "border-accent bg-softBlue text-accent"
-          : "border-line bg-white text-slate hover:border-accent/30 hover:text-ink",
+          ? "border-accent bg-blue-50 text-ink shadow-sm"
+          : "border-line bg-white text-ink hover:border-accent/35",
       )}
     >
-      {label}
+      <span
+        className={cn(
+          "mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition",
+          checked ? "border-accent bg-accent text-white" : "border-line bg-white text-transparent",
+        )}
+      >
+        <span className="h-3 w-3 rounded-full bg-current" />
+      </span>
+      <span className="text-base leading-6">{label}</span>
     </button>
   );
 }
 
-function FamilyNode(props: {
-  node: FamiliaTreeNode;
-  selectedIds: string[];
-  onToggle: (node: FamiliaTreeNode) => void;
-  expandedIds: string[];
-  onToggleExpanded: (nodeId: string) => void;
+function PortalToggle(props: {
+  label: string;
+  checked: boolean;
+  onClick: () => void;
 }) {
-  const { node, selectedIds, onToggle, expandedIds, onToggleExpanded } = props;
-  const isChecked = selectedIds.includes(node.id);
-  const children = node.children ?? [];
-  const hasChildren = children.length > 0;
-  const isExpanded = hasChildren && expandedIds.includes(node.id);
+  const { label, checked, onClick } = props;
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-3 text-sm text-ink">
-        <input
-          type="checkbox"
-          checked={isChecked}
-          onChange={() => onToggle(node)}
-          className="h-4 w-4 rounded border-line text-accent focus:ring-accent/30"
-        />
-
-        <span className={cn("flex-1", hasChildren ? "font-semibold" : "")}>{node.label}</span>
-
-        {hasChildren ? (
-          <button
-            type="button"
-            onClick={() => onToggleExpanded(node.id)}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate transition hover:bg-softBlue hover:text-accent"
-            aria-label={isExpanded ? `Recolher ${node.label}` : `Expandir ${node.label}`}
-          >
-            <ChevronIcon isOpen={isExpanded} />
-          </button>
-        ) : null}
-      </div>
-
-      {hasChildren && isExpanded ? (
-        <div className="ml-7 space-y-3 border-l border-line/70 pl-4">
-          {children.map((child) => (
-            <FamilyNode
-              key={child.id}
-              node={child}
-              selectedIds={selectedIds}
-              onToggle={onToggle}
-              expandedIds={expandedIds}
-              onToggleExpanded={onToggleExpanded}
-            />
-          ))}
-        </div>
-      ) : null}
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition",
+        checked
+          ? "border-accent bg-softBlue text-accent"
+          : "border-line bg-white text-slate hover:border-accent/35 hover:text-ink",
+      )}
+    >
+      <span
+        className={cn(
+          "inline-flex h-2.5 w-2.5 rounded-full transition",
+          checked ? "bg-accent" : "bg-slate-300",
+        )}
+      />
+      {label}
+    </button>
   );
-}
-
-function collectNodeIds(node: FamiliaTreeNode): string[] {
-  return [node.id, ...(node.children?.flatMap(collectNodeIds) ?? [])];
 }
 
 function FiltrosBusca({
   filters,
   filterSupport,
   isLoading,
-  companySuggestions = [],
+  suggestions,
   portalOptions,
   onChange,
   onSearch,
 }: FiltrosBuscaProps) {
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [expandedFamilyIds, setExpandedFamilyIds] = useState<string[]>([]);
-  const [showPortalFilters, setShowPortalFilters] = useState(false);
-
-  const empresaOptions = useMemo(
-    () => Array.from(new Set([...EMPRESA_OPTIONS, ...companySuggestions])).sort(),
-    [companySuggestions],
-  );
-  const supportsField = (field: keyof BuscaLicitacaoFilters) =>
-    filterSupport.supportedFields.includes(field as never);
+  const orgaoSuggestions = suggestions?.orgaos ?? [];
+  const unidadeSuggestions = suggestions?.unidades ?? [];
+  const municipioSuggestions = suggestions?.municipios ?? [];
 
   const activeFiltersCount = useMemo(() => {
     const scalarFilters = [
-      filters.numero_oportunidade,
-      filters.objeto_licitacao,
-      filters.orgao,
-      filters.empresa,
+      filters.buscar_por,
       filters.sub_status,
+      filters.tipo_instrumento_convocatorio,
+      filters.orgao,
+      filters.unidade,
       filters.estado,
+      filters.municipio,
+      filters.esfera,
+      filters.poder,
+      filters.fonte_orcamentaria,
+      filters.margem_preferencia,
+      filters.conteudo_nacional,
       filters.modalidade,
-      filters.data_inicio ?? "",
-      filters.data_fim ?? "",
     ].filter((value) => value.trim() !== "").length;
 
     const portalFilterCount =
@@ -229,35 +250,34 @@ function FiltrosBusca({
         ? 1
         : 0;
 
-    return scalarFilters + filters.tipo_fornecimento.length + filters.familia_fornecimento.length + portalFilterCount;
+    return scalarFilters + portalFilterCount;
   }, [filters, portalOptions.length]);
 
-  const toggleTipoFornecimento = (tipoId: string) => {
-    const next = filters.tipo_fornecimento.includes(tipoId)
-      ? filters.tipo_fornecimento.filter((value) => value !== tipoId)
-      : [...filters.tipo_fornecimento, tipoId];
-    onChange("tipo_fornecimento", next);
-  };
-
-  const toggleFamilyNode = (node: FamiliaTreeNode) => {
-    const nodeIds = collectNodeIds(node);
-    const allSelected = nodeIds.every((id) => filters.familia_fornecimento.includes(id));
-
-    if (allSelected) {
-      onChange(
-        "familia_fornecimento",
-        filters.familia_fornecimento.filter((id) => !nodeIds.includes(id)),
-      );
-      return;
-    }
-
-    onChange("familia_fornecimento", Array.from(new Set([...filters.familia_fornecimento, ...nodeIds])));
-  };
-
-  const toggleExpandedFamily = (nodeId: string) => {
-    setExpandedFamilyIds((current) =>
-      current.includes(nodeId) ? current.filter((value) => value !== nodeId) : [...current, nodeId],
+  const clearAdvancedFilters = () => {
+    onChange(
+      "portais",
+      portalOptions.map((portal) => portal.id),
     );
+    onChange("buscar_por", "");
+    onChange("numero_oportunidade", "");
+    onChange("objeto_licitacao", "");
+    onChange("orgao", "");
+    onChange("empresa", "");
+    onChange("sub_status", "");
+    onChange("tipo_instrumento_convocatorio", "");
+    onChange("unidade", "");
+    onChange("estado", "");
+    onChange("municipio", "");
+    onChange("esfera", "");
+    onChange("poder", "");
+    onChange("fonte_orcamentaria", "");
+    onChange("margem_preferencia", "");
+    onChange("conteudo_nacional", "");
+    onChange("modalidade", "");
+    onChange("data_inicio", "");
+    onChange("data_fim", "");
+    onChange("tipo_fornecimento", []);
+    onChange("familia_fornecimento", []);
   };
 
   const togglePortal = (portalId: string) => {
@@ -267,243 +287,190 @@ function FiltrosBusca({
     onChange("portais", next);
   };
 
-  const clearAdvancedFilters = () => {
-    onChange(
-      "portais",
-      portalOptions.map((portal) => portal.id),
-    );
-    onChange("numero_oportunidade", "");
-    onChange("objeto_licitacao", "");
-    onChange("orgao", "");
-    onChange("empresa", "");
-    onChange("sub_status", "");
-    onChange("estado", "");
-    onChange("modalidade", "");
-    onChange("data_inicio", "");
-    onChange("data_fim", "");
-    onChange("tipo_fornecimento", []);
-    onChange("familia_fornecimento", []);
-  };
-
   return (
-    <div className="space-y-4 p-5">
-      <div className="flex flex-col gap-3 lg:flex-row">
-        <Input
-          icon={<SearchIcon />}
-          className="flex-1"
-          placeholder="Buscar por objeto, descricao, familia, numero, empresa ou datas..."
+    <div className="space-y-6 p-6">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
+        <TextField
+          label="Palavra-chave"
           value={filters.buscar_por}
-          onChange={(event) => onChange("buscar_por", event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") void onSearch();
-          }}
+          placeholder="Digite um termo para pesquisar"
+          onChange={(value) => onChange("buscar_por", value)}
+          onEnter={onSearch}
         />
 
-        <div className="flex gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            className="min-w-[168px]"
-            onClick={() => setShowAdvancedFilters((value) => !value)}
-          >
-            <FilterIcon />
-            Filtros{activeFiltersCount > 0 ? ` (${activeFiltersCount})` : ""}
-          </Button>
-          <Button className="min-w-[124px]" isLoading={isLoading} onClick={onSearch}>
-            Buscar
-          </Button>
+        <div className="space-y-3">
+          <FieldLabel>Status</FieldLabel>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {PNCP_STATUS_OPTIONS.map((option) => (
+              <StatusOption
+                key={option.label}
+                label={option.label}
+                checked={filters.sub_status === option.value}
+                onClick={() => onChange("sub_status", option.value)}
+              />
+            ))}
+          </div>
         </div>
       </div>
 
-      <div
-        className={cn(
-          "overflow-hidden rounded-[26px] border border-line/80 bg-panel/55 transition-all duration-300",
-          showAdvancedFilters ? "max-h-[1800px] opacity-100" : "max-h-0 border-transparent opacity-0",
-        )}
-      >
-        <div className="space-y-6 p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.16em] text-accent/80">Filtros avancados</p>
-              <p className="mt-1 text-sm text-slate">
-                Refine a busca por numero, empresa, periodo, tipo de fornecimento e familias.
-              </p>
-              <p className="mt-2 max-w-3xl text-sm text-slate">
-                {filterSupport.guidance}
-              </p>
+      <div className="overflow-hidden rounded-[30px] border border-line/80 bg-panel/55">
+        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-line/70 px-6 py-5">
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-ink shadow-sm">
+                <FilterIcon />
+              </span>
+              <div>
+                <h3 className="font-heading text-xl font-extrabold text-ink">Filtros</h3>
+                <p className="text-sm text-slate">
+                  Grade de busca no padrao do PNCP, mantendo a consulta integrada entre os portais.
+                </p>
+              </div>
             </div>
 
+            <div className="flex items-start gap-3 rounded-2xl border border-blue-100 bg-white/80 px-4 py-3 text-sm text-slate shadow-sm">
+              <span className="mt-0.5 text-accent">
+                <InfoIcon />
+              </span>
+              <p>{filterSupport.guidance}</p>
+            </div>
+          </div>
+
+          <div className="rounded-full border border-blue-100 bg-white px-4 py-2 text-sm font-semibold text-accent shadow-sm">
+            {activeFiltersCount} filtro{activeFiltersCount === 1 ? "" : "s"} ativo{activeFiltersCount === 1 ? "" : "s"}
+          </div>
+        </div>
+
+        <div className="space-y-6 p-6">
+          <div className="grid gap-5 md:grid-cols-2">
+            <SelectField
+              label="Tipos de Instrumento Convocatorio"
+              value={filters.tipo_instrumento_convocatorio}
+              placeholder="Selecione"
+              options={TIPO_INSTRUMENTO_OPTIONS}
+              onChange={(value) => onChange("tipo_instrumento_convocatorio", value)}
+            />
+
+            <SelectField
+              label="Modalidades da Contratacao"
+              value={filters.modalidade}
+              placeholder="Selecione"
+              options={MODALIDADE_OPTIONS}
+              onChange={(value) => onChange("modalidade", value)}
+            />
+
+            <TextField
+              label="Orgaos"
+              value={filters.orgao}
+              placeholder="Selecione"
+              listId="orgaos-busca-options"
+              options={orgaoSuggestions}
+              onChange={(value) => onChange("orgao", value)}
+              onEnter={onSearch}
+            />
+
+            <TextField
+              label="Unidades"
+              value={filters.unidade}
+              placeholder="Selecione"
+              listId="unidades-busca-options"
+              options={unidadeSuggestions}
+              onChange={(value) => onChange("unidade", value)}
+              onEnter={onSearch}
+            />
+
+            <SelectField
+              label="UFs"
+              value={filters.estado}
+              placeholder="Selecione"
+              options={UF_OPTIONS}
+              onChange={(value) => onChange("estado", value)}
+            />
+
+            <TextField
+              label="Municipios"
+              value={filters.municipio}
+              placeholder="Selecione"
+              listId="municipios-busca-options"
+              options={municipioSuggestions}
+              onChange={(value) => onChange("municipio", value)}
+              onEnter={onSearch}
+            />
+
+            <SelectField
+              label="Esferas"
+              value={filters.esfera}
+              placeholder="Selecione"
+              options={ESFERA_OPTIONS}
+              onChange={(value) => onChange("esfera", value)}
+            />
+
+            <SelectField
+              label="Poderes"
+              value={filters.poder}
+              placeholder="Selecione"
+              options={PODER_OPTIONS}
+              onChange={(value) => onChange("poder", value)}
+            />
+
+            <TextField
+              label="Fontes Orcamentarias"
+              value={filters.fonte_orcamentaria}
+              placeholder="Selecione"
+              onChange={(value) => onChange("fonte_orcamentaria", value)}
+              onEnter={onSearch}
+            />
+
+            <SelectField
+              label="Tipos de Margens de Preferencia"
+              value={filters.margem_preferencia}
+              placeholder="Selecione"
+              options={MARGEM_PREFERENCIA_OPTIONS}
+              onChange={(value) => onChange("margem_preferencia", value)}
+            />
+
+            <SelectField
+              label="Exigencia de Conteudo Nacional"
+              value={filters.conteudo_nacional}
+              placeholder="Selecione"
+              options={CONTEUDO_NACIONAL_OPTIONS}
+              onChange={(value) => onChange("conteudo_nacional", value)}
+            />
+          </div>
+
+          <div className="space-y-3 rounded-[22px] border border-line/70 bg-white/80 p-4 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-ink">Portais consultados</p>
+                <p className="text-sm text-slate">Selecione em quais fontes a busca integrada deve rodar.</p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              {portalOptions.map((portal) => (
+                <PortalToggle
+                  key={portal.id}
+                  label={portal.label}
+                  checked={filters.portais.includes(portal.id)}
+                  onClick={() => togglePortal(portal.id)}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-end gap-4 border-t border-line/70 pt-5">
             <button
               type="button"
               onClick={clearAdvancedFilters}
-              className="text-sm font-semibold text-slate transition hover:text-accent"
+              className="text-base font-semibold text-accent transition hover:text-accentDark"
             >
-              Limpar filtros
+              Limpar
             </button>
-          </div>
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {supportsField("numero_oportunidade") ? (
-              <Input
-                placeholder="Numero da oportunidade"
-                value={filters.numero_oportunidade}
-                onChange={(event) => onChange("numero_oportunidade", event.target.value)}
-              />
-            ) : null}
-            {supportsField("objeto_licitacao") ? (
-              <Input
-                placeholder="Objeto da licitacao"
-                value={filters.objeto_licitacao}
-                onChange={(event) => onChange("objeto_licitacao", event.target.value)}
-              />
-            ) : null}
-            {supportsField("orgao") ? (
-              <Input
-                placeholder="Filtrar por orgao"
-                value={filters.orgao}
-                onChange={(event) => onChange("orgao", event.target.value)}
-              />
-            ) : null}
-            {supportsField("empresa") ? (
-              <div>
-                <Input
-                  list="empresa-options"
-                  placeholder="Empresa"
-                  value={filters.empresa}
-                  onChange={(event) => onChange("empresa", event.target.value)}
-                />
-                <datalist id="empresa-options">
-                  {empresaOptions.map((option) => (
-                    <option key={option} value={option} />
-                  ))}
-                </datalist>
-              </div>
-            ) : null}
-            {supportsField("sub_status") ? (
-              <SelectField
-                value={filters.sub_status}
-                onChange={(value) => onChange("sub_status", value)}
-                placeholder="Sub-status"
-                options={SUB_STATUS_OPTIONS}
-              />
-            ) : null}
-            {supportsField("estado") ? (
-              <SelectField
-                value={filters.estado}
-                onChange={(value) => onChange("estado", value)}
-                placeholder="Estado (UF)"
-                options={UF_OPTIONS}
-              />
-            ) : null}
-            {supportsField("modalidade") ? (
-              <SelectField
-                value={filters.modalidade}
-                onChange={(value) => onChange("modalidade", value)}
-                placeholder="Modalidade"
-                options={MODALIDADE_OPTIONS}
-              />
-            ) : null}
-            {supportsField("data_inicio") ? (
-              <label className="space-y-2">
-                <span className="text-sm font-semibold text-ink">Data inicial</span>
-                <Input
-                  type="date"
-                  value={filters.data_inicio ?? ""}
-                  onChange={(event) => onChange("data_inicio", event.target.value)}
-                />
-              </label>
-            ) : null}
-            {supportsField("data_fim") ? (
-              <label className="space-y-2">
-                <span className="text-sm font-semibold text-ink">Data final</span>
-                <Input
-                  type="date"
-                  min={filters.data_inicio || undefined}
-                  value={filters.data_fim ?? ""}
-                  onChange={(event) => onChange("data_fim", event.target.value)}
-                />
-              </label>
-            ) : null}
-          </div>
-
-          <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-            <div className="space-y-5">
-              <div className="rounded-[24px] border border-line bg-white p-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <h3 className="font-heading text-lg font-extrabold text-ink">Portais de busca</h3>
-                    <p className="mt-1 text-sm text-slate">
-                      Escolha em quais portais ativos a busca deve rodar. Todos comecam selecionados.
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setShowPortalFilters((value) => !value)}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate transition hover:bg-softBlue hover:text-accent"
-                    aria-label={showPortalFilters ? "Recolher portais de busca" : "Expandir portais de busca"}
-                  >
-                    <ChevronIcon isOpen={showPortalFilters} />
-                  </button>
-                </div>
-
-                {showPortalFilters ? (
-                  <div className="mt-4 space-y-3">
-                    {portalOptions.map((portal) => (
-                      <label key={portal.id} className="flex items-center gap-3 text-sm text-ink">
-                        <input
-                          type="checkbox"
-                          checked={filters.portais.includes(portal.id)}
-                          onChange={() => togglePortal(portal.id)}
-                          className="h-4 w-4 rounded border-line text-accent focus:ring-accent/30"
-                        />
-                        <span className="font-medium">{portal.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-
-              {supportsField("tipo_fornecimento") ? (
-                <div className="rounded-[24px] border border-line bg-white p-5">
-                  <h3 className="font-heading text-lg font-extrabold text-ink">Tipo de fornecimento</h3>
-                  <p className="mt-1 text-sm text-slate">Selecione uma ou mais categorias para afunilar o resultado.</p>
-
-                  <div className="mt-4 flex flex-wrap gap-3">
-                    {TIPO_FORNECIMENTO_OPTIONS.map((option) => (
-                      <ToggleChip
-                        key={option.id}
-                        checked={filters.tipo_fornecimento.includes(option.id)}
-                        label={option.label}
-                        onClick={() => toggleTipoFornecimento(option.id)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-            </div>
-
-            {supportsField("familia_fornecimento") ? (
-              <div className="rounded-[24px] border border-line bg-white p-5">
-                <h3 className="font-heading text-lg font-extrabold text-ink">Familia de fornecimento</h3>
-                <p className="mt-1 text-sm text-slate">
-                  Estrutura hierarquica sugerida para agrupar materiais e servicos durante a busca.
-                </p>
-
-                <div className="mt-4 space-y-4">
-                  {FAMILIA_FORNECIMENTO_TREE.map((node) => (
-                    <FamilyNode
-                      key={node.id}
-                      node={node}
-                      selectedIds={filters.familia_fornecimento}
-                      onToggle={toggleFamilyNode}
-                      expandedIds={expandedFamilyIds}
-                      onToggleExpanded={toggleExpandedFamily}
-                    />
-                  ))}
-                </div>
-              </div>
-            ) : null}
+            <Button className="min-w-[172px]" size="lg" isLoading={isLoading} onClick={onSearch}>
+              <SearchIcon />
+              Pesquisar
+            </Button>
           </div>
         </div>
       </div>

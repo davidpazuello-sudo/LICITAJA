@@ -92,7 +92,15 @@ class PncpService:
         orgao: str | None,
         empresa: str | None,
         sub_status: str | None,
+        tipo_instrumento_convocatorio: str | None,
+        unidade: str | None,
         estado: str | None,
+        municipio: str | None,
+        esfera: str | None,
+        poder: str | None,
+        fonte_orcamentaria: str | None,
+        margem_preferencia: str | None,
+        conteudo_nacional: str | None,
         modalidade: str | None,
         tipo_fornecimento: list[str],
         familia_fornecimento: list[str],
@@ -111,7 +119,15 @@ class PncpService:
                 orgao=orgao,
                 empresa=None,
                 sub_status=sub_status,
+                tipo_instrumento_convocatorio=tipo_instrumento_convocatorio,
+                unidade=unidade,
                 estado=estado,
+                municipio=municipio,
+                esfera=esfera,
+                poder=poder,
+                fonte_orcamentaria=fonte_orcamentaria,
+                margem_preferencia=margem_preferencia,
+                conteudo_nacional=conteudo_nacional,
                 modalidade=modalidade,
                 tipo_fornecimento=tipo_fornecimento,
                 familia_fornecimento=familia_fornecimento,
@@ -253,7 +269,15 @@ class PncpService:
                         orgao=orgao,
                         empresa=None,
                         sub_status=sub_status,
+                        tipo_instrumento_convocatorio=tipo_instrumento_convocatorio,
+                        unidade=unidade,
                         estado=estado,
+                        municipio=municipio,
+                        esfera=esfera,
+                        poder=poder,
+                        fonte_orcamentaria=fonte_orcamentaria,
+                        margem_preferencia=margem_preferencia,
+                        conteudo_nacional=conteudo_nacional,
                         modalidade=effective_modalidade,
                         tipo_fornecimento=tipo_fornecimento,
                         familia_fornecimento=familia_fornecimento,
@@ -273,7 +297,15 @@ class PncpService:
                         orgao=orgao,
                         empresa=None,
                         sub_status=sub_status,
+                        tipo_instrumento_convocatorio=tipo_instrumento_convocatorio,
+                        unidade=unidade,
                         estado=estado,
+                        municipio=municipio,
+                        esfera=esfera,
+                        poder=poder,
+                        fonte_orcamentaria=fonte_orcamentaria,
+                        margem_preferencia=margem_preferencia,
+                        conteudo_nacional=conteudo_nacional,
                         modalidade=effective_modalidade,
                         tipo_fornecimento=tipo_fornecimento,
                         familia_fornecimento=familia_fornecimento,
@@ -401,7 +433,15 @@ class PncpService:
         orgao: str | None,
         empresa: str | None,
         sub_status: str | None,
+        tipo_instrumento_convocatorio: str | None,
+        unidade: str | None,
         estado: str | None,
+        municipio: str | None,
+        esfera: str | None,
+        poder: str | None,
+        fonte_orcamentaria: str | None,
+        margem_preferencia: str | None,
+        conteudo_nacional: str | None,
         modalidade: str | None,
         tipo_fornecimento: list[str],
         familia_fornecimento: list[str],
@@ -409,8 +449,8 @@ class PncpService:
         data_fim: str | None,
     ) -> bool:
         orgao_nome = ((item.get("orgaoEntidade") or {}).get("razaoSocial")) or ""
-        unidade = item.get("unidadeOrgao") or {}
-        estado_sigla = (unidade.get("ufSigla") or "").upper()
+        unidade_orgao = item.get("unidadeOrgao") or {}
+        estado_sigla = (unidade_orgao.get("ufSigla") or "").upper()
         modalidade_nome = self._normalize_modalidade_nome(item.get("modalidadeNome"))
         data_abertura = item.get("dataAberturaProposta") or item.get("dataPublicacaoPncp")
         item_sub_status = self._extract_sub_status(item)
@@ -431,7 +471,7 @@ class PncpService:
                 informacao_complementar,
                 orgao_nome,
                 item_sub_status,
-                unidade.get("municipioNome"),
+                unidade_orgao.get("municipioNome"),
                 data_abertura,
                 raw_blob,
             ],
@@ -451,7 +491,48 @@ class PncpService:
         if sub_status and self._normalize_text(sub_status) not in self._normalize_text(item_sub_status):
             return False
 
+        if tipo_instrumento_convocatorio and not self._contains_all_terms(
+            [
+                item.get("instrumentoConvocatorio"),
+                item.get("modalidadeNome"),
+                objeto,
+                raw_blob,
+            ],
+            tipo_instrumento_convocatorio,
+        ):
+            return False
+
+        if unidade and not self._contains_all_terms(
+            [
+                unidade_orgao.get("codigoUnidade"),
+                unidade_orgao.get("nomeUnidade"),
+                unidade_orgao.get("municipioNome"),
+                orgao_nome,
+                raw_blob,
+            ],
+            unidade,
+        ):
+            return False
+
         if estado and estado.upper() != estado_sigla:
+            return False
+
+        if municipio and not self._contains_all_terms([unidade_orgao.get("municipioNome"), raw_blob], municipio):
+            return False
+
+        if esfera and not self._contains_all_terms([item.get("esferaId"), item.get("esferaNome"), raw_blob], esfera):
+            return False
+
+        if poder and not self._contains_all_terms([item.get("poderId"), item.get("poderNome"), raw_blob], poder):
+            return False
+
+        if fonte_orcamentaria and not self._contains_all_terms([raw_blob], fonte_orcamentaria):
+            return False
+
+        if margem_preferencia and not self._contains_all_terms([raw_blob], margem_preferencia):
+            return False
+
+        if conteudo_nacional and not self._contains_all_terms([raw_blob], conteudo_nacional):
             return False
 
         if modalidade and self._normalize_text(modalidade) not in self._normalize_text(modalidade_nome):

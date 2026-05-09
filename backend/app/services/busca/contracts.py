@@ -15,7 +15,15 @@ class SearchQuery:
     orgao: str | None
     empresa: str | None
     sub_status: str | None
+    tipo_instrumento_convocatorio: str | None
+    unidade: str | None
     estado: str | None
+    municipio: str | None
+    esfera: str | None
+    poder: str | None
+    fonte_orcamentaria: str | None
+    margem_preferencia: str | None
+    conteudo_nacional: str | None
     modalidade: str | None
     tipo_fornecimento: list[str]
     familia_fornecimento: list[str]

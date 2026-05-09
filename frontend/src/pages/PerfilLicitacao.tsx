@@ -111,7 +111,7 @@ function PerfilLicitacao() {
         <Link to="/minhas-licitacoes" className="transition hover:text-accent">
           Minhas Licitacoes
         </Link>
-        <span className="mx-2 text-line">&gt;</span>
+        <span className="mx-2 text-slate/70">&gt;</span>
         <span className="text-ink">{perfil ? perfil.orgao.slice(0, 42) : `Licitacao ${id ?? ""}`}</span>
       </div>
 

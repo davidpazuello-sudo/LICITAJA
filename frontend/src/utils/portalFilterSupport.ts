@@ -7,7 +7,15 @@ export type BuscaFilterField =
   | "orgao"
   | "empresa"
   | "sub_status"
+  | "tipo_instrumento_convocatorio"
+  | "unidade"
   | "estado"
+  | "municipio"
+  | "esfera"
+  | "poder"
+  | "fonte_orcamentaria"
+  | "margem_preferencia"
+  | "conteudo_nacional"
   | "modalidade"
   | "tipo_fornecimento"
   | "familia_fornecimento"
@@ -41,7 +49,15 @@ const ALL_FILTER_FIELDS: BuscaFilterField[] = [
   "orgao",
   "empresa",
   "sub_status",
+  "tipo_instrumento_convocatorio",
+  "unidade",
   "estado",
+  "municipio",
+  "esfera",
+  "poder",
+  "fonte_orcamentaria",
+  "margem_preferencia",
+  "conteudo_nacional",
   "modalidade",
   "tipo_fornecimento",
   "familia_fornecimento",
@@ -58,65 +74,32 @@ const DEFAULT_PROFILE: PortalFilterProfile = {
 const PORTAL_FILTER_PROFILES: Record<string, PortalFilterProfile> = {
   pncp: {
     key: "pncp",
-    reliableFilters: ["buscar_por", "numero_oportunidade", "estado", "modalidade", "data_inicio", "data_fim"],
+    reliableFilters: ALL_FILTER_FIELDS,
     guidance:
-      "No PNCP, a busca textual foi reaberta, mas os filtros mais estaveis continuam sendo numero da oportunidade, UF, modalidade e periodo de publicacao.",
+      "A interface segue o modelo do PNCP, com filtros principais para palavra-chave, status, modalidade, orgao, unidade e localizacao.",
   },
   compras_gov: {
     key: "compras_gov",
-    reliableFilters: [
-      "buscar_por",
-      "numero_oportunidade",
-      "objeto_licitacao",
-      "orgao",
-      "sub_status",
-      "estado",
-      "modalidade",
-      "tipo_fornecimento",
-      "familia_fornecimento",
-      "data_inicio",
-      "data_fim",
-    ],
+    reliableFilters: ALL_FILTER_FIELDS,
     guidance:
-      "No Compras.gov, a busca funciona melhor com numero do aviso, texto, orgao, UF, modalidade e periodo.",
+      "No Compras.gov, o sistema aplica a mesma grade de filtros para manter a experiencia de busca consistente.",
   },
   ecompras_am: {
     key: "ecompras_am",
-    reliableFilters: [
-      "buscar_por",
-      "numero_oportunidade",
-      "objeto_licitacao",
-      "sub_status",
-      "estado",
-      "modalidade",
-      "tipo_fornecimento",
-      "familia_fornecimento",
-      "data_inicio",
-      "data_fim",
-    ],
+    reliableFilters: ALL_FILTER_FIELDS,
     guidance:
-      "No e-Compras AM, a busca esta alinhada ao numero, objeto, status, modalidade, periodo e categorias do edital.",
+      "No e-Compras AM, a tela preserva o mesmo conjunto de filtros para reduzir troca de contexto entre portais.",
   },
   compras_manaus: {
     key: "compras_manaus",
-    reliableFilters: [
-      "buscar_por",
-      "numero_oportunidade",
-      "objeto_licitacao",
-      "orgao",
-      "sub_status",
-      "estado",
-      "modalidade",
-      "tipo_fornecimento",
-      "familia_fornecimento",
-    ],
+    reliableFilters: ALL_FILTER_FIELDS,
     guidance:
-      "No Compras Manaus, os filtros mais estaveis sao texto, numero, orgao, status, modalidade e categorias.",
+      "No Compras Manaus, o layout tambem segue a mesma estrutura para deixar a busca mais previsivel.",
   },
   licitaja: {
     key: "licitaja",
     reliableFilters: ALL_FILTER_FIELDS,
-    guidance: "Na LicitaJa, todos os filtros avancados estao disponiveis nesta integracao.",
+    guidance: "Na LicitaJa, todos os filtros desta grade ficam centralizados na mesma experiencia de consulta.",
   },
 };
 
@@ -210,8 +193,32 @@ export function sanitizeFiltersByPortalSupport(
   if (!support.supportedFields.includes("sub_status")) {
     nextFilters.sub_status = "";
   }
+  if (!support.supportedFields.includes("tipo_instrumento_convocatorio")) {
+    nextFilters.tipo_instrumento_convocatorio = "";
+  }
+  if (!support.supportedFields.includes("unidade")) {
+    nextFilters.unidade = "";
+  }
   if (!support.supportedFields.includes("estado")) {
     nextFilters.estado = "";
+  }
+  if (!support.supportedFields.includes("municipio")) {
+    nextFilters.municipio = "";
+  }
+  if (!support.supportedFields.includes("esfera")) {
+    nextFilters.esfera = "";
+  }
+  if (!support.supportedFields.includes("poder")) {
+    nextFilters.poder = "";
+  }
+  if (!support.supportedFields.includes("fonte_orcamentaria")) {
+    nextFilters.fonte_orcamentaria = "";
+  }
+  if (!support.supportedFields.includes("margem_preferencia")) {
+    nextFilters.margem_preferencia = "";
+  }
+  if (!support.supportedFields.includes("conteudo_nacional")) {
+    nextFilters.conteudo_nacional = "";
   }
   if (!support.supportedFields.includes("modalidade")) {
     nextFilters.modalidade = "";

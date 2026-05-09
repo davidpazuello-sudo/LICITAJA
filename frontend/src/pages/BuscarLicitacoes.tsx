@@ -26,7 +26,14 @@ function BuscarLicitacoes() {
     updateFilter,
   } = useBusca();
   const { items: portalItems } = usePortalIntegracoes();
-  const companySuggestions = Array.from(new Set(response.items.map((item) => item.orgao))).slice(0, 20);
+  const searchSuggestions = useMemo(
+    () => ({
+      orgaos: Array.from(new Set(response.items.map((item) => item.orgao).filter(Boolean))).slice(0, 30),
+      unidades: Array.from(new Set(response.items.map((item) => item.uasg).filter(Boolean) as string[])).slice(0, 30),
+      municipios: Array.from(new Set(response.items.map((item) => item.cidade).filter(Boolean) as string[])).slice(0, 30),
+    }),
+    [response.items],
+  );
   const currentPage = response.numero_pagina || filters.pagina || 1;
   const totalPages = Math.max(response.total_paginas || 1, 1);
   const showingFrom = response.total_registros === 0 ? 0 : (currentPage - 1) * 10 + 1;
@@ -95,7 +102,15 @@ function BuscarLicitacoes() {
         sanitized.orgao !== current.orgao ||
         sanitized.empresa !== current.empresa ||
         sanitized.sub_status !== current.sub_status ||
+        sanitized.tipo_instrumento_convocatorio !== current.tipo_instrumento_convocatorio ||
+        sanitized.unidade !== current.unidade ||
         sanitized.estado !== current.estado ||
+        sanitized.municipio !== current.municipio ||
+        sanitized.esfera !== current.esfera ||
+        sanitized.poder !== current.poder ||
+        sanitized.fonte_orcamentaria !== current.fonte_orcamentaria ||
+        sanitized.margem_preferencia !== current.margem_preferencia ||
+        sanitized.conteudo_nacional !== current.conteudo_nacional ||
         sanitized.modalidade !== current.modalidade ||
         sanitized.data_inicio !== current.data_inicio ||
         sanitized.data_fim !== current.data_fim ||
@@ -119,7 +134,7 @@ function BuscarLicitacoes() {
               filters={filters}
               filterSupport={filterSupport}
               isLoading={status === "loading"}
-              companySuggestions={companySuggestions}
+              suggestions={searchSuggestions}
               portalOptions={portalOptions}
               onChange={updateFilter}
               onSearch={submitSearch}

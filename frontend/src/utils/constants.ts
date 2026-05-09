@@ -63,6 +63,32 @@ export const SUB_STATUS_OPTIONS = [
   "Revogada",
 ] as const;
 
+export const PNCP_STATUS_OPTIONS = [
+  { label: "A Receber/Recebendo Proposta", value: "recebendo proposta" },
+  { label: "Em Julgamento/Propostas Encerradas", value: "julgamento" },
+  { label: "Encerradas", value: "encerrada" },
+  { label: "Todos", value: "" },
+] as const;
+
+export const TIPO_INSTRUMENTO_OPTIONS = [
+  "Edital",
+  "Aviso de Contratacao Direta",
+  "Chamamento Publico",
+  "Manifestacao de Interesse",
+  "Concurso",
+  "Leilao",
+  "Pre-qualificacao",
+  "Credenciamento",
+] as const;
+
+export const ESFERA_OPTIONS = ["Federal", "Estadual", "Distrital", "Municipal"] as const;
+
+export const PODER_OPTIONS = ["Executivo", "Legislativo", "Judiciario"] as const;
+
+export const MARGEM_PREFERENCIA_OPTIONS = ["Margem normal", "Margem adicional"] as const;
+
+export const CONTEUDO_NACIONAL_OPTIONS = ["Sim", "Nao"] as const;
+
 export const TIPO_FORNECIMENTO_OPTIONS = [
   { id: "bens", label: "Bens" },
   { id: "servicos", label: "Servicos" },
