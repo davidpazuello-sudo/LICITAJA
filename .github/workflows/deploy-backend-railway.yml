@@ -1,0 +1,50 @@
+name: Deploy Backend to Railway
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy-backend-railway.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Railway CLI
+        run: npm install --global @railway/cli
+
+      - name: Deploy backend service
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: >
+          railway up backend
+          --path-as-root
+          --detach
+          --ci
+          --service LICITAJA
+          --environment production
+          --project c6b019f1-a049-4086-b4fd-2ac13211ef6a
+          --message "GitHub Actions deploy ${GITHUB_SHA}"
+
+      - name: Verify API healthcheck
+        run: |
+          for attempt in {1..20}; do
+            if curl --fail --silent --show-error "https://licitaja-production.up.railway.app/api/health"; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Healthcheck failed after deploy."
+          exit 1

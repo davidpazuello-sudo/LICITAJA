@@ -109,6 +109,43 @@ Observacoes:
 - isso evita o erro de publicar build apontando para `127.0.0.1`
 - se frontend e backend ficarem em dominios diferentes, o `config.js` precisa apontar para a URL publica real da API
 
+## Deploy automatico pelo GitHub
+
+O repositorio agora pode publicar automaticamente os dois ambientes ao receber push na branch `main`:
+
+- backend no Railway via `.github/workflows/deploy-backend-railway.yml`
+- frontend no Hostinger via `.github/workflows/deploy-frontend-hostinger.yml`
+
+### Secrets necessarios no GitHub
+
+Crie estes `Repository secrets` em `Settings > Secrets and variables > Actions`:
+
+| Secret | Uso |
+|---|---|
+| `RAILWAY_TOKEN` | Autoriza o deploy automatico do backend no Railway |
+| `HOSTINGER_SERVER` | Host FTP/FTPS do site na Hostinger |
+| `HOSTINGER_USERNAME` | Usuario FTP/FTPS da Hostinger |
+| `HOSTINGER_PASSWORD` | Senha FTP/FTPS da Hostinger |
+| `HOSTINGER_PORT` | Porta da conexao, por exemplo `21` ou `22` conforme seu acesso |
+| `HOSTINGER_PROTOCOL` | Protocolo do action, normalmente `ftps` ou `ftp` |
+| `HOSTINGER_SERVER_DIR` | Pasta remota publicada, por exemplo `/public_html/` |
+
+### Comportamento
+
+- push com mudancas em `backend/**` dispara deploy no Railway
+- push com mudancas em `frontend/**` dispara build e deploy no Hostinger
+- ambos os workflows tambem podem ser executados manualmente com `workflow_dispatch`
+
+### URL da API publicada no frontend
+
+O workflow do frontend escreve automaticamente este valor em `frontend/dist/config.js`:
+
+```js
+window.__LICITAAI_CONFIG__ = {
+  apiBaseUrl: "https://licitaja-production.up.railway.app/api",
+};
+```
+
 ## Banco e migracoes
 
 O projeto agora suporta dois modos de banco:
