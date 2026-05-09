@@ -32,6 +32,25 @@ const navigationItems = [
       </svg>
     ),
   },
+  {
+    to: "/areas-e-empresas",
+    label: "Areas e Empresas",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
+        <path
+          d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5v-11Z"
+          stroke="currentColor"
+          strokeWidth="1.8"
+        />
+        <path
+          d="M8 9h8M8 12h8M8 15h5"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+        />
+      </svg>
+    ),
+  },
 ];
 
 function Sidebar() {

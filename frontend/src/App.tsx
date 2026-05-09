@@ -1,6 +1,7 @@
 import { Navigate, Outlet, Route, BrowserRouter as Router, Routes } from "react-router-dom";
 
 import { Sidebar } from "./components/layout/Sidebar";
+import { AreasEmpresas } from "./pages/AreasEmpresas";
 import { BuscarLicitacoes } from "./pages/BuscarLicitacoes";
 import { Configuracoes } from "./pages/Configuracoes";
 import { MinhasLicitacoes } from "./pages/MinhasLicitacoes";
@@ -29,6 +30,7 @@ function App() {
         <Route element={<AppShell />}>
           <Route index element={<Navigate replace to="/minhas-licitacoes" />} />
           <Route path="/buscar" element={<BuscarLicitacoes />} />
+          <Route path="/areas-e-empresas" element={<AreasEmpresas />} />
           <Route path="/minhas-licitacoes" element={<MinhasLicitacoes />} />
           <Route path="/licitacoes/:id" element={<PerfilLicitacao />} />
           <Route path="/configuracoes" element={<Configuracoes />} />
@@ -39,4 +41,3 @@ function App() {
 }
 
 export default App;
-
