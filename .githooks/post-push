@@ -1,0 +1,10 @@
+#!/bin/sh
+
+HOOK_DIR="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
+STDIN_FILE="$(mktemp)"
+
+cat > "$STDIN_FILE"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$HOOK_DIR/post-push.ps1" "$STDIN_FILE"
+STATUS=$?
+rm -f "$STDIN_FILE"
+exit $STATUS

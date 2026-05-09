@@ -114,7 +114,7 @@ Observacoes:
 O repositorio agora pode publicar automaticamente os dois ambientes ao receber push na branch `main`:
 
 - backend no Railway via `.github/workflows/deploy-backend-railway.yml`
-- frontend no Hostinger via `.github/workflows/deploy-frontend-hostinger.yml`
+- frontend no Hostinger via deploy local no `post-push`
 
 ### Secrets necessarios no GitHub
 
@@ -133,8 +133,17 @@ Crie estes `Repository secrets` em `Settings > Secrets and variables > Actions`:
 ### Comportamento
 
 - push com mudancas em `backend/**` dispara deploy no Railway
-- push com mudancas em `frontend/**` dispara build e deploy no Hostinger
-- ambos os workflows tambem podem ser executados manualmente com `workflow_dispatch`
+- o workflow do frontend fica disponivel apenas para execucao manual, porque o runner hospedado do GitHub tomou timeout no FTP da Hostinger neste ambiente
+- o frontend passa a subir automaticamente neste computador via hook local `post-push`
+
+### Hook local do frontend
+
+O repositorio inclui:
+
+- `scripts/deploy_hostinger_frontend.py` para buildar e sincronizar o frontend
+- `.githooks/post-push` e `.githooks/post-push.ps1` para publicar automaticamente depois de cada `git push`
+
+As credenciais ficam no `git config` local deste clone e nao sao versionadas.
 
 ### URL da API publicada no frontend
 
