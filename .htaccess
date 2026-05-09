@@ -3,6 +3,8 @@ RewriteEngine On
 RewriteBase /
 RewriteCond %{REQUEST_URI} ^/frontend/dist [NC]
 RewriteRule ^ - [L]
+RewriteCond %{REQUEST_URI} ^/api(?:/|$) [NC]
+RewriteRule ^ - [L]
 RewriteCond %{REQUEST_FILENAME} -f
 RewriteRule ^ - [L]
 RewriteRule ^(.*)$ /frontend/dist/$1 [L,QSA]

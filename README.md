@@ -61,6 +61,12 @@ npm.cmd run dev
 
 Interface disponivel em: `http://127.0.0.1:5173`
 
+Opcionalmente, para apontar o frontend para outra API durante o build:
+
+```env
+VITE_API_BASE_URL=http://127.0.0.1:8000/api
+```
+
 ## Variaveis de ambiente
 
 Todas as variaveis ficam em `backend/.env`. As principais:
@@ -73,6 +79,35 @@ Todas as variaveis ficam em `backend/.env`. As principais:
 | `DATABASE_URL` | Caminho do banco SQLite | `sqlite:///./licitai.db` |
 | `PNCP_BASE_URL` | URL base da API do PNCP | valor oficial |
 | `FRONTEND_ORIGIN` | Origem permitida pelo CORS | `http://localhost:5173` |
+
+## Deploy rapido para web
+
+Para publicar sem quebrar as chamadas da API:
+
+1. Suba o backend em uma URL publica, por exemplo `https://api.seudominio.com`
+2. No frontend publicado, ajuste `frontend/dist/config.js` para:
+
+```js
+window.__LICITAAI_CONFIG__ = {
+  apiBaseUrl: "https://api.seudominio.com/api",
+};
+```
+
+3. No backend, inclua o dominio do frontend em `ALLOWED_ORIGINS_RAW`
+
+Exemplo:
+
+```env
+APP_URL=https://red-crab-342914.hostingersite.com
+FRONTEND_ORIGIN=https://red-crab-342914.hostingersite.com
+ALLOWED_ORIGINS_RAW=https://red-crab-342914.hostingersite.com
+```
+
+Observacoes:
+
+- sem `config.js`, o frontend usa por padrao `${window.location.origin}/api`
+- isso evita o erro de publicar build apontando para `127.0.0.1`
+- se frontend e backend ficarem em dominios diferentes, o `config.js` precisa apontar para a URL publica real da API
 
 ## Banco e migracoes
 
