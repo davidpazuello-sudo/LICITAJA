@@ -14,8 +14,8 @@ function AppShell() {
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(47,111,237,0.15),_transparent_34%),radial-gradient(circle_at_bottom_left,_rgba(15,23,42,0.09),_transparent_28%)]" />
       <div className="relative flex h-screen">
         <Sidebar />
-        <main className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
-          <div className="min-h-full rounded-[28px] border border-white/70 bg-white/88 shadow-soft backdrop-blur">
+        <main className="flex-1 overflow-y-auto">
+          <div className="min-h-full bg-white/88 backdrop-blur">
             <Outlet />
           </div>
         </main>
