@@ -1,0 +1,36 @@
+databases:
+  - name: licitaai-db
+    plan: free
+    databaseName: licitaai
+    user: licitaai
+
+services:
+  - type: web
+    name: licitaai-backend
+    runtime: python
+    rootDir: backend
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    preDeployCommand: python -m alembic upgrade head
+    startCommand: python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: API_PREFIX
+        value: /api
+      - key: APP_URL
+        value: https://red-crab-342914.hostingersite.com
+      - key: FRONTEND_ORIGIN
+        value: https://red-crab-342914.hostingersite.com
+      - key: ALLOWED_ORIGINS_RAW
+        value: https://red-crab-342914.hostingersite.com
+      - key: PNCP_BASE_URL
+        value: https://pncp.gov.br/api/consulta/v1
+      - key: STORAGE_BACKEND
+        value: local
+      - key: DATABASE_URL
+        fromDatabase:
+          name: licitaai-db
+          property: connectionString
