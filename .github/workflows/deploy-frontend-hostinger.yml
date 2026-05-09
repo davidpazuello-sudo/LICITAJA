@@ -5,6 +5,7 @@ on:
     branches:
       - main
     paths:
+      - ".htaccess"
       - "frontend/**"
       - ".github/workflows/deploy-frontend-hostinger.yml"
   workflow_dispatch:
@@ -41,6 +42,17 @@ jobs:
           };
           EOF
 
+      - name: Prepare Hostinger deploy package
+        shell: bash
+        run: |
+          rm -rf hostinger-deploy
+          mkdir -p hostinger-deploy/frontend/dist
+          cp .htaccess hostinger-deploy/.htaccess
+          cp frontend/dist/config.js hostinger-deploy/config.js
+          cp frontend/dist/index.html hostinger-deploy/frontend/dist/index.html
+          cp frontend/dist/.htaccess hostinger-deploy/frontend/dist/.htaccess
+          cp -R frontend/dist/assets hostinger-deploy/frontend/dist/assets
+
       - name: Deploy frontend via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
@@ -50,4 +62,4 @@ jobs:
           port: ${{ secrets.HOSTINGER_PORT }}
           protocol: ${{ secrets.HOSTINGER_PROTOCOL }}
           server-dir: ${{ secrets.HOSTINGER_SERVER_DIR }}
-          local-dir: frontend/dist/
+          local-dir: hostinger-deploy/
