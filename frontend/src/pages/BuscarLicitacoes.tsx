@@ -110,13 +110,6 @@ function BuscarLicitacoes() {
     <div className="h-full">
       <PageHeader
         title="Buscar Licitacoes"
-        description="Pesquise oportunidades reais em portais integrados, filtre os resultados e salve no seu painel de analise."
-        actions={
-          <div className="flex items-center gap-3">
-            <Badge variant="blue">Portais integrados</Badge>
-            {status === "success" ? <Badge variant="slate">{response.total_registros} registros na fonte</Badge> : null}
-          </div>
-        }
       />
 
       <div className="px-6 py-8 sm:px-8">

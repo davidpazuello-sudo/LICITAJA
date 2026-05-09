@@ -68,7 +68,6 @@ function AreaEmpresasDetalhe() {
 
       <header className="flex flex-col gap-5 border-b border-line px-6 pb-6 pt-6 sm:px-8 lg:flex-row lg:items-end lg:justify-between">
         <div className="space-y-3">
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-accent/80">Area selecionada</p>
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="font-heading text-4xl font-extrabold tracking-tight text-ink sm:text-[3.2rem]">
               {area.setor}

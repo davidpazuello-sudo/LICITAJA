@@ -4,7 +4,7 @@ import { Badge } from "../ui/Badge";
 
 interface PageHeaderProps {
   title: string;
-  description: string;
+  description?: string;
   eyebrow?: string;
   badgeText?: string;
   actions?: ReactNode;
@@ -25,7 +25,7 @@ function PageHeader({ title, description, eyebrow, badgeText, actions }: PageHea
           </h1>
           {badgeText ? <Badge variant="slate">{badgeText}</Badge> : null}
         </div>
-        <p className="max-w-3xl text-lg text-slate">{description}</p>
+        {description ? <p className="max-w-3xl text-lg text-slate">{description}</p> : null}
       </div>
 
       {actions ? <div className="shrink-0">{actions}</div> : null}
@@ -34,4 +34,3 @@ function PageHeader({ title, description, eyebrow, badgeText, actions }: PageHea
 }
 
 export { PageHeader };
-

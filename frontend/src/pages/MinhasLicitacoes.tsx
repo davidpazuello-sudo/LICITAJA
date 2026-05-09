@@ -44,9 +44,6 @@ function MinhasLicitacoes() {
     <div className="h-full">
       <PageHeader
         title="Minhas Licitacoes"
-        badgeText={`${totalSaved} licitacoes salvas`}
-        description="Acompanhe as oportunidades que voce salvou, filtre por status e abra o perfil completo de cada licitacao."
-
       />
 
       <div className="space-y-6 px-6 py-8 sm:px-8">

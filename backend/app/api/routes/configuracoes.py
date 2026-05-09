@@ -1,4 +1,5 @@
 import time
+from datetime import datetime
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
@@ -30,6 +31,16 @@ PNCP_DESCRICAO = (
     "Portal Nacional de Contratacoes Publicas - fonte oficial de licitacoes do governo federal brasileiro. "
     "A API de consulta e publica e nao requer autenticacao."
 )
+
+BUILTIN_PORTAIS = [
+    {
+        "nome": "Licitanet",
+        "url_base": "https://www.licitanet.com.br/processos",
+        "tipo_auth": "none",
+        "credencial": "",
+        "status": "inativa",
+    },
+]
 
 
 def _get_pncp_status_payload(db: Session) -> tuple[str, str]:
@@ -115,6 +126,38 @@ def _serialize_portal_integracao(portal) -> PortalIntegracaoRead:
         status=portal.status,
         criado_em=portal.criado_em,
     )
+
+
+def _ensure_builtin_portais(db: Session) -> None:
+    from sqlalchemy import select
+
+    from app.models.portal_integracao import PortalIntegracaoModel
+
+    rows = db.scalars(select(PortalIntegracaoModel)).all()
+    existing_names = {row.nome.strip().casefold() for row in rows}
+    existing_urls = {row.url_base.strip().rstrip("/").casefold() for row in rows}
+    created = False
+
+    for portal in BUILTIN_PORTAIS:
+        portal_name = portal["nome"].strip().casefold()
+        portal_url = portal["url_base"].strip().rstrip("/").casefold()
+        if portal_name in existing_names or portal_url in existing_urls:
+            continue
+
+        db.add(
+            PortalIntegracaoModel(
+                nome=portal["nome"],
+                url_base=portal["url_base"],
+                tipo_auth=portal["tipo_auth"],
+                credencial=portal["credencial"],
+                status=portal["status"],
+                criado_em=datetime.utcnow().isoformat(),
+            ),
+        )
+        created = True
+
+    if created:
+        db.commit()
 
 
 @router.get("/pncp", response_model=PncpConfigRead)
@@ -227,6 +270,7 @@ def list_portais(db: Session = Depends(get_db_session)) -> PortalIntegracoesList
 
     from app.models.portal_integracao import PortalIntegracaoModel
 
+    _ensure_builtin_portais(db)
     rows = db.scalars(select(PortalIntegracaoModel).order_by(PortalIntegracaoModel.id.desc())).all()
     return PortalIntegracoesListRead(items=[_serialize_portal_integracao(row) for row in rows])
 
