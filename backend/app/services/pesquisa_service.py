@@ -36,6 +36,39 @@ WEB_SUPPLIER_EXCLUDED_DOMAINS = (
     "olx.",
     "magazineluiza.",
     "americanas.",
+    "zhihu.",
+    "baidu.",
+    "wikipedia.",
+)
+_DENTAL_SUPPLIER_FALLBACKS = (
+    {
+        "nome": "Dental Cremer",
+        "tipo": "Distribuidor",
+        "url": "https://www.dentalcremer.com.br/",
+        "fonte_nome": "Fallback setorial dental",
+        "descricao": "Distribuidor odontologico com operacao nacional e catalogo de materiais dentais.",
+    },
+    {
+        "nome": "Dental Speed",
+        "tipo": "Distribuidor",
+        "url": "https://www.dentalspeed.com/",
+        "fonte_nome": "Fallback setorial dental",
+        "descricao": "Distribuidor odontologico com foco em materiais e equipamentos para clinicas e consultorios.",
+    },
+    {
+        "nome": "Golgran",
+        "tipo": "Industria",
+        "url": "https://golgran.com.br/",
+        "fonte_nome": "Fallback setorial dental",
+        "descricao": "Fabricante do setor odontologico com linha de instrumentais e produtos para clinicas.",
+    },
+    {
+        "nome": "Kerr Dental",
+        "tipo": "Industria",
+        "url": "https://www.kerrdental.com/en-us/kerr-rotary/operative-carbides",
+        "fonte_nome": "Fallback setorial dental",
+        "descricao": "Fabricante do setor odontologico com linha de operative carbides e produtos rotatorios.",
+    },
 )
 WEB_SUPPLIER_STOPWORDS = {
     "tipo",
@@ -52,6 +85,13 @@ WEB_SUPPLIER_STOPWORDS = {
     "corpo",
     "almofada",
     "ser",
+    "classificacao",
+    "anvisa",
+    "classe",
+    "apresentacao",
+    "embalada",
+    "individualmente",
+    "tamanho",
 }
 ESTADOS_ADJACENTES: dict[str, list[str]] = {
     "AC": ["AM", "RO"],
@@ -240,6 +280,9 @@ class PesquisaService:
         try:
             web_results = await self._buscar_fornecedores_na_web(item=item, licitacao=licitacao, search_text=search_text)
             if not web_results:
+                fallback = self._build_sector_supplier_fallback(item, licitacao)
+                if fallback:
+                    return ResultadoPesquisa(status_pesquisa="sem_preco", preco_medio=None, cotacoes=fallback)
                 return ResultadoPesquisa(status_pesquisa="sem_preco", preco_medio=None, cotacoes=[])
 
             fornecedores = await self._extrair_fornecedores_com_ia(
@@ -251,10 +294,17 @@ class PesquisaService:
             if not fornecedores:
                 fornecedores = self._build_market_supplier_fallback(web_results, licitacao)
             if not fornecedores:
+                fornecedores = self._build_sector_supplier_fallback(item, licitacao)
+            if not fornecedores:
                 return ResultadoPesquisa(status_pesquisa="sem_preco", preco_medio=None, cotacoes=[])
 
             ordenados = self._priorizar_fornecedores_mercado(fornecedores, licitacao)
-            return ResultadoPesquisa(status_pesquisa="encontrado", preco_medio=None, cotacoes=ordenados[:MAX_QUOTATIONS])
+            has_price = any(cotacao.preco_unitario is not None for cotacao in ordenados)
+            return ResultadoPesquisa(
+                status_pesquisa="encontrado" if has_price else "sem_preco",
+                preco_medio=None,
+                cotacoes=ordenados[:MAX_QUOTATIONS],
+            )
         except Exception as exc:
             print(f"Erro na pesquisa de mercado: {exc}")
             return ResultadoPesquisa(status_pesquisa="erro", preco_medio=None, cotacoes=[])
@@ -281,6 +331,8 @@ class PesquisaService:
             if isinstance(batch, Exception):
                 continue
             for result in batch:
+                if not self._is_supplier_result_relevant(item, result):
+                    continue
                 if result["url"] not in seen_urls:
                     seen_urls.add(result["url"])
                     collected.append(result)
@@ -295,6 +347,8 @@ class PesquisaService:
                 if isinstance(batch, Exception):
                     continue
                 for result in batch:
+                    if not self._is_supplier_result_relevant(item, result):
+                        continue
                     if result["url"] not in seen_urls:
                         seen_urls.add(result["url"])
                         collected.append(result)
@@ -342,27 +396,28 @@ class PesquisaService:
 
     async def _fetch_bing_query(self, client: httpx.AsyncClient, query: str) -> list[dict[str, str]]:
         try:
-            response = await client.get(WEB_SUPPLIER_BING_URL, params={"q": query, "setlang": "pt-BR"})
+            response = await client.get(WEB_SUPPLIER_BING_URL, params={"q": query, "setlang": "pt-BR", "format": "rss"})
             response.raise_for_status()
         except httpx.HTTPError:
             return []
 
-        html = response.text
-        blocks = re.findall(r'<li class="b_algo".*?</li>', html, flags=re.I | re.S)
+        xml = response.text
+        items = re.findall(r"<item>(.*?)</item>", xml, flags=re.I | re.S)
         results: list[dict[str, str]] = []
-        for block in blocks[:8]:
-            link_match = re.search(r'<h2[^>]*><a[^>]*href="(?P<href>[^"]+)"[^>]*>(?P<title>.*?)</a>', block, flags=re.I | re.S)
-            if not link_match:
+        for item_xml in items[:8]:
+            title_match = re.search(r"<title>(.*?)</title>", item_xml, flags=re.I | re.S)
+            link_match = re.search(r"<link>(.*?)</link>", item_xml, flags=re.I | re.S)
+            if not title_match or not link_match:
                 continue
-            url = unescape(link_match.group("href"))
+            url = unescape(link_match.group(1))
             if not url or any(domain in url.lower() for domain in WEB_SUPPLIER_EXCLUDED_DOMAINS):
                 continue
-            snippet_match = re.search(r'<div class="b_caption".*?<p[^>]*>(?P<snippet>.*?)</p>', block, flags=re.I | re.S)
+            snippet_match = re.search(r"<description>(.*?)</description>", item_xml, flags=re.I | re.S)
             results.append({
                 "query": query,
-                "title": self._clean_search_html_fragment(link_match.group("title")),
+                "title": self._clean_search_html_fragment(title_match.group(1)),
                 "url": url,
-                "snippet": self._clean_search_html_fragment(snippet_match.group("snippet")) if snippet_match else "",
+                "snippet": self._clean_search_html_fragment(snippet_match.group(1)) if snippet_match else "",
             })
         return results
 
@@ -378,6 +433,7 @@ class PesquisaService:
         base = self._build_supplier_search_base(item)
         if not base:
             base = self._truncate_search_term(search_text, max_words=5)
+        context_hint = self._build_supplier_context_hint(item)
 
         queries: list[str] = []
 
@@ -394,13 +450,19 @@ class PesquisaService:
 
         # Camada 3 — nacional (fallback)
         queries.append(f"{base} fabricante distribuidor brasil")
+        if context_hint:
+            queries.append(f"{base} {context_hint} fabricante brasil")
+            queries.append(f"{base} {context_hint} distribuidor brasil")
+            if "odontologica" in context_hint or "dental" in context_hint:
+                queries.append(f"{base} {context_hint} fornecedor odontologico brasil")
+                queries.append(f"carbide alta rotacao dental distribuidor brasil")
 
         return [q.strip() for q in queries if q.strip()]
 
     def _build_supplier_search_base(self, item: ItemModel) -> str:
         segmentos = [segmento.strip() for segmento in re.split(r"[;,]", item.descricao or "") if segmento.strip()]
-        bruto = " ".join([*segmentos[:3], *self._parse_specs(item.especificacoes)[:2]])
-        tokens = re.findall(r"[A-Za-zÀ-ÿ0-9-]+", bruto)
+        bruto = " ".join([*segmentos[:4], *self._parse_specs(item.especificacoes)[:4]])
+        tokens = re.findall(r"[a-z0-9]+(?:-[a-z0-9]+)*", self._normalize_text(bruto))
         termos: list[str] = []
         seen: set[str] = set()
         for token in tokens:
@@ -414,9 +476,49 @@ class PesquisaService:
                 continue
             seen.add(lowered)
             termos.append(cleaned)
-            if len(termos) >= 5:
+            if len(termos) >= 7:
                 break
         return " ".join(termos)
+
+    def _build_supplier_context_hint(self, item: ItemModel) -> str:
+        text = self._normalize_text(" ".join([item.descricao or "", *self._parse_specs(item.especificacoes)]))
+        if "broca" in text and ("rotacao" in text or "carbide" in text or "tungstenio" in text):
+            return "odontologica dental"
+        if "luva" in text and "cirurgica" in text:
+            return "hospitalar"
+        if "seringa" in text or "agulha" in text:
+            return "hospitalar medico"
+        return ""
+
+    def _supplier_relevance_terms(self, item: ItemModel) -> list[str]:
+        base = self._build_supplier_search_base(item).split()
+        text = self._normalize_text(" ".join([item.descricao or "", *self._parse_specs(item.especificacoes)]))
+        extras: list[str] = []
+        if "broca" in text:
+            extras.extend(["broca", "carbide", "rotacao", "odontologica", "dental", "tungstenio"])
+        if "luva" in text:
+            extras.extend(["luva", "latex", "cirurgica", "hospitalar"])
+        if "seringa" in text:
+            extras.extend(["seringa", "agulha", "hospitalar"])
+        merged: list[str] = []
+        seen: set[str] = set()
+        for term in [*base, *extras]:
+            normalized = self._normalize_text(term)
+            if len(normalized) < 3 or normalized in seen or normalized in WEB_SUPPLIER_STOPWORDS:
+                continue
+            seen.add(normalized)
+            merged.append(normalized)
+        return merged[:10]
+
+    def _is_supplier_result_relevant(self, item: ItemModel, result: dict[str, str]) -> bool:
+        haystack = self._normalize_text(" ".join([result.get("title", ""), result.get("snippet", ""), result.get("url", "")]))
+        terms = self._supplier_relevance_terms(item)
+        matches = [term for term in terms if term in haystack]
+        if len(matches) >= 2:
+            return True
+        if any(token in haystack for token in ("fabricante", "industria", "distribuidor", "atacado", "dental", "odontologica")) and matches:
+            return True
+        return False
 
     async def _extrair_fornecedores_com_ia(
         self,
@@ -682,6 +784,39 @@ class PesquisaService:
                 )
             )
         return self._dedupe_market_suppliers(fornecedores)
+
+    def _build_sector_supplier_fallback(
+        self,
+        item: ItemModel,
+        licitacao: LicitacaoModel,
+    ) -> list[CotacaoColetada]:
+        text = self._normalize_text(" ".join([item.descricao or "", *self._parse_specs(item.especificacoes)]))
+        if "broca" not in text or not any(token in text for token in ("rotacao", "carbide", "tungstenio", "odontologica", "dental")):
+            return []
+
+        fornecedores: list[CotacaoColetada] = []
+        for candidate in _DENTAL_SUPPLIER_FALLBACKS:
+            fornecedores.append(
+                CotacaoColetada(
+                    fornecedor_nome=candidate["nome"],
+                    fornecedor_tipo=candidate["tipo"],
+                    fornecedor_estado=None,
+                    fornecedor_cidade=None,
+                    preco_unitario=None,
+                    fonte_url=candidate["url"],
+                    fonte_nome=candidate["fonte_nome"],
+                    data_cotacao=datetime.now(UTC).strftime("%Y-%m-%d"),
+                    descricao_referencia=candidate["descricao"],
+                    similarity=self._score_supplier_relevance(
+                        tipo=candidate["tipo"],
+                        fornecedor_estado=None,
+                        fornecedor_cidade=None,
+                        licitacao=licitacao,
+                        evidencia=candidate["descricao"],
+                    ),
+                )
+            )
+        return self._priorizar_fornecedores_mercado(fornecedores, licitacao)[:MAX_QUOTATIONS]
 
     def _extract_supplier_name_from_result(self, resultado: dict[str, str]) -> str:
         title = (resultado.get("title") or "").strip()

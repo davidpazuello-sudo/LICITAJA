@@ -46,6 +46,7 @@ function PerfilLicitacao() {
   const {
     errorMessage: itensErrorMessage,
     exportarTabela,
+    backgroundJob,
     isExtracting,
     isExporting,
     isSearchingAll,
@@ -334,6 +335,12 @@ function PerfilLicitacao() {
                     {itensErrorMessage ? (
                       <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">
                         {itensErrorMessage}
+                      </div>
+                    ) : null}
+
+                    {backgroundJob && (backgroundJob.status === "queued" || backgroundJob.status === "processing") ? (
+                      <div className="rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm text-sky-700">
+                        {backgroundJob.mensagem || "Enriquecendo marcas/fabricantes dos itens em segundo plano."}
                       </div>
                     ) : null}
                   </div>

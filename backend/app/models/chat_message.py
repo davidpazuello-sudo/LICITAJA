@@ -1,4 +1,6 @@
-from sqlalchemy import ForeignKey, String, Text, func
+from datetime import UTC, datetime
+
+from sqlalchemy import ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -17,7 +19,7 @@ class ChatMessageModel(Base):
     created_at: Mapped[str] = mapped_column(
         String,
         nullable=False,
-        server_default=func.datetime("now"),
+        default=lambda: datetime.now(UTC).isoformat(),
     )
 
     licitacao = relationship("LicitacaoModel", back_populates="chat_messages")

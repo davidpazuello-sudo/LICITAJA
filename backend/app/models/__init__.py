@@ -5,6 +5,7 @@ from app.models.edital import EditalModel
 from app.models.item import ItemModel
 from app.models.licitacao import LicitacaoModel
 from app.models.portal_integracao import PortalIntegracaoModel
+from app.models.processamento_job import ProcessamentoJobModel
 
 __all__ = [
     "ChatMessageModel",
@@ -14,4 +15,5 @@ __all__ = [
     "ItemModel",
     "LicitacaoModel",
     "PortalIntegracaoModel",
+    "ProcessamentoJobModel",
 ]

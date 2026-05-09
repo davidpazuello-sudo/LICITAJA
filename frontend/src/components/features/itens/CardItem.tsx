@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 
-import type { ItemType } from "../../../types/item.types";
+import type { ItemType, MarcaFabricanteType } from "../../../types/item.types";
 import { formatCurrency } from "../../../utils/formatters";
 import { Badge } from "../../ui/Badge";
 import { Button } from "../../ui/Button";
@@ -48,8 +48,36 @@ function CardItem({
     }
 
     try {
-      const parsed = JSON.parse(item.marcas_fabricantes) as string[];
-      return Array.isArray(parsed) ? parsed : [];
+      const parsed = JSON.parse(item.marcas_fabricantes) as Array<string | MarcaFabricanteType>;
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+
+      return parsed
+        .map((entry) => {
+          if (typeof entry === "string") {
+            return {
+              nome: entry,
+              preco_unitario_medio: null,
+              quantidade_referencias_preco: 0,
+              observacao: null,
+            } satisfies MarcaFabricanteType;
+          }
+
+          if (!entry || typeof entry !== "object" || !("nome" in entry)) {
+            return null;
+          }
+
+          return {
+            nome: String(entry.nome),
+            preco_unitario_medio:
+              typeof entry.preco_unitario_medio === "number" ? entry.preco_unitario_medio : null,
+            quantidade_referencias_preco:
+              typeof entry.quantidade_referencias_preco === "number" ? entry.quantidade_referencias_preco : 0,
+            observacao: typeof entry.observacao === "string" ? entry.observacao : null,
+          } satisfies MarcaFabricanteType;
+        })
+        .filter((entry): entry is MarcaFabricanteType => entry !== null);
     } catch {
       return [];
     }
@@ -59,7 +87,8 @@ function CardItem({
   const cotacoesSemPreco = item.cotacoes.filter((cotacao) => cotacao.preco_unitario === null);
   const totalEstimado =
     item.preco_medio !== null && item.quantidade !== null ? item.preco_medio * item.quantidade : null;
-  const shouldCollapseDescription = item.descricao.length > 220;
+  const hasExpandableDetails =
+    item.descricao.trim().length > 0 || especificacoes.length > 0 || marcasFabricantes.length > 0;
 
   return (
     <Card className="overflow-hidden">
@@ -83,7 +112,7 @@ function CardItem({
         </button>
 
         <div className="flex items-center gap-3">
-          {shouldCollapseDescription ? (
+          {hasExpandableDetails ? (
             <Button
               type="button"
               variant="outline"
@@ -149,7 +178,20 @@ function CardItem({
                 {marcasFabricantes.length > 0 ? (
                   <ul className="mt-2 space-y-2 text-sm leading-6 text-ink">
                     {marcasFabricantes.map((marca) => (
-                      <li key={marca}>- {marca}</li>
+                      <li key={marca.nome} className="rounded-xl border border-line/70 bg-white/70 px-3 py-2">
+                        <p className="font-medium text-ink">{marca.nome}</p>
+                        <p className="text-xs text-slate">
+                          {marca.preco_unitario_medio !== null
+                            ? `Media estimada: ${formatCurrency(marca.preco_unitario_medio)}/un`
+                            : "Media estimada nao encontrada"}
+                          {marca.quantidade_referencias_preco > 0
+                            ? ` · ${marca.quantidade_referencias_preco} referencias`
+                            : ""}
+                        </p>
+                        {marca.observacao ? (
+                          <p className="mt-1 text-xs leading-5 text-slate">{marca.observacao}</p>
+                        ) : null}
+                      </li>
                     ))}
                   </ul>
                 ) : (

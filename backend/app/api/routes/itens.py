@@ -2,7 +2,7 @@ import csv
 from datetime import UTC, datetime
 from io import StringIO
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
@@ -12,9 +12,12 @@ from app.models.cotacao import CotacaoModel
 from app.models.edital import EditalModel
 from app.models.item import ItemModel
 from app.models.licitacao import LicitacaoModel
+from app.models.processamento_job import ProcessamentoJobModel
 from app.schemas.edital import EditalRead
+from app.schemas.job import JobRead
 from app.schemas.item import ItemListResponse, ItemRead
 from app.services.ia_service import ExtracaoItensError, IaService
+from app.services.job_service import criar_job_processamento, enriquecer_marcas_em_segundo_plano
 from app.services.pesquisa_service import PesquisaService
 
 router = APIRouter(tags=["itens"])
@@ -39,7 +42,7 @@ async def upload_edital(
     edital = EditalModel(
         licitacao_id=licitacao_id,
         arquivo_nome=arquivo.filename,
-        arquivo_path=str(saved_path),
+        arquivo_path=saved_path,
         status_extracao="pendente",
         erro_mensagem=None,
     )
@@ -63,7 +66,18 @@ async def listar_itens_licitacao(
         .where(ItemModel.licitacao_id == licitacao_id)
         .order_by(ItemModel.numero_item.asc(), ItemModel.id.asc()),
     ).all()
-    return ItemListResponse(items=[ItemRead.model_validate(item) for item in items])
+    background_job = db.scalar(
+        select(ProcessamentoJobModel)
+        .where(
+            ProcessamentoJobModel.licitacao_id == licitacao_id,
+            ProcessamentoJobModel.tipo == "brand_enrichment",
+        )
+        .order_by(ProcessamentoJobModel.id.desc())
+    )
+    return ItemListResponse(
+        items=[ItemRead.model_validate(item) for item in items],
+        background_job=JobRead.model_validate(background_job) if background_job is not None else None,
+    )
 
 
 @router.get("/licitacoes/{licitacao_id}/itens/exportar")
@@ -135,6 +149,7 @@ async def obter_item(
 @router.post("/licitacoes/{licitacao_id}/itens/extrair", response_model=ItemListResponse)
 async def extrair_itens_licitacao(
     licitacao_id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db_session),
 ) -> ItemListResponse:
     licitacao = db.get(LicitacaoModel, licitacao_id)
@@ -162,7 +177,7 @@ async def extrair_itens_licitacao(
         edital = EditalModel(
             licitacao_id=licitacao_id,
             arquivo_nome=arquivo_nome,
-            arquivo_path=str(arquivo_path),
+            arquivo_path=arquivo_path,
             status_extracao="pendente",
             erro_mensagem=None,
         )
@@ -178,7 +193,10 @@ async def extrair_itens_licitacao(
     db.commit()
 
     try:
-        extraidos = await service.extrair_itens_do_edital(edital.arquivo_path)
+        extraidos = await service.extrair_itens_do_edital(
+            edital.arquivo_path,
+            include_brand_enrichment=False,
+        )
     except ExtracaoItensError as exc:
         edital.status_extracao = "erro"
         edital.erro_mensagem = str(exc)
@@ -216,7 +234,36 @@ async def extrair_itens_licitacao(
     for item_model in persisted_items:
         db.refresh(item_model)
 
-    return ItemListResponse(items=[ItemRead.model_validate(item) for item in persisted_items])
+    background_job = criar_job_processamento(
+        licitacao_id,
+        "brand_enrichment",
+        mensagem="Aguardando enriquecimento de marcas/fabricantes.",
+    )
+    background_tasks.add_task(enriquecer_marcas_em_segundo_plano, background_job.id, licitacao_id)
+    return ItemListResponse(
+        items=[ItemRead.model_validate(item) for item in persisted_items],
+        background_job=JobRead.model_validate(background_job),
+    )
+
+
+@router.get("/licitacoes/{licitacao_id}/jobs/brand-enrichment", response_model=JobRead | None)
+async def obter_job_enriquecimento_marcas(
+    licitacao_id: int,
+    db: Session = Depends(get_db_session),
+) -> JobRead | None:
+    licitacao = db.get(LicitacaoModel, licitacao_id)
+    if licitacao is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Licitacao nao encontrada.")
+
+    job = db.scalar(
+        select(ProcessamentoJobModel)
+        .where(
+            ProcessamentoJobModel.licitacao_id == licitacao_id,
+            ProcessamentoJobModel.tipo == "brand_enrichment",
+        )
+        .order_by(ProcessamentoJobModel.id.desc())
+    )
+    return JobRead.model_validate(job) if job is not None else None
 
 
 @router.post("/itens/{item_id}/pesquisar", response_model=ItemRead)

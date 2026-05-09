@@ -1,5 +1,12 @@
 import type { CotacaoType } from "./cotacao.types";
 
+export interface MarcaFabricanteType {
+  nome: string;
+  preco_unitario_medio: number | null;
+  quantidade_referencias_preco: number;
+  observacao: string | null;
+}
+
 export interface ItemType {
   id: number;
   licitacao_id: number;
@@ -17,6 +24,19 @@ export interface ItemType {
   cotacoes: CotacaoType[];
 }
 
+export interface BackgroundJobType {
+  id: number;
+  licitacao_id: number | null;
+  tipo: string;
+  status: string;
+  mensagem: string | null;
+  criado_em: string;
+  iniciado_em: string | null;
+  finalizado_em: string | null;
+  atualizado_em: string;
+}
+
 export interface ItemListResponseType {
   items: ItemType[];
+  background_job?: BackgroundJobType | null;
 }

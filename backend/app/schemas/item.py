@@ -1,6 +1,7 @@
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.cotacao import CotacaoRead
+from app.schemas.job import JobRead
 
 
 class ItemBase(BaseModel):
@@ -32,3 +33,4 @@ class ItemRead(ItemBase):
 
 class ItemListResponse(BaseModel):
     items: list[ItemRead]
+    background_job: JobRead | None = None

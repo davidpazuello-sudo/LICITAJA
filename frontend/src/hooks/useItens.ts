@@ -4,12 +4,13 @@ import {
   exportarTabelaItens,
   extrairItens,
   listarItens,
+  obterJobEnriquecimentoMarcas,
   pesquisarItem,
   pesquisarMercado,
   pesquisarTodosItens,
   uploadEdital,
 } from "../services/itens.service";
-import type { ItemType } from "../types/item.types";
+import type { BackgroundJobType, ItemType } from "../types/item.types";
 import type { EditalType, LicitacaoDetailType } from "../types/licitacao.types";
 
 type ItensStatus = "idle" | "loading" | "ready" | "error";
@@ -28,6 +29,32 @@ export function useItens(params: {
   const [isSearchingAll, setIsSearchingAll] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [searchingItemIds, setSearchingItemIds] = useState<number[]>([]);
+  const [backgroundJob, setBackgroundJob] = useState<BackgroundJobType | null>(null);
+
+  const refreshItemsSilently = async (targetLicitacaoId: number) => {
+    const response = await listarItens(targetLicitacaoId);
+    setItems(response.items);
+    setBackgroundJob(response.background_job ?? null);
+    setStatus("ready");
+    setErrorMessage("");
+    return response.items;
+  };
+
+  const pollBrandEnrichment = async (targetLicitacaoId: number) => {
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, 2500));
+      try {
+        const job = await obterJobEnriquecimentoMarcas(targetLicitacaoId);
+        setBackgroundJob(job ?? null);
+        if (job?.status === "completed" || job?.status === "failed") {
+          await refreshItemsSilently(targetLicitacaoId);
+          return;
+        }
+      } catch {
+        return;
+      }
+    }
+  };
 
   useEffect(() => {
     if (!licitacaoId) {
@@ -36,14 +63,15 @@ export function useItens(params: {
 
     let isCancelled = false;
 
-    const loadItems = async () => {
-      setStatus("loading");
-      try {
-        const response = await listarItens(licitacaoId);
+      const loadItems = async () => {
+        setStatus("loading");
+        try {
+          const response = await listarItens(licitacaoId);
         if (isCancelled) {
           return;
         }
         setItems(response.items);
+        setBackgroundJob(response.background_job ?? null);
         setStatus("ready");
         setErrorMessage("");
       } catch (error) {
@@ -114,9 +142,11 @@ export function useItens(params: {
     try {
       const response = await extrairItens(licitacaoId);
       setItems(response.items);
+      setBackgroundJob(response.background_job ?? null);
       setStatus("ready");
       setErrorMessage("");
       await onRefreshPerfil();
+      void pollBrandEnrichment(licitacaoId);
     } catch (error) {
       setStatus("error");
       setErrorMessage(
@@ -229,6 +259,7 @@ export function useItens(params: {
     isUploading,
     items,
     latestEdital,
+    backgroundJob,
     resumo,
     enviarEdital,
     iniciarExtracao,

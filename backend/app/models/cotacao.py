@@ -1,4 +1,6 @@
-from sqlalchemy import Float, ForeignKey, String, Text, func
+from datetime import UTC, datetime
+
+from sqlalchemy import Float, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -20,12 +22,12 @@ class CotacaoModel(Base):
     data_cotacao: Mapped[str] = mapped_column(
         String,
         nullable=False,
-        server_default=func.datetime("now"),
+        default=lambda: datetime.now(UTC).isoformat(),
     )
     created_at: Mapped[str] = mapped_column(
         String,
         nullable=False,
-        server_default=func.datetime("now"),
+        default=lambda: datetime.now(UTC).isoformat(),
     )
 
     item = relationship("ItemModel", back_populates="cotacoes")

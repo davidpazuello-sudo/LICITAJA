@@ -8,7 +8,7 @@ Busque editais no PNCP, salve os que interessam, extraia itens com a IA ativa e 
 
 - Frontend: React 18 + TypeScript + Vite + Tailwind CSS
 - Backend: FastAPI (Python 3.11+)
-- Banco de dados: SQLite (arquivo local `backend/licitai.db`)
+- Banco de dados: SQLite local ou Postgres para web/producao
 - IA: OpenAI, Anthropic ou Gemini, com uma ativa por vez
 
 ## Pre-requisitos
@@ -73,6 +73,94 @@ Todas as variaveis ficam em `backend/.env`. As principais:
 | `DATABASE_URL` | Caminho do banco SQLite | `sqlite:///./licitai.db` |
 | `PNCP_BASE_URL` | URL base da API do PNCP | valor oficial |
 | `FRONTEND_ORIGIN` | Origem permitida pelo CORS | `http://localhost:5173` |
+
+## Banco e migracoes
+
+O projeto agora suporta dois modos de banco:
+
+- desenvolvimento local rapido com SQLite
+- producao com Postgres
+
+Exemplo local:
+
+```env
+DATABASE_URL=sqlite:///./licitai.db
+```
+
+Exemplo producao:
+
+```env
+DATABASE_URL=postgresql+psycopg://USER:PASSWORD@HOST:5432/licitai
+```
+
+As migracoes ficam em [`backend/alembic`](backend/alembic) e usam `alembic`.
+
+Comandos uteis:
+
+```bash
+cd backend
+
+# aplicar migracoes
+python -m alembic upgrade head
+
+# criar nova migracao
+python -m alembic revision -m "descricao_da_mudanca"
+```
+
+Observacoes:
+
+- o projeto ainda inicializa tabelas automaticamente no startup como protecao para ambiente vazio
+- para web/producao, o fluxo recomendado e aplicar `alembic upgrade head` antes de subir a API
+
+## Preparacao para Web
+
+O backend ja foi preparado para a primeira etapa da migracao para web:
+
+- suporte a `Postgres`
+- base de migracoes com `Alembic`
+- configuracoes de `CORS` por lista de origens
+- configuracoes iniciais para `storage` externo
+- camada de storage compativel com disco local ou bucket `S3/R2`
+
+Variaveis novas para storage:
+
+```env
+STORAGE_BACKEND=local
+STORAGE_BUCKET=
+STORAGE_REGION=
+STORAGE_ENDPOINT_URL=
+STORAGE_ACCESS_KEY_ID=
+STORAGE_SECRET_ACCESS_KEY=
+STORAGE_PUBLIC_BASE_URL=
+STORAGE_PREFIX=licitai
+```
+
+Nesta fase, o sistema ja salva e le editais pela camada de storage:
+
+- `STORAGE_BACKEND=local` continua usando disco local
+- `STORAGE_BACKEND=s3` permite usar bucket compativel com `S3/R2`
+
+O campo `arquivo_path` dos editais agora deve ser tratado como referencia de storage, nao necessariamente como caminho fisico local.
+
+### Migrar editais antigos para o storage novo
+
+Depois de configurar `STORAGE_BACKEND=s3` e as credenciais do bucket, voce pode migrar os editais que hoje ainda estao no disco local:
+
+```bash
+cd backend
+
+# simular sem alterar nada
+python scripts/migrate_editais_to_storage.py --dry-run
+
+# migrar de fato
+python scripts/migrate_editais_to_storage.py
+```
+
+Durante a migracao:
+
+- editais que ja estiverem em `storage://...` sao ignorados
+- editais sem arquivo local valido sao reportados como falha
+- o banco passa a guardar a nova referencia remota em `arquivo_path`
 
 ## Funcionalidades do MVP
 

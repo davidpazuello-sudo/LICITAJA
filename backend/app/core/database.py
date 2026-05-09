@@ -14,6 +14,10 @@ class Base(DeclarativeBase):
 settings = get_settings()
 
 
+def is_sqlite_url(database_url: str) -> bool:
+    return database_url.startswith("sqlite:")
+
+
 def _resolve_sqlite_path(database_url: str) -> str:
     if not database_url.startswith("sqlite:///./"):
         return database_url
@@ -23,9 +27,22 @@ def _resolve_sqlite_path(database_url: str) -> str:
     return f"sqlite:///{absolute_path.as_posix()}"
 
 
+def build_database_url(database_url: str) -> str:
+    if is_sqlite_url(database_url):
+        return _resolve_sqlite_path(database_url)
+    return database_url
+
+
+def _build_engine_kwargs(database_url: str) -> dict[str, object]:
+    kwargs: dict[str, object] = {"pool_pre_ping": True}
+    if is_sqlite_url(database_url):
+        kwargs["connect_args"] = {"check_same_thread": False}
+    return kwargs
+
+
 engine = create_engine(
-    _resolve_sqlite_path(settings.database_url),
-    connect_args={"check_same_thread": False},
+    build_database_url(settings.database_url),
+    **_build_engine_kwargs(settings.database_url),
 )
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
 
@@ -46,6 +63,7 @@ def init_database() -> None:
     from app.models.item import ItemModel
     from app.models.licitacao import LicitacaoModel
     from app.models.portal_integracao import PortalIntegracaoModel
+    from app.models.processamento_job import ProcessamentoJobModel
 
     _ = (
         ChatMessageModel,
@@ -55,10 +73,12 @@ def init_database() -> None:
         ItemModel,
         LicitacaoModel,
         PortalIntegracaoModel,
+        ProcessamentoJobModel,
     )
 
     Base.metadata.create_all(bind=engine)
-    _ensure_schema_updates()
+    if is_sqlite_url(settings.database_url):
+        _ensure_schema_updates()
     _seed_default_configurations()
 
 

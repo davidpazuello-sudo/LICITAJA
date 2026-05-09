@@ -12,11 +12,14 @@ import httpx
 import pdfplumber
 from openai import OpenAI
 from pydantic import BaseModel, Field, RootModel  # noqa: F401 (RootModel usado por ItensExtraidosSchema)
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.models.item import ItemModel
 from app.models.licitacao import LicitacaoModel
 from app.services.ia_config_service import get_active_provider_id, get_ai_provider_internal_config
+from app.services.storage_service import StorageError, StorageService
 
 _SUMMARY_SYSTEM_INSTRUCTION = (
     "Voce e um analista de licitacoes publicas brasileiras. "
@@ -56,18 +59,30 @@ class ExtracaoItensError(Exception):
 
 
 class ItemExtraidoSchema(BaseModel):
+    class BrandCandidateSchema(BaseModel):
+        nome: str
+        preco_unitario_medio: float | None = None
+        quantidade_referencias_preco: int = 0
+        observacao: str | None = None
+
     numero_item: int
     descricao: str
     quantidade: float | None = None
     unidade: str | None = None
     especificacoes: list[str] = Field(default_factory=list)
-    marcas_fabricantes: list[str] = Field(default_factory=list)
+    marcas_fabricantes: list[str | BrandCandidateSchema] = Field(default_factory=list)
 
     def especificacoes_json(self) -> str:
         return json.dumps(self.especificacoes, ensure_ascii=False)
 
     def marcas_fabricantes_json(self) -> str:
-        return json.dumps(self.marcas_fabricantes, ensure_ascii=False)
+        serialized: list[dict[str, object] | str] = []
+        for entry in self.marcas_fabricantes:
+            if isinstance(entry, ItemExtraidoSchema.BrandCandidateSchema):
+                serialized.append(entry.model_dump())
+            else:
+                serialized.append(entry)
+        return json.dumps(serialized, ensure_ascii=False)
 
 
 class ItensExtraidosSchema(RootModel[list[ItemExtraidoSchema]]):
@@ -121,9 +136,53 @@ _INVALID_ITEM_PATTERNS = (
     r"\bproduto com no minimo de",
 )
 _WEB_BRAND_SEARCH_URL = "https://html.duckduckgo.com/html/"
+_WEB_BRAND_BING_URL = "https://www.bing.com/search"
 _WEB_BRAND_MAX_RESULTS = 6
 _WEB_BRAND_MAX_ITEMS_PER_EXTRACTION = 12
 _WEB_BRAND_CONCURRENCY = 2
+_WEB_BRAND_MAX_PRICE_SEARCH_RESULTS = 5
+_WEB_BRAND_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/124.0.0.0 Safari/537.36"
+)
+_PRICE_PATTERN = re.compile(r"R\$\s*([0-9]{1,3}(?:\.[0-9]{3})*,[0-9]{2})", re.I)
+_WEB_BRAND_EXCLUDED_DOMAINS = (
+    "mercadolivre.",
+    "amazon.",
+    "shopee.",
+    "olx.",
+    "magazineluiza.",
+    "americanas.",
+    "superepi.",
+    "lojadomecanico.",
+    "fg.com.br",
+    "drogaraia.",
+    "drogasil.",
+    "paguemenos.",
+    "ultrafarma.",
+    "zhihu.",
+    "baidu.",
+)
+_WEB_BRAND_EXCLUDED_TITLE_TERMS = (
+    "mercado livre",
+    "loja do mecânico",
+    "loja do mecanico",
+    "drogaria",
+    "droga raia",
+    "farmácia",
+    "farmacia",
+)
+_DENTAL_BRAND_FALLBACK_CANDIDATES = (
+    {
+        "nome": "Golgran",
+        "observacao": "Fabricante do segmento odontologico com linha de instrumentais e brocas.",
+    },
+    {
+        "nome": "Kerr Dental",
+        "observacao": "Fabricante internacional do segmento odontologico com linha de operative carbides.",
+    },
+)
 _WEB_BRAND_STOPWORDS = {
     "a",
     "o",
@@ -146,6 +205,32 @@ _WEB_BRAND_STOPWORDS = {
     "adicionais",
     "dimensoes",
     "dimensões",
+    "classificacao",
+    "anvisa",
+    "classe",
+    "embalagem",
+    "fornecimento",
+    "comprimento",
+    "minimo",
+    "minima",
+    "minimas",
+    "externa",
+    "interna",
+    "interno",
+    "involucro",
+    "grau",
+    "abertura",
+    "petala",
+    "quantidade",
+    "adequada",
+    "excelente",
+    "resistente",
+    "atoxica",
+    "atoxico",
+    "hipoalergenica",
+    "hipoalergenico",
+    "unidade",
+    "formato",
     "definida",
     "corpo",
 }
@@ -155,17 +240,16 @@ class IaService:
     def __init__(self, db: Session | None = None) -> None:
         self.settings = get_settings()
         self.db = db
+        self.storage = StorageService()
 
-    async def salvar_edital(self, licitacao_id: int, arquivo) -> Path:
-        uploads_root = Path(__file__).resolve().parents[2] / self.settings.uploads_dir / str(licitacao_id)
-        uploads_root.mkdir(parents=True, exist_ok=True)
-
-        destination = uploads_root / Path(arquivo.filename or "edital.pdf").name
+    async def salvar_edital(self, licitacao_id: int, arquivo) -> str:
         content = await arquivo.read()
-        destination.write_bytes(content)
-        return destination
+        try:
+            return self.storage.save_edital(licitacao_id, arquivo.filename or "edital.pdf", content)
+        except StorageError as exc:
+            raise ExtracaoItensError(f"Nao foi possivel salvar o edital no storage configurado: {exc}") from exc
 
-    async def baixar_edital_principal(self, licitacao: LicitacaoModel) -> tuple[Path, str]:
+    async def baixar_edital_principal(self, licitacao: LicitacaoModel) -> tuple[str, str]:
         edital_url = await self._resolve_edital_principal_url(licitacao)
         if not edital_url:
             raise ExtracaoItensError("Esta licitacao nao possui edital principal acessivel para download automatico.")
@@ -181,13 +265,12 @@ class IaService:
         except httpx.HTTPError as exc:
             raise ExtracaoItensError("Nao foi possivel baixar o edital principal desta licitacao no momento.") from exc
 
-        uploads_root = Path(__file__).resolve().parents[2] / self.settings.uploads_dir / str(licitacao.id)
-        uploads_root.mkdir(parents=True, exist_ok=True)
-
         arquivo_nome = self._resolve_remote_pdf_name(edital_url, response.headers.get("content-disposition"))
-        destination = uploads_root / arquivo_nome
-        destination.write_bytes(response.content)
-        return destination, arquivo_nome
+        try:
+            reference = self.storage.save_edital(licitacao.id, arquivo_nome, response.content)
+        except StorageError as exc:
+            raise ExtracaoItensError(f"Nao foi possivel persistir o edital principal no storage configurado: {exc}") from exc
+        return reference, arquivo_nome
 
     async def _resolve_edital_principal_url(self, licitacao: LicitacaoModel) -> str | None:
         if licitacao.link_edital:
@@ -228,11 +311,21 @@ class IaService:
         )
         return preferred or candidates[0][1]
 
-    async def extrair_itens_do_edital(self, arquivo_path: str) -> list[ItemExtraidoSchema]:
+    async def extrair_itens_do_edital(
+        self,
+        arquivo_path: str,
+        *,
+        include_brand_enrichment: bool = True,
+    ) -> list[ItemExtraidoSchema]:
         if self.db is None:
             raise ExtracaoItensError("Servico de IA sem acesso ao banco para carregar a configuracao ativa.")
 
-        texto = self._extrair_texto_pdf(Path(arquivo_path))
+        try:
+            arquivo_bytes = self.storage.read_bytes(arquivo_path)
+        except StorageError as exc:
+            raise ExtracaoItensError(f"Nao foi possivel ler o edital no storage configurado: {exc}") from exc
+
+        texto = self._extrair_texto_pdf_bytes(arquivo_bytes)
         texto = await self._enriquecer_texto_com_anexos(arquivo_path, texto)
         if not texto.strip():
             raise ExtracaoItensError(
@@ -255,6 +348,8 @@ class IaService:
                 self._extract_with_openai,
             )
             itens_finalizados = self._finalize_extracted_items(itens, texto)
+            if not include_brand_enrichment:
+                return itens_finalizados
             return await self._enrich_items_with_web_brand_candidates(itens_finalizados, provider_id, provider)
         if provider_id == "deepseek":
             itens = await self._extract_with_chunking(
@@ -265,6 +360,8 @@ class IaService:
                 self._extract_with_deepseek,
             )
             itens_finalizados = self._finalize_extracted_items(itens, texto)
+            if not include_brand_enrichment:
+                return itens_finalizados
             return await self._enrich_items_with_web_brand_candidates(itens_finalizados, provider_id, provider)
         if provider_id == "groq":
             itens = await self._extract_with_chunking(
@@ -275,6 +372,8 @@ class IaService:
                 self._extract_with_groq,
             )
             itens_finalizados = self._finalize_extracted_items(itens, texto)
+            if not include_brand_enrichment:
+                return itens_finalizados
             return await self._enrich_items_with_web_brand_candidates(itens_finalizados, provider_id, provider)
         if provider_id == "anthropic":
             itens = await self._extract_with_chunking(
@@ -285,6 +384,8 @@ class IaService:
                 self._extract_with_anthropic,
             )
             itens_finalizados = self._finalize_extracted_items(itens, texto)
+            if not include_brand_enrichment:
+                return itens_finalizados
             return await self._enrich_items_with_web_brand_candidates(itens_finalizados, provider_id, provider)
         if provider_id == "gemini":
             itens = await self._extract_with_chunking(
@@ -295,9 +396,79 @@ class IaService:
                 self._extract_with_gemini_single_request,
             )
             itens_finalizados = self._finalize_extracted_items(itens, texto)
+            if not include_brand_enrichment:
+                return itens_finalizados
             return await self._enrich_items_with_web_brand_candidates(itens_finalizados, provider_id, provider)
 
         raise ExtracaoItensError(f"IA ativa nao suportada: {provider['nome']}.")
+
+    async def enriquecer_marcas_fabricantes_licitacao(self, licitacao_id: int) -> None:
+        if self.db is None:
+            raise ExtracaoItensError("Servico de IA sem acesso ao banco para enriquecer marcas dos itens.")
+
+        provider_id = get_active_provider_id(self.db)
+        provider = get_ai_provider_internal_config(self.db, provider_id, self.settings)
+        if not provider["api_key"]:
+            return
+
+        item_models = self.db.scalars(
+            select(ItemModel)
+            .where(ItemModel.licitacao_id == licitacao_id)
+            .order_by(ItemModel.numero_item.asc(), ItemModel.id.asc()),
+        ).all()
+        if not item_models:
+            return
+
+        candidates: list[tuple[ItemModel, ItemExtraidoSchema]] = []
+        for item_model in item_models:
+            existing_payload = item_model.marcas_fabricantes or "[]"
+            if existing_payload.strip() not in {"", "[]"}:
+                continue
+            try:
+                especificacoes = json.loads(item_model.especificacoes or "[]")
+            except json.JSONDecodeError:
+                especificacoes = []
+            candidates.append(
+                (
+                    item_model,
+                    ItemExtraidoSchema(
+                        numero_item=item_model.numero_item,
+                        descricao=item_model.descricao,
+                        quantidade=item_model.quantidade,
+                        unidade=item_model.unidade,
+                        especificacoes=especificacoes if isinstance(especificacoes, list) else [],
+                        marcas_fabricantes=[],
+                    ),
+                ),
+            )
+
+        if not candidates:
+            return
+
+        enriched = await self._enrich_items_with_web_brand_candidates(
+            [schema for _, schema in candidates],
+            provider_id,
+            provider,
+        )
+
+        by_key = {
+            (schema.numero_item, schema.descricao): schema
+            for schema in enriched
+        }
+        updated = False
+        for item_model, schema in candidates:
+            enriched_schema = by_key.get((schema.numero_item, schema.descricao))
+            if enriched_schema is None:
+                continue
+            payload = enriched_schema.marcas_fabricantes_json()
+            if payload == (item_model.marcas_fabricantes or "[]"):
+                continue
+            item_model.marcas_fabricantes = payload
+            self.db.add(item_model)
+            updated = True
+
+        if updated:
+            self.db.commit()
 
     async def gerar_resumo_licitacao(self, licitacao: LicitacaoModel) -> str:
         if self.db is None:
@@ -853,11 +1024,14 @@ class IaService:
             if not arquivo_path:
                 continue
 
-            path = Path(arquivo_path)
-            if not path.exists():
+            if not self.storage.exists(arquivo_path):
                 continue
 
-            texto = self._extrair_texto_pdf(path)
+            try:
+                arquivo_bytes = self.storage.read_bytes(arquivo_path)
+            except StorageError:
+                continue
+            texto = self._extrair_texto_pdf_bytes(arquivo_bytes)
             if texto.strip():
                 documentos.append((f"Edital enviado: {arquivo_nome}", texto))
 
@@ -1020,21 +1194,61 @@ class IaService:
             )
         return renumerados
 
-    def _normalize_brand_candidates(self, marcas_fabricantes: list[str]) -> list[str]:
-        normalized: list[str] = []
+    def _normalize_brand_candidates(
+        self,
+        marcas_fabricantes: list[str | ItemExtraidoSchema.BrandCandidateSchema | dict[str, object]],
+    ) -> list[ItemExtraidoSchema.BrandCandidateSchema]:
+        normalized: list[ItemExtraidoSchema.BrandCandidateSchema] = []
         seen: set[str] = set()
 
         for marca in marcas_fabricantes:
-            cleaned = " ".join((marca or "").split()).strip(" ,.;:-")
-            if not cleaned:
+            candidate = self._coerce_brand_candidate(marca)
+            if candidate is None:
                 continue
-            key = cleaned.lower()
+            key = candidate.nome.lower()
             if key in seen:
                 continue
             seen.add(key)
-            normalized.append(cleaned)
+            normalized.append(candidate)
 
         return normalized[:8]
+
+    def _coerce_brand_candidate(
+        self,
+        marca: str | ItemExtraidoSchema.BrandCandidateSchema | dict[str, object] | None,
+    ) -> ItemExtraidoSchema.BrandCandidateSchema | None:
+        if marca is None:
+            return None
+
+        if isinstance(marca, ItemExtraidoSchema.BrandCandidateSchema):
+            nome = " ".join(marca.nome.split()).strip(" ,.;:-")
+            if not nome:
+                return None
+            return ItemExtraidoSchema.BrandCandidateSchema(
+                nome=nome,
+                preco_unitario_medio=marca.preco_unitario_medio,
+                quantidade_referencias_preco=max(int(marca.quantidade_referencias_preco or 0), 0),
+                observacao=marca.observacao,
+            )
+
+        if isinstance(marca, dict):
+            nome = " ".join(str(marca.get("nome", "")).split()).strip(" ,.;:-")
+            if not nome:
+                return None
+            preco = marca.get("preco_unitario_medio")
+            quantidade = marca.get("quantidade_referencias_preco", 0)
+            observacao = marca.get("observacao")
+            return ItemExtraidoSchema.BrandCandidateSchema(
+                nome=nome,
+                preco_unitario_medio=float(preco) if isinstance(preco, (int, float)) else None,
+                quantidade_referencias_preco=int(quantidade) if isinstance(quantidade, (int, float)) else 0,
+                observacao=str(observacao).strip() if observacao else None,
+            )
+
+        cleaned = " ".join(str(marca).split()).strip(" ,.;:-")
+        if not cleaned:
+            return None
+        return ItemExtraidoSchema.BrandCandidateSchema(nome=cleaned)
 
     async def _enrich_items_with_web_brand_candidates(
         self,
@@ -1050,14 +1264,43 @@ class IaService:
 
         async def enrich_single(item: ItemExtraidoSchema) -> ItemExtraidoSchema:
             existing = self._normalize_brand_candidates(item.marcas_fabricantes)
+            category_fallback = self._build_category_brand_fallback_candidates(item)
             query = self._build_brand_search_query(item)
             if not query:
+                if category_fallback:
+                    merged_fallback = self._merge_brand_candidates(category_fallback, existing)
+                    return ItemExtraidoSchema(
+                        numero_item=item.numero_item,
+                        descricao=item.descricao,
+                        quantidade=item.quantidade,
+                        unidade=item.unidade,
+                        especificacoes=item.especificacoes,
+                        marcas_fabricantes=merged_fallback,
+                    )
                 return item
 
             async with semaphore:
                 search_results = await self._search_brand_candidates_on_web(query)
+            search_results = [result for result in search_results if self._is_brand_search_result_relevant(item, result)]
 
             if not search_results:
+                fallback_query = self._build_brand_fallback_query(item)
+                if fallback_query and fallback_query != query:
+                    async with semaphore:
+                        search_results = await self._search_brand_candidates_on_web(fallback_query)
+                    search_results = [result for result in search_results if self._is_brand_search_result_relevant(item, result)]
+
+            if not search_results:
+                if category_fallback:
+                    merged_fallback = self._merge_brand_candidates(category_fallback, existing)
+                    return ItemExtraidoSchema(
+                        numero_item=item.numero_item,
+                        descricao=item.descricao,
+                        quantidade=item.quantidade,
+                        unidade=item.unidade,
+                        especificacoes=item.especificacoes,
+                        marcas_fabricantes=merged_fallback,
+                    )
                 return ItemExtraidoSchema(
                     numero_item=item.numero_item,
                     descricao=item.descricao,
@@ -1073,7 +1316,10 @@ class IaService:
                 item,
                 search_results,
             )
-            merged_brands = self._normalize_brand_candidates([*web_brands, *existing])
+            if not web_brands and category_fallback:
+                web_brands = category_fallback
+            price_enriched_brands = await self._enrich_brand_candidates_with_prices(item, web_brands)
+            merged_brands = self._merge_brand_candidates(price_enriched_brands, existing)
             return ItemExtraidoSchema(
                 numero_item=item.numero_item,
                 descricao=item.descricao,
@@ -1089,15 +1335,56 @@ class IaService:
         enriched_items.extend(restantes)
         return enriched_items
 
+    def _build_category_brand_fallback_candidates(
+        self,
+        item: ItemExtraidoSchema,
+    ) -> list[ItemExtraidoSchema.BrandCandidateSchema]:
+        text = self._normalize_web_query_text(" ".join([item.descricao, *item.especificacoes]))
+        if "broca" in text and ("rotacao" in text or "carbide" in text or "tungstenio" in text):
+            return [
+                ItemExtraidoSchema.BrandCandidateSchema(
+                    nome=candidate["nome"],
+                    observacao=candidate["observacao"],
+                )
+                for candidate in _DENTAL_BRAND_FALLBACK_CANDIDATES
+            ]
+        return []
+
+    def _merge_brand_candidates(
+        self,
+        primary: list[ItemExtraidoSchema.BrandCandidateSchema],
+        secondary: list[ItemExtraidoSchema.BrandCandidateSchema],
+    ) -> list[ItemExtraidoSchema.BrandCandidateSchema]:
+        merged: dict[str, ItemExtraidoSchema.BrandCandidateSchema] = {}
+        for candidate in [*primary, *secondary]:
+            key = candidate.nome.lower()
+            current = merged.get(key)
+            if current is None:
+                merged[key] = candidate
+                continue
+            if current.preco_unitario_medio is None and candidate.preco_unitario_medio is not None:
+                merged[key] = candidate
+        return list(merged.values())[:8]
+
     def _build_brand_search_query(self, item: ItemExtraidoSchema) -> str:
+        termos = self._extract_brand_query_terms(item)
+        if not termos:
+            return ""
+
+        hint = self._build_brand_context_hint(item)
+        query = f"{' '.join(termos)} {hint} fabricante brasil".strip()
+        query = re.sub(r"\s+", " ", query).strip()
+        return query[:220]
+
+    def _extract_brand_query_terms(self, item: ItemExtraidoSchema) -> list[str]:
         segmentos_descricao = [segmento.strip() for segmento in re.split(r"[;,]", item.descricao) if segmento.strip()]
         bruto = " ".join(
             [
-                *segmentos_descricao[:3],
-                *item.especificacoes[:2],
+                *segmentos_descricao[:4],
+                *item.especificacoes[:4],
             ]
         )
-        tokens = re.findall(r"[A-Za-zÀ-ÿ0-9-]+", bruto)
+        tokens = re.findall(r"[a-z0-9]+(?:-[a-z0-9]+)*", self._normalize_web_query_text(bruto))
         termos: list[str] = []
         seen: set[str] = set()
         for token in tokens:
@@ -1111,33 +1398,81 @@ class IaService:
                 continue
             seen.add(lowered)
             termos.append(cleaned)
-            if len(termos) >= 5:
+            if len(termos) >= 7:
                 break
 
-        if not termos:
-            return ""
+        return termos
 
-        query = f"{' '.join(termos)} fabricante marca brasil"
-        query = re.sub(r"\s+", " ", query).strip()
-        return query[:220]
+    def _normalize_web_query_text(self, text: str) -> str:
+        normalized = unicodedata.normalize("NFKD", text or "")
+        without_accents = "".join(char for char in normalized if not unicodedata.combining(char))
+        return without_accents.lower()
+
+    def _build_brand_context_hint(self, item: ItemExtraidoSchema) -> str:
+        text = self._normalize_web_query_text(" ".join([item.descricao, *item.especificacoes]))
+        if "broca" in text and ("rotacao" in text or "carbide" in text or "tungstenio" in text):
+            return "odontologica dental"
+        if "luva" in text and "cirurgica" in text:
+            return "hospitalar"
+        if "seringa" in text or "agulha" in text:
+            return "hospitalar medico"
+        return ""
+
+    def _build_brand_fallback_query(self, item: ItemExtraidoSchema) -> str:
+        text = self._normalize_web_query_text(" ".join([item.descricao, *item.especificacoes]))
+        if "broca" in text and ("rotacao" in text or "carbide" in text or "tungstenio" in text):
+            return "broca carbide odontologica dental alta rotacao fabricante brasil"
+        if "luva" in text and "cirurgica" in text:
+            return "luva cirurgica latex hospitalar fabricante brasil"
+        return ""
+
+    def _get_brand_relevance_terms(self, item: ItemExtraidoSchema) -> list[str]:
+        base_terms = self._extract_brand_query_terms(item)
+        text = self._normalize_web_query_text(" ".join([item.descricao, *item.especificacoes]))
+        extras: list[str] = []
+        if "broca" in text:
+            extras.extend(["broca", "carbide", "rotacao", "odontologica", "dental", "tungstenio"])
+        if "luva" in text:
+            extras.extend(["luva", "latex", "cirurgica", "hospitalar"])
+        if "seringa" in text:
+            extras.extend(["seringa", "agulha", "hospitalar"])
+
+        merged: list[str] = []
+        seen: set[str] = set()
+        for term in [*base_terms, *extras]:
+            normalized = self._normalize_web_query_text(term)
+            if len(normalized) < 3 or normalized in seen or normalized in _WEB_BRAND_STOPWORDS:
+                continue
+            seen.add(normalized)
+            merged.append(normalized)
+        return merged[:10]
+
+    def _is_brand_search_result_relevant(self, item: ItemExtraidoSchema, result: dict[str, str]) -> bool:
+        haystack = self._normalize_web_query_text(
+            " ".join([result.get("title", ""), result.get("snippet", ""), result.get("url", "")]),
+        )
+        terms = self._get_brand_relevance_terms(item)
+        matches = [term for term in terms if term in haystack]
+        if len(matches) >= 2:
+            return True
+        if any(term in haystack for term in ("fabricante", "industria", "dental", "odontologica", "hospitalar")) and matches:
+            return True
+        return False
 
     async def _search_brand_candidates_on_web(self, query: str) -> list[dict[str, str]]:
-        headers = {
-            "user-agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/124.0.0.0 Safari/537.36"
-            ),
-        }
+        headers = {"user-agent": _WEB_BRAND_USER_AGENT}
         params = {"q": query, "kl": "br-pt"}
         try:
             async with httpx.AsyncClient(timeout=20.0, follow_redirects=True, headers=headers) as client:
                 response = await client.get(_WEB_BRAND_SEARCH_URL, params=params)
                 response.raise_for_status()
         except httpx.HTTPError:
-            return []
+            return await self._search_brand_candidates_on_bing(query)
 
         html = response.text
+        if "anomaly-modal" in html or "Unfortunately, bots use DuckDuckGo too." in html:
+            return await self._search_brand_candidates_on_bing(query)
+
         matches = re.findall(
             r'<a[^>]*class="result__a"[^>]*href="(?P<href>[^"]+)"[^>]*>(?P<title>.*?)</a>',
             html,
@@ -1157,6 +1492,37 @@ class IaService:
                     "title": self._clean_search_html_fragment(title_html),
                     "url": self._resolve_duckduckgo_result_url(href),
                     "snippet": self._clean_search_html_fragment(snippets[index]) if index < len(snippets) else "",
+                }
+            )
+        cleaned_results = [result for result in results if result["title"] or result["snippet"]]
+        if cleaned_results:
+            return cleaned_results
+        return await self._search_brand_candidates_on_bing(query)
+
+    async def _search_brand_candidates_on_bing(self, query: str) -> list[dict[str, str]]:
+        headers = {"user-agent": _WEB_BRAND_USER_AGENT}
+        params = {"q": query, "setlang": "pt-BR", "format": "rss"}
+        try:
+            async with httpx.AsyncClient(timeout=20.0, follow_redirects=True, headers=headers) as client:
+                response = await client.get(_WEB_BRAND_BING_URL, params=params)
+                response.raise_for_status()
+        except httpx.HTTPError:
+            return []
+
+        xml = response.text
+        items = re.findall(r"<item>(.*?)</item>", xml, flags=re.I | re.S)
+        results: list[dict[str, str]] = []
+        for item_xml in items[:_WEB_BRAND_MAX_RESULTS]:
+            title_match = re.search(r"<title>(.*?)</title>", item_xml, flags=re.I | re.S)
+            link_match = re.search(r"<link>(.*?)</link>", item_xml, flags=re.I | re.S)
+            snippet_match = re.search(r"<description>(.*?)</description>", item_xml, flags=re.I | re.S)
+            if not title_match or not link_match:
+                continue
+            results.append(
+                {
+                    "title": self._clean_search_html_fragment(title_match.group(1)),
+                    "url": unescape(link_match.group(1)).strip(),
+                    "snippet": self._clean_search_html_fragment(snippet_match.group(1)) if snippet_match else "",
                 }
             )
         return [result for result in results if result["title"] or result["snippet"]]
@@ -1182,7 +1548,7 @@ class IaService:
         provider: dict[str, str],
         item: ItemExtraidoSchema,
         search_results: list[dict[str, str]],
-    ) -> list[str]:
+    ) -> list[ItemExtraidoSchema.BrandCandidateSchema]:
         resultados_texto = "\n".join(
             f"{index}. TITULO: {resultado['title']}\nURL: {resultado['url']}\nSNIPPET: {resultado['snippet']}"
             for index, resultado in enumerate(search_results, start=1)
@@ -1224,11 +1590,114 @@ class IaService:
             else:
                 return []
         except ExtracaoItensError:
-            return []
+            return self._extract_brand_candidates_heuristic(search_results)
 
-        return self._parse_brand_candidates_from_text(raw)
+        parsed = self._parse_brand_candidates_from_text(raw)
+        if parsed:
+            return parsed
+        return self._extract_brand_candidates_heuristic(search_results)
 
-    def _parse_brand_candidates_from_text(self, raw_text: str) -> list[str]:
+    def _extract_brand_candidates_heuristic(
+        self,
+        search_results: list[dict[str, str]],
+    ) -> list[ItemExtraidoSchema.BrandCandidateSchema]:
+        candidatos: list[ItemExtraidoSchema.BrandCandidateSchema] = []
+        vistos: set[str] = set()
+
+        for resultado in search_results:
+            url = (resultado.get("url") or "").strip()
+            title = self._clean_search_html_fragment(resultado.get("title", ""))
+            hostname = (urlparse(url).hostname or "").lower()
+            if not hostname:
+                continue
+            if any(fragment in hostname for fragment in _WEB_BRAND_EXCLUDED_DOMAINS):
+                continue
+
+            candidate_name = ""
+            title_parts = [part.strip() for part in re.split(r"[|\-–:]", title) if part.strip()]
+            for part in title_parts[:2]:
+                normalized = self._normalize_web_query_text(part)
+                if normalized in _WEB_BRAND_STOPWORDS or len(normalized) < 3:
+                    continue
+                if any(term in normalized for term in _WEB_BRAND_EXCLUDED_TITLE_TERMS):
+                    continue
+                if any(word in normalized for word in ("luva", "carimbo", "seringa", "hospitalar", "produto", "categoria")):
+                    continue
+                candidate_name = part
+                break
+
+            if not candidate_name:
+                domain_label = hostname.replace("www.", "").split(".")[0].replace("-", " ").strip()
+                if len(domain_label) < 3:
+                    continue
+                candidate_name = domain_label.title()
+
+            normalized_name = self._normalize_web_query_text(candidate_name)
+            if normalized_name in vistos or len(normalized_name) < 3:
+                continue
+            vistos.add(normalized_name)
+            candidatos.append(ItemExtraidoSchema.BrandCandidateSchema(nome=candidate_name))
+
+        return candidatos[:5]
+
+    async def _enrich_brand_candidates_with_prices(
+        self,
+        item: ItemExtraidoSchema,
+        brands: list[ItemExtraidoSchema.BrandCandidateSchema],
+    ) -> list[ItemExtraidoSchema.BrandCandidateSchema]:
+        enriched: list[ItemExtraidoSchema.BrandCandidateSchema] = []
+        for brand in brands:
+            average_price, evidence_count = await self._estimate_brand_unit_price(item, brand.nome)
+            enriched.append(
+                ItemExtraidoSchema.BrandCandidateSchema(
+                    nome=brand.nome,
+                    preco_unitario_medio=average_price,
+                    quantidade_referencias_preco=evidence_count,
+                    observacao=brand.observacao,
+                )
+            )
+        return enriched
+
+    async def _estimate_brand_unit_price(
+        self,
+        item: ItemExtraidoSchema,
+        brand_name: str,
+    ) -> tuple[float | None, int]:
+        query = self._build_brand_price_search_query(item, brand_name)
+        if not query:
+            return None, 0
+
+        search_results = await self._search_brand_candidates_on_web(query)
+        if not search_results:
+            return None, 0
+
+        prices: list[float] = []
+        for result in search_results[:_WEB_BRAND_MAX_PRICE_SEARCH_RESULTS]:
+            prices.extend(self._extract_brl_prices_from_text(" ".join([result.get("title", ""), result.get("snippet", "")])))
+
+        filtered_prices = [price for price in prices if 0.5 <= price <= 50000]
+        if not filtered_prices:
+            return None, 0
+
+        average = round(sum(filtered_prices) / len(filtered_prices), 2)
+        return average, len(filtered_prices)
+
+    def _build_brand_price_search_query(self, item: ItemExtraidoSchema, brand_name: str) -> str:
+        base = self._build_brand_search_query(item).replace(" fabricante marca brasil", "").strip()
+        query = f"{base} {brand_name} preco"
+        return re.sub(r"\s+", " ", query).strip()[:220]
+
+    def _extract_brl_prices_from_text(self, text: str) -> list[float]:
+        values: list[float] = []
+        for match in _PRICE_PATTERN.findall(text or ""):
+            numeric = match.replace(".", "").replace(",", ".")
+            try:
+                values.append(float(numeric))
+            except ValueError:
+                continue
+        return values
+
+    def _parse_brand_candidates_from_text(self, raw_text: str) -> list[ItemExtraidoSchema.BrandCandidateSchema]:
         cleaned = raw_text.strip()
         if cleaned.startswith("```"):
             cleaned = cleaned.removeprefix("```json").removeprefix("```").removesuffix("```").strip()

@@ -16,6 +16,10 @@ export async function listarItens(licitacaoId: number): Promise<ItemListResponse
   return apiRequest<ItemListResponseType>(`/licitacoes/${licitacaoId}/itens`);
 }
 
+export async function obterJobEnriquecimentoMarcas(licitacaoId: number) {
+  return apiRequest<ItemListResponseType["background_job"]>(`/licitacoes/${licitacaoId}/jobs/brand-enrichment`);
+}
+
 export async function extrairItens(licitacaoId: number): Promise<ItemListResponseType> {
   return apiRequest<ItemListResponseType>(`/licitacoes/${licitacaoId}/itens/extrair`, {
     method: "POST",
