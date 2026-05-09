@@ -1,7 +1,7 @@
 """add processing jobs table
 
 Revision ID: 20260429_02_processing_jobs
-Revises: 20260429_01_initial_schema
+Revises: 20260429_01
 Create Date: 2026-04-29 23:30:00
 """
 
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 revision = "20260429_02_processing_jobs"
-down_revision = "20260429_01_initial_schema"
+down_revision = "20260429_01"
 branch_labels = None
 depends_on = None
 
