@@ -3,7 +3,6 @@ import { useMemo, useState } from "react";
 import { PageHeader } from "../components/layout/PageHeader";
 import { Badge } from "../components/ui/Badge";
 import { Card } from "../components/ui/Card";
-import { Input } from "../components/ui/Input";
 
 type AreaCatalogItem = {
   setor: string;
@@ -145,11 +144,16 @@ const companyProfiles: CompanyProfile[] = [
   },
 ];
 
-function SearchIcon() {
+function ChevronIcon({ expanded }: { expanded: boolean }) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      className={`h-5 w-5 transition duration-200 ${expanded ? "rotate-180 text-accent" : "text-slate"}`}
+      aria-hidden="true"
+    >
       <path
-        d="M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Zm9 2-3.8-3.8"
+        d="m6 9 6 6 6-6"
         stroke="currentColor"
         strokeWidth="1.8"
         strokeLinecap="round"
@@ -160,34 +164,32 @@ function SearchIcon() {
 }
 
 function AreasEmpresas() {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedArea, setSelectedArea] = useState("Todas");
+  const [selectedArea, setSelectedArea] = useState<string | null>(null);
 
-  const companies = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase();
+  const companiesByArea = useMemo(
+    () =>
+      areasCatalog.map((area) => ({
+        ...area,
+        empresas: companyProfiles.filter((company) => company.areas.includes(area.setor)),
+      })),
+    [],
+  );
 
-    return companyProfiles.filter((company) => {
-      const matchesArea = selectedArea === "Todas" || company.areas.includes(selectedArea);
-      const matchesSearch =
-        normalizedSearch.length === 0 ||
-        company.nome.toLowerCase().includes(normalizedSearch) ||
-        company.email.toLowerCase().includes(normalizedSearch) ||
-        company.areas.some((area) => area.toLowerCase().includes(normalizedSearch)) ||
-        company.tiposProduto.some((item) => item.toLowerCase().includes(normalizedSearch));
+  const selectedAreaData =
+    selectedArea === null ? null : companiesByArea.find((area) => area.setor === selectedArea) ?? null;
 
-      return matchesArea && matchesSearch;
-    });
-  }, [searchTerm, selectedArea]);
+  const coveredAreas = companiesByArea.filter((area) => area.empresas.length > 0).length;
+  const totalLinks = companiesByArea.reduce((sum, area) => sum + area.empresas.length, 0);
 
   return (
     <div className="h-full">
       <PageHeader
         title="Areas e Empresas"
-        description="Organize setores estrategicos, veja o escopo de cada area e mantenha um cadastro de empresas com contatos, especialidades e tipos de produto."
+        description="Comece navegando pelas areas estrategicas. Ao selecionar uma area, voce abre a lista de empresas relacionadas a ela."
         actions={
           <div className="flex flex-wrap items-center gap-3">
             <Badge variant="blue">{areasCatalog.length} areas mapeadas</Badge>
-            <Badge variant="slate">{companyProfiles.length} empresas cadastradas</Badge>
+            <Badge variant="slate">{companyProfiles.length} empresas na base</Badge>
           </div>
         }
       />
@@ -198,25 +200,23 @@ function AreasEmpresas() {
             <div className="p-6">
               <p className="text-sm font-semibold uppercase tracking-[0.16em] text-accent/80">Catalogo</p>
               <h2 className="mt-3 font-heading text-3xl font-extrabold text-ink">{areasCatalog.length}</h2>
-              <p className="mt-2 text-sm text-slate">Setores estrategicos prontos para segmentar fornecedores.</p>
-            </div>
-          </Card>
-
-          <Card>
-            <div className="p-6">
-              <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate/80">Empresas</p>
-              <h2 className="mt-3 font-heading text-3xl font-extrabold text-ink">{companyProfiles.length}</h2>
-              <p className="mt-2 text-sm text-slate">Perfis com nome, contato, areas atendidas e mix de produtos.</p>
+              <p className="mt-2 text-sm text-slate">Areas disponiveis para organizar fornecedores por segmento.</p>
             </div>
           </Card>
 
           <Card>
             <div className="p-6">
               <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate/80">Cobertura</p>
-              <h2 className="mt-3 font-heading text-3xl font-extrabold text-ink">
-                {new Set(companyProfiles.flatMap((company) => company.areas)).size}
-              </h2>
-              <p className="mt-2 text-sm text-slate">Areas ja relacionadas com empresas para acelerar prospeccao.</p>
+              <h2 className="mt-3 font-heading text-3xl font-extrabold text-ink">{coveredAreas}</h2>
+              <p className="mt-2 text-sm text-slate">Areas que ja possuem pelo menos uma empresa relacionada.</p>
+            </div>
+          </Card>
+
+          <Card>
+            <div className="p-6">
+              <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate/80">Relacionamentos</p>
+              <h2 className="mt-3 font-heading text-3xl font-extrabold text-ink">{totalLinks}</h2>
+              <p className="mt-2 text-sm text-slate">Vinculos atuais entre areas e empresas cadastradas.</p>
             </div>
           </Card>
         </section>
@@ -225,132 +225,126 @@ function AreasEmpresas() {
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.16em] text-accent/80">Base de areas</p>
-              <h2 className="font-heading text-3xl font-extrabold text-ink">Setor e descricao</h2>
+              <h2 className="font-heading text-3xl font-extrabold text-ink">Clique em uma area para ver as empresas</h2>
             </div>
             <p className="max-w-2xl text-sm text-slate">
-              Cada area serve como referencia para organizar fornecedores, tipos de produto e futuras integracoes.
+              A lista abaixo mostra apenas as areas. As empresas ficam escondidas ate voce selecionar o setor desejado.
             </p>
           </div>
 
           <Card className="overflow-hidden">
-            <div className="hidden grid-cols-[minmax(240px,320px)_1fr] border-b border-line/80 bg-panel/70 px-6 py-4 text-xs font-semibold uppercase tracking-[0.16em] text-slate/80 md:grid">
+            <div className="hidden grid-cols-[minmax(240px,320px)_1fr_72px] border-b border-line/80 bg-panel/70 px-6 py-4 text-xs font-semibold uppercase tracking-[0.16em] text-slate/80 md:grid">
               <span>Setor</span>
               <span>Descricao</span>
+              <span className="text-right">Empresas</span>
             </div>
 
             <div className="divide-y divide-line/80">
-              {areasCatalog.map((area) => (
-                <div key={area.setor} className="grid gap-3 px-6 py-5 md:grid-cols-[minmax(240px,320px)_1fr] md:gap-6">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate/70 md:hidden">Setor</p>
-                    <p className="font-heading text-xl font-extrabold text-ink">{area.setor}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate/70 md:hidden">Descricao</p>
-                    <p className="text-sm leading-7 text-slate">{area.descricao}</p>
-                  </div>
-                </div>
-              ))}
+              {companiesByArea.map((area) => {
+                const isSelected = selectedArea === area.setor;
+
+                return (
+                  <button
+                    key={area.setor}
+                    type="button"
+                    className={`grid w-full gap-4 px-6 py-5 text-left transition duration-200 md:grid-cols-[minmax(240px,320px)_1fr_72px] md:gap-6 ${
+                      isSelected ? "bg-blue-50/60" : "hover:bg-panel/60"
+                    }`}
+                    onClick={() => setSelectedArea(isSelected ? null : area.setor)}
+                  >
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate/70 md:hidden">Setor</p>
+                      <p className="font-heading text-xl font-extrabold text-ink">{area.setor}</p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate/70 md:hidden">Descricao</p>
+                      <p className="text-sm leading-7 text-slate">{area.descricao}</p>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 md:justify-end">
+                      <div className="md:hidden">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate/70">Empresas</p>
+                        <p className="mt-1 text-sm font-semibold text-ink">{area.empresas.length}</p>
+                      </div>
+
+                      <div className="hidden items-center gap-3 md:flex">
+                        <Badge variant={area.empresas.length > 0 ? "green" : "slate"}>
+                          {area.empresas.length}
+                        </Badge>
+                      </div>
+
+                      <ChevronIcon expanded={isSelected} />
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </Card>
         </section>
 
-        <section className="space-y-4">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.16em] text-accent/80">Cadastro comercial</p>
-              <h2 className="font-heading text-3xl font-extrabold text-ink">Empresas e propriedades</h2>
+        {selectedAreaData ? (
+          <section className="space-y-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.16em] text-accent/80">Empresas da area</p>
+                <h2 className="font-heading text-3xl font-extrabold text-ink">{selectedAreaData.setor}</h2>
+              </div>
+              <Badge variant="blue">
+                {selectedAreaData.empresas.length} empresa{selectedAreaData.empresas.length === 1 ? "" : "s"}
+              </Badge>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[520px]">
-              <Input
-                icon={<SearchIcon />}
-                placeholder="Buscar por nome, area ou produto..."
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-              />
-              <label className="flex h-14 items-center rounded-2xl border border-line bg-white px-4 text-sm text-slate shadow-sm transition duration-200 focus-within:border-accent/40 focus-within:ring-4 focus-within:ring-accent/10">
-                <select
-                  className="w-full border-none bg-transparent text-sm text-ink outline-none"
-                  value={selectedArea}
-                  onChange={(event) => setSelectedArea(event.target.value)}
-                >
-                  <option value="Todas">Todas as areas</option>
-                  {areasCatalog.map((area) => (
-                    <option key={area.setor} value={area.setor}>
-                      {area.setor}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-          </div>
+            {selectedAreaData.empresas.length > 0 ? (
+              <div className="grid gap-4 xl:grid-cols-2">
+                {selectedAreaData.empresas.map((company) => (
+                  <Card key={`${selectedAreaData.setor}-${company.nome}`} className="overflow-hidden">
+                    <div className="space-y-6 p-6">
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-accent/80">Empresa</p>
+                          <h3 className="mt-2 font-heading text-2xl font-extrabold text-ink">{company.nome}</h3>
+                        </div>
+                        <Badge variant="green">Atende esta area</Badge>
+                      </div>
 
-          <p className="text-sm text-slate">
-            {companies.length} empresa{companies.length === 1 ? "" : "s"} encontrada
-            {companies.length === 1 ? "" : "s"} com os filtros atuais.
-          </p>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="rounded-2xl border border-line/80 bg-panel/60 p-4">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate/80">Telefone</p>
+                          <p className="mt-2 text-sm font-medium text-ink">{company.telefone}</p>
+                        </div>
+                        <div className="rounded-2xl border border-line/80 bg-panel/60 p-4">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate/80">Email</p>
+                          <p className="mt-2 text-sm font-medium text-ink">{company.email}</p>
+                        </div>
+                      </div>
 
-          <div className="grid gap-4 xl:grid-cols-2">
-            {companies.map((company) => (
-              <Card key={company.nome} className="overflow-hidden">
-                <div className="space-y-6 p-6">
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <p className="text-sm font-semibold uppercase tracking-[0.16em] text-accent/80">Empresa</p>
-                      <h3 className="mt-2 font-heading text-2xl font-extrabold text-ink">{company.nome}</h3>
+                      <div className="space-y-3">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate/80">Tipos de produto</p>
+                        <div className="flex flex-wrap gap-2">
+                          {company.tiposProduto.map((item) => (
+                            <Badge key={item} variant="slate">
+                              {item}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
                     </div>
-                    <Badge variant="green">{company.areas.length} area{company.areas.length === 1 ? "" : "s"}</Badge>
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="rounded-2xl border border-line/80 bg-panel/60 p-4">
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate/80">Telefone</p>
-                      <p className="mt-2 text-sm font-medium text-ink">{company.telefone}</p>
-                    </div>
-                    <div className="rounded-2xl border border-line/80 bg-panel/60 p-4">
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate/80">Email</p>
-                      <p className="mt-2 text-sm font-medium text-ink">{company.email}</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate/80">Areas</p>
-                    <div className="flex flex-wrap gap-2">
-                      {company.areas.map((area) => (
-                        <Badge key={area} variant="blue">
-                          {area}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate/80">Tipos de produto</p>
-                    <div className="flex flex-wrap gap-2">
-                      {company.tiposProduto.map((item) => (
-                        <Badge key={item} variant="slate">
-                          {item}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <Card className="border-dashed bg-panel/70">
+                <div className="p-8">
+                  <h3 className="font-heading text-2xl font-extrabold text-ink">Nenhuma empresa vinculada ainda</h3>
+                  <p className="mt-2 text-base text-slate">
+                    Esta area ja esta catalogada, mas ainda nao possui empresas cadastradas para exibicao.
+                  </p>
                 </div>
               </Card>
-            ))}
-          </div>
-
-          {companies.length === 0 ? (
-            <Card className="border-dashed bg-panel/70">
-              <div className="p-8">
-                <h3 className="font-heading text-2xl font-extrabold text-ink">Nenhuma empresa encontrada</h3>
-                <p className="mt-2 text-base text-slate">
-                  Ajuste o termo digitado ou selecione outra area para ampliar o cadastro exibido.
-                </p>
-              </div>
-            </Card>
-          ) : null}
-        </section>
+            )}
+          </section>
+        ) : null}
       </div>
     </div>
   );
