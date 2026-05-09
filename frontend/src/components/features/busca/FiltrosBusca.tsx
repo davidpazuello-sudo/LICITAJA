@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import type { BuscaLicitacaoFilters } from "../../../types/licitacao.types";
 import {
@@ -71,7 +71,7 @@ function InfoIcon() {
 }
 
 function FieldLabel(props: { children: string }) {
-  return <span className="text-sm font-semibold text-ink">{props.children}</span>;
+  return <span className="text-xs font-semibold text-ink">{props.children}</span>;
 }
 
 function TextField(props: {
@@ -86,7 +86,7 @@ function TextField(props: {
   const { label, value, placeholder, onChange, onEnter, listId, options = [] } = props;
 
   return (
-    <label className="space-y-3">
+    <label className="space-y-2">
       <FieldLabel>{label}</FieldLabel>
       <div className="rounded-[14px] border border-line bg-white shadow-sm transition focus-within:border-accent/40 focus-within:ring-4 focus-within:ring-accent/10">
         <input
@@ -97,7 +97,7 @@ function TextField(props: {
             if (event.key === "Enter") void onEnter();
           }}
           placeholder={placeholder}
-          className="h-12 w-full rounded-[14px] border-none bg-transparent px-4 text-sm text-ink outline-none placeholder:text-slate/90"
+          className="h-11 w-full rounded-[14px] border-none bg-transparent px-4 text-[13px] text-ink outline-none placeholder:text-slate/90"
         />
       </div>
       {listId && options.length > 0 ? (
@@ -121,13 +121,13 @@ function SelectField(props: {
   const { label, value, placeholder, options, onChange } = props;
 
   return (
-    <label className="space-y-3">
+    <label className="space-y-2">
       <FieldLabel>{label}</FieldLabel>
       <div className="relative rounded-[14px] border border-line bg-white shadow-sm transition focus-within:border-accent/40 focus-within:ring-4 focus-within:ring-accent/10">
         <select
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className="h-12 w-full appearance-none rounded-[14px] border-none bg-transparent px-4 pr-12 text-sm text-ink outline-none"
+          className="h-11 w-full appearance-none rounded-[14px] border-none bg-transparent px-4 pr-12 text-[13px] text-ink outline-none"
         >
           <option value="">{placeholder}</option>
           {options.map((option) => (
@@ -165,7 +165,7 @@ function StatusOption(props: {
       type="button"
       onClick={onClick}
       className={cn(
-        "flex min-h-[58px] items-start gap-3 rounded-[18px] border px-4 py-3 text-left transition",
+        "flex min-h-[50px] items-start gap-3 rounded-[16px] border px-4 py-3 text-left transition",
         checked
           ? "border-accent bg-blue-50 text-ink shadow-sm"
           : "border-line bg-white text-ink hover:border-accent/35",
@@ -173,13 +173,13 @@ function StatusOption(props: {
     >
       <span
         className={cn(
-          "mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition",
+          "mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition",
           checked ? "border-accent bg-accent text-white" : "border-line bg-white text-transparent",
         )}
       >
         <span className="h-3 w-3 rounded-full bg-current" />
       </span>
-      <span className="text-base leading-6">{label}</span>
+      <span className="text-sm leading-6">{label}</span>
     </button>
   );
 }
@@ -196,7 +196,7 @@ function PortalToggle(props: {
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition",
+        "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold transition",
         checked
           ? "border-accent bg-softBlue text-accent"
           : "border-line bg-white text-slate hover:border-accent/35 hover:text-ink",
@@ -222,6 +222,7 @@ function FiltrosBusca({
   onChange,
   onSearch,
 }: FiltrosBuscaProps) {
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const orgaoSuggestions = suggestions?.orgaos ?? [];
   const unidadeSuggestions = suggestions?.unidades ?? [];
   const municipioSuggestions = suggestions?.municipios ?? [];
@@ -288,47 +289,69 @@ function FiltrosBusca({
   };
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
-        <TextField
-          label="Palavra-chave"
-          value={filters.buscar_por}
-          placeholder="Digite um termo para pesquisar"
-          onChange={(value) => onChange("buscar_por", value)}
-          onEnter={onSearch}
-        />
+    <div className="space-y-5 p-6">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-end">
+        <div className="flex-1">
+          <TextField
+            label="Palavra-chave"
+            value={filters.buscar_por}
+            placeholder="Digite um termo para pesquisar"
+            onChange={(value) => onChange("buscar_por", value)}
+            onEnter={onSearch}
+          />
+        </div>
 
-        <div className="space-y-3">
-          <FieldLabel>Status</FieldLabel>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {PNCP_STATUS_OPTIONS.map((option) => (
-              <StatusOption
-                key={option.label}
-                label={option.label}
-                checked={filters.sub_status === option.value}
-                onClick={() => onChange("sub_status", option.value)}
-              />
-            ))}
-          </div>
+        <div className="flex flex-wrap gap-3 xl:shrink-0">
+          <Button
+            type="button"
+            variant="outline"
+            className="min-w-[148px]"
+            onClick={() => setShowAdvancedFilters((value) => !value)}
+          >
+            <FilterIcon />
+            {showAdvancedFilters ? "Ocultar filtros" : "Filtros"}
+            {activeFiltersCount > 0 ? ` (${activeFiltersCount})` : ""}
+          </Button>
+
+          <Button className="min-w-[140px]" size="lg" isLoading={isLoading} onClick={onSearch}>
+            <SearchIcon />
+            Pesquisar
+          </Button>
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-[30px] border border-line/80 bg-panel/55">
+      <div
+        className={cn(
+          "overflow-hidden rounded-[30px] border border-line/80 bg-panel/55 transition-all duration-300",
+          showAdvancedFilters ? "max-h-[2200px] opacity-100" : "max-h-0 border-transparent opacity-0",
+        )}
+      >
         <div className="flex flex-wrap items-start justify-between gap-4 border-b border-line/70 px-6 py-5">
           <div className="space-y-3">
             <div className="flex items-center gap-3">
-              <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-ink shadow-sm">
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-ink shadow-sm">
                 <FilterIcon />
               </span>
               <div>
-                <h3 className="font-heading text-xl font-extrabold text-ink">Filtros</h3>
-                <p className="text-sm text-slate">
-                  Grade de busca no padrao do PNCP, mantendo a consulta integrada entre os portais.
-                </p>
+                <h3 className="font-heading text-lg font-extrabold text-ink">Filtros</h3>
               </div>
             </div>
 
-            <div className="flex items-start gap-3 rounded-2xl border border-blue-100 bg-white/80 px-4 py-3 text-sm text-slate shadow-sm">
+            <div className="space-y-2">
+              <FieldLabel>Status</FieldLabel>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {PNCP_STATUS_OPTIONS.map((option) => (
+                  <StatusOption
+                    key={option.label}
+                    label={option.label}
+                    checked={filters.sub_status === option.value}
+                    onClick={() => onChange("sub_status", option.value)}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 rounded-2xl border border-blue-100 bg-white/80 px-4 py-3 text-xs text-slate shadow-sm">
               <span className="mt-0.5 text-accent">
                 <InfoIcon />
               </span>
@@ -336,7 +359,7 @@ function FiltrosBusca({
             </div>
           </div>
 
-          <div className="rounded-full border border-blue-100 bg-white px-4 py-2 text-sm font-semibold text-accent shadow-sm">
+          <div className="rounded-full border border-blue-100 bg-white px-4 py-2 text-xs font-semibold text-accent shadow-sm">
             {activeFiltersCount} filtro{activeFiltersCount === 1 ? "" : "s"} ativo{activeFiltersCount === 1 ? "" : "s"}
           </div>
         </div>
@@ -441,8 +464,8 @@ function FiltrosBusca({
           <div className="space-y-3 rounded-[22px] border border-line/70 bg-white/80 p-4 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-ink">Portais consultados</p>
-                <p className="text-sm text-slate">Selecione em quais fontes a busca integrada deve rodar.</p>
+                <p className="text-xs font-semibold text-ink">Portais consultados</p>
+                <p className="text-xs text-slate">Selecione em quais fontes a busca integrada deve rodar.</p>
               </div>
             </div>
 
@@ -462,12 +485,12 @@ function FiltrosBusca({
             <button
               type="button"
               onClick={clearAdvancedFilters}
-              className="text-base font-semibold text-accent transition hover:text-accentDark"
+              className="text-sm font-semibold text-accent transition hover:text-accentDark"
             >
               Limpar
             </button>
 
-            <Button className="min-w-[172px]" size="lg" isLoading={isLoading} onClick={onSearch}>
+            <Button className="min-w-[148px]" isLoading={isLoading} onClick={onSearch}>
               <SearchIcon />
               Pesquisar
             </Button>
