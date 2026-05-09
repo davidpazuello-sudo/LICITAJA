@@ -9,7 +9,6 @@ backend/logs/
 backend/tmp_api_compras_manual.pdf
 node_modules/
 frontend/node_modules/
-frontend/dist/
 frontend/logs/
 frontend/*.timestamp-*.mjs
 *.tsbuildinfo
