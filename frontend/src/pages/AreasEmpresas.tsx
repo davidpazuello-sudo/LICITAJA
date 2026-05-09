@@ -20,7 +20,7 @@ function AreasEmpresas() {
     <div className="h-full">
       <PageHeader
         title="Areas e Empresas"
-        description="Comece pelas areas estrategicas. Ao entrar em uma area, voce acessa a pagina dedicada com as empresas do setor."
+        description=""
         actions={
           <div className="flex flex-wrap items-center gap-3">
             <Badge variant="blue">{areasCatalog.length} areas mapeadas</Badge>
@@ -35,7 +35,6 @@ function AreasEmpresas() {
             <div className="p-6">
               <p className="text-sm font-semibold uppercase tracking-[0.16em] text-accent/80">Catalogo</p>
               <h2 className="mt-3 font-heading text-3xl font-extrabold text-ink">{areasCatalog.length}</h2>
-              <p className="mt-2 text-sm text-slate">Areas disponiveis para organizar fornecedores por segmento.</p>
             </div>
           </Card>
 
@@ -43,7 +42,6 @@ function AreasEmpresas() {
             <div className="p-6">
               <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate/80">Cobertura</p>
               <h2 className="mt-3 font-heading text-3xl font-extrabold text-ink">{coveredAreas}</h2>
-              <p className="mt-2 text-sm text-slate">Areas que ja possuem pelo menos uma empresa relacionada.</p>
             </div>
           </Card>
 
@@ -51,20 +49,16 @@ function AreasEmpresas() {
             <div className="p-6">
               <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate/80">Relacionamentos</p>
               <h2 className="mt-3 font-heading text-3xl font-extrabold text-ink">{totalLinks}</h2>
-              <p className="mt-2 text-sm text-slate">Vinculos atuais entre areas e empresas cadastradas.</p>
             </div>
           </Card>
         </section>
 
         <section className="space-y-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex flex-col gap-2">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.16em] text-accent/80">Base de areas</p>
               <h2 className="font-heading text-3xl font-extrabold text-ink">Selecione uma area</h2>
             </div>
-            <p className="max-w-2xl text-sm text-slate">
-              Cada area abre uma pagina propria com a lista de empresas do setor e a acao para adicionar novas empresas.
-            </p>
           </div>
 
           <Card className="overflow-hidden">

@@ -77,7 +77,6 @@ function AreaEmpresasDetalhe() {
               {companies.length} empresa{companies.length === 1 ? "" : "s"}
             </Badge>
           </div>
-          <p className="max-w-3xl text-lg text-slate">{area.descricao}</p>
         </div>
 
         <div className="shrink-0">
@@ -93,8 +92,7 @@ function AreaEmpresasDetalhe() {
                 <div className="space-y-6 p-6">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                      <p className="text-sm font-semibold uppercase tracking-[0.16em] text-accent/80">Empresa</p>
-                      <h2 className="mt-2 font-heading text-2xl font-extrabold text-ink">{company.nome}</h2>
+                      <h2 className="font-heading text-2xl font-extrabold text-ink">{company.nome}</h2>
                     </div>
                     <Badge variant="green">Ativa nesta area</Badge>
                   </div>
