@@ -120,8 +120,10 @@ const PORTAL_FILTER_PROFILES: Record<string, PortalFilterProfile> = {
       "buscar_por",
       "numero_oportunidade",
       "objeto_licitacao",
+      "orgao",
       "sub_status",
       "estado",
+      "municipio",
       "modalidade",
       "tipo_fornecimento",
       "familia_fornecimento",
@@ -129,7 +131,7 @@ const PORTAL_FILTER_PROFILES: Record<string, PortalFilterProfile> = {
       "data_fim",
     ],
     guidance:
-      "No e-Compras AM, os filtros seguem o mapeamento atual do provider. O tratamento das nomenclaturas equivalentes ao PNCP ainda sera feito separadamente.",
+      "No e-Compras AM, os filtros confiaveis se baseiam no portal publico e nos detalhes de cada edital para objeto, modalidade, status, datas e classificacao do fornecimento.",
   },
   compras_manaus: {
     key: "compras_manaus",

@@ -76,8 +76,10 @@ class EComprasAMProvider(SearchProvider):
         "buscar_por",
         "numero_oportunidade",
         "objeto_licitacao",
+        "orgao",
         "sub_status",
         "estado",
+        "municipio",
         "modalidade",
         "tipo_fornecimento",
         "familia_fornecimento",
@@ -95,13 +97,24 @@ class EComprasAMProvider(SearchProvider):
 
         try:
             summaries = await self._load_summaries(homepage_url)
-            filtered = [summary for summary in summaries if self._matches_summary(summary, query)]
-            total_registros = len(filtered)
+            summary_candidates = [summary for summary in summaries if self._matches_summary(summary, query)]
+            details_map = await self._load_details_map(summary_candidates)
+            filtered_items = [
+                item
+                for summary in summary_candidates
+                if (
+                    item := self._build_summary_item(
+                        summary,
+                        details_map.get(str(summary.get("ident") or "")),
+                    )
+                )
+                and self._matches_item(item, query)
+            ]
+            total_registros = len(filtered_items)
             total_paginas = max((total_registros + query.page_size - 1) // query.page_size, 1)
             start_index = max(query.pagina - 1, 0) * query.page_size
             end_index = start_index + query.page_size
-            page_candidates = filtered[start_index:end_index]
-            details_map = await self._load_details_map(page_candidates)
+            items = filtered_items[start_index:end_index]
         except httpx.TimeoutException as exc:
             raise ProviderSearchError(
                 provider_id=self.provider_id,
@@ -124,11 +137,6 @@ class EComprasAMProvider(SearchProvider):
                 message=f"Nao foi possivel consultar {self.display_name} no momento.",
                 supported_filters=sorted(self.supported_filters),
             ) from exc
-
-        items = [
-            self._build_summary_item(summary, details_map.get(str(summary.get("ident") or "")))
-            for summary in page_candidates
-        ]
 
         return ProviderSearchResult(
             items=items,
@@ -382,7 +390,10 @@ class EComprasAMProvider(SearchProvider):
         if query.estado and query.estado.upper() != "AM":
             return False
 
-        if query.sub_status and not self._contains_all_terms([summary.get("sub_status")], query.sub_status):
+        if query.municipio and not self._contains_all_terms(["Manaus"], query.municipio):
+            return False
+
+        if query.orgao and not self._contains_all_terms(["Governo do Estado do Amazonas"], query.orgao):
             return False
 
         if query.modalidade and not self._contains_all_terms([summary.get("modalidade")], query.modalidade):
@@ -421,10 +432,16 @@ class EComprasAMProvider(SearchProvider):
         if query.objeto_licitacao and not self._contains_all_terms([item.objeto], query.objeto_licitacao):
             return False
 
+        if query.orgao and not self._contains_all_terms([item.orgao], query.orgao):
+            return False
+
         if query.sub_status and not self._contains_all_terms([item.sub_status], query.sub_status):
             return False
 
         if query.estado and (item.estado or "").upper() != query.estado.upper():
+            return False
+
+        if query.municipio and not self._contains_all_terms([item.cidade], query.municipio):
             return False
 
         if query.modalidade and not self._contains_all_terms([item.modalidade], query.modalidade):
