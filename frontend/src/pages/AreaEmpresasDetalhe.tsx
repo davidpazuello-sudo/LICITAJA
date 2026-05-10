@@ -8,15 +8,46 @@ import { Input } from "../components/ui/Input";
 import { findAreaBySlug } from "../data/areasEmpresas";
 import { useCompanyProfiles } from "../hooks/useCompanyProfiles";
 
+function SearchIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
+      <path
+        d="M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Zm9 2-3.8-3.8"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function LinkIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+      <path
+        d="M10 13a5 5 0 0 0 7.07 0l2.12-2.12a5 5 0 0 0-7.07-7.07L10.7 5.22M14 11a5 5 0 0 0-7.07 0L4.8 13.12a5 5 0 1 0 7.07 7.07l1.41-1.41"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function AreaEmpresasDetalhe() {
   const { areaSlug } = useParams();
   const area = areaSlug ? findAreaBySlug(areaSlug) : null;
   const { addCompany, items: companyProfiles } = useCompanyProfiles();
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
   const [formValues, setFormValues] = useState({
     nome: "",
     telefone: "",
     email: "",
+    site: "",
     tiposProduto: "",
   });
 
@@ -28,8 +59,33 @@ function AreaEmpresasDetalhe() {
     return companyProfiles.filter((company) => company.areas.includes(area.setor));
   }, [area, companyProfiles]);
 
+  const filteredCompanies = useMemo(() => {
+    const normalizedTerm = searchTerm.trim().toLowerCase();
+    if (!normalizedTerm) {
+      return companies;
+    }
+
+    return companies.filter((company) => {
+      const haystack = [company.nome, ...company.tiposProduto].join(" ").toLowerCase();
+      return haystack.includes(normalizedTerm);
+    });
+  }, [companies, searchTerm]);
+
   const renderValue = (value: string, fallback = "Nao informado") => {
     return value.trim() ? value : fallback;
+  };
+
+  const normalizeSiteUrl = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return "";
+    }
+
+    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+      return trimmed;
+    }
+
+    return `https://${trimmed}`;
   };
 
   if (!area) {
@@ -80,17 +136,32 @@ function AreaEmpresasDetalhe() {
               {companies.length} empresa{companies.length === 1 ? "" : "s"}
             </Badge>
           </div>
+
+          {showSearch ? (
+            <div className="max-w-xl">
+              <Input
+                icon={<SearchIcon />}
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Pesquisar por nome da empresa ou item"
+              />
+            </div>
+          ) : null}
         </div>
 
-        <div className="shrink-0">
+        <div className="flex shrink-0 flex-wrap items-center gap-3">
+          <Button variant="outline" onClick={() => setShowSearch((value) => !value)}>
+            <SearchIcon />
+            {showSearch ? "Fechar busca" : "Buscar"}
+          </Button>
           <Button onClick={() => setShowAddModal(true)}>Adicionar nova empresa</Button>
         </div>
       </header>
 
       <div className="space-y-6 px-6 py-8 sm:px-8">
-        {companies.length > 0 ? (
+        {filteredCompanies.length > 0 ? (
           <div className="grid gap-4 xl:grid-cols-2">
-            {companies.map((company) => (
+            {filteredCompanies.map((company) => (
               <Card key={`${area.setor}-${company.nome}`} className="overflow-hidden">
                 <div className="space-y-6 p-6">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -111,6 +182,27 @@ function AreaEmpresasDetalhe() {
                     </div>
                   </div>
 
+                  <div className="rounded-2xl border border-line/80 bg-panel/60 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate/80">Site</p>
+                        <p className="mt-2 text-sm font-medium text-ink">{renderValue(company.site ?? "")}</p>
+                      </div>
+
+                      {company.site?.trim() ? (
+                        <a
+                          href={normalizeSiteUrl(company.site)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-line bg-white px-4 py-2 text-sm font-semibold text-ink transition hover:border-accent/40 hover:text-accent"
+                        >
+                          <LinkIcon />
+                          Abrir site
+                        </a>
+                      ) : null}
+                    </div>
+                  </div>
+
                   <div className="space-y-3">
                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate/80">Tipos de produto</p>
                     <div className="flex flex-wrap gap-2">
@@ -128,9 +220,13 @@ function AreaEmpresasDetalhe() {
         ) : (
           <Card className="border-dashed bg-panel/70">
             <div className="p-8">
-              <h2 className="font-heading text-2xl font-extrabold text-ink">Nenhuma empresa cadastrada</h2>
+              <h2 className="font-heading text-2xl font-extrabold text-ink">
+                {searchTerm.trim() ? "Nenhum resultado encontrado" : "Nenhuma empresa cadastrada"}
+              </h2>
               <p className="mt-2 text-base text-slate">
-                Esta area ainda nao possui empresas listadas. Use o botao acima para cadastrar a primeira.
+                {searchTerm.trim()
+                  ? "Tente pesquisar por outro nome ou item para encontrar a empresa desejada."
+                  : "Esta area ainda nao possui empresas listadas. Use o botao acima para cadastrar a primeira."}
               </p>
             </div>
           </Card>
@@ -159,6 +255,7 @@ function AreaEmpresasDetalhe() {
                   nome: formValues.nome.trim(),
                   telefone: formValues.telefone.trim(),
                   email: formValues.email.trim(),
+                  site: normalizeSiteUrl(formValues.site),
                   areas: [area.setor],
                   tiposProduto,
                 });
@@ -167,6 +264,7 @@ function AreaEmpresasDetalhe() {
                   nome: "",
                   telefone: "",
                   email: "",
+                  site: "",
                   tiposProduto: "",
                 });
                 setShowAddModal(false);
@@ -197,11 +295,19 @@ function AreaEmpresasDetalhe() {
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-ink">Email</label>
                 <Input
-                  required
                   type="email"
                   value={formValues.email}
                   onChange={(event) => setFormValues((current) => ({ ...current, email: event.target.value }))}
                   placeholder="empresa@exemplo.com.br"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-ink">Site</label>
+                <Input
+                  value={formValues.site}
+                  onChange={(event) => setFormValues((current) => ({ ...current, site: event.target.value }))}
+                  placeholder="https://empresa.com.br"
                 />
               </div>
 
