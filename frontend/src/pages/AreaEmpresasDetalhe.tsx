@@ -66,7 +66,16 @@ function AreaEmpresasDetalhe() {
     }
 
     return companies.filter((company) => {
-      const haystack = [company.nome, ...company.tiposProduto].join(" ").toLowerCase();
+      const haystack = [
+        company.nome,
+        company.telefone,
+        company.email,
+        company.site ?? "",
+        ...company.areas,
+        ...company.tiposProduto,
+      ]
+        .join(" ")
+        .toLowerCase();
       return haystack.includes(normalizedTerm);
     });
   }, [companies, searchTerm]);
@@ -138,12 +147,12 @@ function AreaEmpresasDetalhe() {
           </div>
 
           {showSearch ? (
-            <div className="max-w-xl">
+            <div className="w-full max-w-4xl">
               <Input
                 icon={<SearchIcon />}
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Pesquisar por nome da empresa ou item"
+                placeholder="Pesquisar por nome, item, telefone, email, site, bairro ou categoria"
               />
             </div>
           ) : null}
