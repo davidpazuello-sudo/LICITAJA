@@ -141,31 +141,6 @@ function BuscarLicitacoes() {
             />
           </Card>
 
-          {status === "idle" && !hasSearched ? (
-            <Card className="border-dashed bg-panel/70">
-              <div className="flex flex-col items-start gap-5 p-8">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-accent shadow-card">
-                  <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" aria-hidden="true">
-                    <path
-                      d="M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Zm9 2-3.8-3.8"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </div>
-                <div>
-                  <h2 className="font-heading text-2xl font-extrabold text-ink">Comece buscando uma oportunidade</h2>
-                  <p className="mt-2 max-w-2xl text-base text-slate">
-                    Digite algo como <strong>papel A4</strong>, <strong>informatica</strong> ou o nome de um orgao. A
-                    busca consulta os portais selecionados e marca automaticamente o que ja foi salvo.
-                  </p>
-                </div>
-              </div>
-            </Card>
-          ) : null}
-
           {status === "loading" ? (
             <div className="flex flex-wrap items-center justify-between gap-3 px-1">
               <div className="inline-flex items-center gap-3 rounded-full border border-line bg-white px-4 py-2 shadow-card">

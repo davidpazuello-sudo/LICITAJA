@@ -27,7 +27,30 @@ MODALIDADE_CODES = {
     "Leilao - Presencial": 13,
 }
 
-FALLBACK_PUBLICACAO_CODES = [6, 4, 12]
+INSTRUMENTO_CONVOCATORIO_CODES = {
+    "Edital": 1,
+    "Aviso de Contratacao Direta": 2,
+    "Ato que autoriza a Contratacao Direta": 3,
+}
+
+ESFERA_LABELS = {
+    "F": "Federal",
+    "E": "Estadual",
+    "M": "Municipal",
+    "D": "Distrital",
+}
+
+PODER_LABELS = {
+    "E": "Executivo",
+    "L": "Legislativo",
+    "J": "Judiciario",
+}
+
+STATUS_FILTER_RECEBENDO = "recebendo_proposta"
+STATUS_FILTER_JULGAMENTO = "julgamento"
+STATUS_FILTER_ENCERRADA = "encerrada"
+
+FALLBACK_PUBLICACAO_CODES = list(MODALIDADE_CODES.values())
 MAX_TARGETED_SCAN_PAGES = 2
 
 FAMILY_KEYWORDS = {
@@ -109,9 +132,25 @@ class PncpService:
         pagina: int,
         page_size: int = 10,
     ) -> BuscaLicitacoesResponse:
-        needs_targeted_search = any([q, buscar_por, numero_oportunidade, objeto_licitacao, orgao])
+        status_mode = self._resolve_status_filter_mode(sub_status)
+        requires_publicacao_scan = any(
+            [
+                q,
+                buscar_por,
+                numero_oportunidade,
+                objeto_licitacao,
+                orgao,
+                unidade,
+                municipio,
+                esfera,
+                poder,
+                fonte_orcamentaria,
+                tipo_instrumento_convocatorio,
+                status_mode != STATUS_FILTER_RECEBENDO,
+            ]
+        )
 
-        if needs_targeted_search:
+        if requires_publicacao_scan:
             return await self._buscar_publicacoes_direcionadas(
                 buscar_por=buscar_por or q,
                 numero_oportunidade=numero_oportunidade,
@@ -176,7 +215,15 @@ class PncpService:
                     orgao=orgao,
                     empresa=empresa,
                     sub_status=sub_status,
+                    tipo_instrumento_convocatorio=tipo_instrumento_convocatorio,
+                    unidade=unidade,
                     estado=estado,
+                    municipio=municipio,
+                    esfera=esfera,
+                    poder=poder,
+                    fonte_orcamentaria=fonte_orcamentaria,
+                    margem_preferencia=margem_preferencia,
+                    conteudo_nacional=conteudo_nacional,
                     modalidade=modalidade,
                     tipo_fornecimento=tipo_fornecimento,
                     familia_fornecimento=familia_fornecimento,
@@ -211,7 +258,15 @@ class PncpService:
         orgao: str | None,
         empresa: str | None,
         sub_status: str | None,
+        tipo_instrumento_convocatorio: str | None,
+        unidade: str | None,
         estado: str | None,
+        municipio: str | None,
+        esfera: str | None,
+        poder: str | None,
+        fonte_orcamentaria: str | None,
+        margem_preferencia: str | None,
+        conteudo_nacional: str | None,
         modalidade: str | None,
         tipo_fornecimento: list[str],
         familia_fornecimento: list[str],
@@ -453,7 +508,7 @@ class PncpService:
         estado_sigla = (unidade_orgao.get("ufSigla") or "").upper()
         modalidade_nome = self._normalize_modalidade_nome(item.get("modalidadeNome"))
         data_abertura = item.get("dataAberturaProposta") or item.get("dataPublicacaoPncp")
-        item_sub_status = self._extract_sub_status(item)
+        item_sub_status = self._resolve_display_status(item)
         supply_type = self._infer_supply_type(item)
         family_tags = self._infer_family_tags(item, supply_type)
         numero_compra = self._compose_numero_compra(item) or ""
@@ -488,15 +543,13 @@ class PncpService:
         if orgao and self._normalize_text(orgao) not in self._normalize_text(orgao_nome):
             return False
 
-        if sub_status and self._normalize_text(sub_status) not in self._normalize_text(item_sub_status):
+        if sub_status and not self._matches_status_filter(item, sub_status):
             return False
 
         if tipo_instrumento_convocatorio and not self._contains_all_terms(
             [
-                item.get("instrumentoConvocatorio"),
-                item.get("modalidadeNome"),
-                objeto,
-                raw_blob,
+                item.get("tipoInstrumentoConvocatorioNome"),
+                item.get("tipoInstrumentoConvocatorioCodigo"),
             ],
             tipo_instrumento_convocatorio,
         ):
@@ -520,13 +573,28 @@ class PncpService:
         if municipio and not self._contains_all_terms([unidade_orgao.get("municipioNome"), raw_blob], municipio):
             return False
 
-        if esfera and not self._contains_all_terms([item.get("esferaId"), item.get("esferaNome"), raw_blob], esfera):
+        if esfera and not self._contains_all_terms(
+            [
+                (item.get("orgaoEntidade") or {}).get("esferaId"),
+                self._resolve_esfera_label((item.get("orgaoEntidade") or {}).get("esferaId")),
+            ],
+            esfera,
+        ):
             return False
 
-        if poder and not self._contains_all_terms([item.get("poderId"), item.get("poderNome"), raw_blob], poder):
+        if poder and not self._contains_all_terms(
+            [
+                (item.get("orgaoEntidade") or {}).get("poderId"),
+                self._resolve_poder_label((item.get("orgaoEntidade") or {}).get("poderId")),
+            ],
+            poder,
+        ):
             return False
 
-        if fonte_orcamentaria and not self._contains_all_terms([raw_blob], fonte_orcamentaria):
+        if fonte_orcamentaria and not self._contains_all_terms(
+            self._extract_fontes_orcamentarias(item) + [raw_blob],
+            fonte_orcamentaria,
+        ):
             return False
 
         if margem_preferencia and not self._contains_all_terms([raw_blob], margem_preferencia):
@@ -546,14 +614,6 @@ class PncpService:
 
         if data_inicio or data_fim:
             if not self._is_date_within_range(data_abertura, data_inicio, data_fim):
-                return False
-
-        # Exclude licitações whose proposal period has already closed
-        data_encerramento = item.get("dataEncerramentoProposta")
-        if data_encerramento and isinstance(data_encerramento, str) and len(data_encerramento) >= 10:
-            encerramento_iso = data_encerramento[:10]
-            hoje_iso = datetime.now().strftime("%Y-%m-%d")
-            if encerramento_iso < hoje_iso:
                 return False
 
         return True
@@ -596,7 +656,7 @@ class PncpService:
         return {
             "numero_controle": item.get("numeroControlePNCP"),
             "numero_compra": self._compose_numero_compra(item),
-            "sub_status": self._extract_sub_status(item) or None,
+            "sub_status": self._resolve_display_status(item) or None,
             "numero_processo": item.get("processo"),
             "orgao": ((item.get("orgaoEntidade") or {}).get("razaoSocial")) or "Orgao nao informado",
             "uasg": unidade.get("codigoUnidade"),
@@ -689,15 +749,99 @@ class PncpService:
         return modalidade
 
     def _extract_sub_status(self, item: dict) -> str:
-        values: list[str] = []
-        for key in STATUS_KEYS:
-            value = item.get(key)
-            if isinstance(value, str):
-                values.append(value)
-            elif isinstance(value, dict):
-                values.extend(str(inner_value) for inner_value in value.values() if isinstance(inner_value, str))
+        return self._resolve_display_status(item)
 
-        return " ".join(values)
+    def _resolve_status_filter_mode(self, sub_status: str | None) -> str:
+        normalized = self._normalize_text(sub_status or "")
+        if not normalized:
+            return "todos"
+        if "receb" in normalized or ("proposta" in normalized and "encerrad" not in normalized):
+            return STATUS_FILTER_RECEBENDO
+        if "julg" in normalized or ("proposta" in normalized and "encerrad" in normalized):
+            return STATUS_FILTER_JULGAMENTO
+        if "encerrad" in normalized:
+            return STATUS_FILTER_ENCERRADA
+        return normalized
+
+    def _resolve_display_status(self, item: dict) -> str:
+        situacao_nome = str(item.get("situacaoCompraNome") or "").strip()
+        if self._is_recebendo_proposta(item):
+            return "A Receber/Recebendo Proposta"
+        if self._is_em_julgamento(item):
+            return "Em Julgamento/Propostas Encerradas"
+        if self._is_encerrada(item):
+            return situacao_nome or "Encerradas"
+        return situacao_nome or "Divulgada no PNCP"
+
+    def _matches_status_filter(self, item: dict, sub_status: str) -> bool:
+        mode = self._resolve_status_filter_mode(sub_status)
+        if mode == "todos":
+            return True
+        if mode == STATUS_FILTER_RECEBENDO:
+            return self._is_recebendo_proposta(item)
+        if mode == STATUS_FILTER_JULGAMENTO:
+            return self._is_em_julgamento(item)
+        if mode == STATUS_FILTER_ENCERRADA:
+            return self._is_encerrada(item)
+        return self._contains_all_terms(
+            [self._resolve_display_status(item), item.get("situacaoCompraNome"), json.dumps(item, ensure_ascii=False)],
+            sub_status,
+        )
+
+    def _is_recebendo_proposta(self, item: dict) -> bool:
+        now = datetime.now()
+        abertura = self._parse_item_datetime(item.get("dataAberturaProposta"))
+        encerramento = self._parse_item_datetime(item.get("dataEncerramentoProposta"))
+        if abertura and now < abertura:
+            return True
+        if abertura and encerramento:
+            return abertura <= now <= encerramento
+        return False
+
+    def _is_em_julgamento(self, item: dict) -> bool:
+        encerramento = self._parse_item_datetime(item.get("dataEncerramentoProposta"))
+        situacao_id = item.get("situacaoCompraId")
+        if encerramento and datetime.now() > encerramento:
+            return situacao_id == 1 or self._normalize_text(str(item.get("situacaoCompraNome") or "")) == "divulgada no pncp"
+        return False
+
+    def _is_encerrada(self, item: dict) -> bool:
+        situacao_id = item.get("situacaoCompraId")
+        if isinstance(situacao_id, int) and situacao_id != 1:
+            return True
+        situacao_nome = self._normalize_text(str(item.get("situacaoCompraNome") or ""))
+        return any(token in situacao_nome for token in ("encerr", "conclu", "revog", "anulad", "suspens", "cancel"))
+
+    def _parse_item_datetime(self, raw_value: object) -> datetime | None:
+        if not isinstance(raw_value, str) or not raw_value.strip():
+            return None
+        try:
+            return datetime.fromisoformat(raw_value.replace("Z", "+00:00")).replace(tzinfo=None)
+        except ValueError:
+            return None
+
+    def _resolve_esfera_label(self, value: object) -> str | None:
+        if not isinstance(value, str):
+            return None
+        return ESFERA_LABELS.get(value.upper(), value)
+
+    def _resolve_poder_label(self, value: object) -> str | None:
+        if not isinstance(value, str):
+            return None
+        return PODER_LABELS.get(value.upper(), value)
+
+    def _extract_fontes_orcamentarias(self, item: dict) -> list[str]:
+        fontes = item.get("fontesOrcamentarias")
+        if not isinstance(fontes, list):
+            return []
+
+        extracted: list[str] = []
+        for fonte in fontes:
+            if isinstance(fonte, str):
+                extracted.append(fonte)
+            elif isinstance(fonte, dict):
+                extracted.extend(str(value) for value in fonte.values() if value not in (None, ""))
+        return extracted
 
     def _infer_supply_type(self, item: dict) -> str:
         raw_text = self._normalize_text(

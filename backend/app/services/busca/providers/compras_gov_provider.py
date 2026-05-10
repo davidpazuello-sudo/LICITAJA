@@ -90,7 +90,9 @@ class ComprasGovProvider(SearchProvider):
         "objeto_licitacao",
         "orgao",
         "sub_status",
+        "unidade",
         "estado",
+        "municipio",
         "modalidade",
         "tipo_fornecimento",
         "familia_fornecimento",
@@ -297,7 +299,7 @@ class ComprasGovProvider(SearchProvider):
         if not prelim_matches:
             return matched_items
 
-        needs_uasg_context = bool(query.orgao)
+        needs_uasg_context = bool(query.orgao or query.unidade or query.estado or query.municipio)
         if not needs_uasg_context:
             return [item for _, item in prelim_matches]
 
@@ -324,7 +326,9 @@ class ComprasGovProvider(SearchProvider):
                 query.orgao,
                 query.empresa,
                 query.sub_status,
+                query.unidade,
                 query.estado,
+                query.municipio,
                 query.modalidade,
                 query.tipo_fornecimento,
                 query.familia_fornecimento,
@@ -452,13 +456,19 @@ class ComprasGovProvider(SearchProvider):
         ):
             return False
 
-        if include_uasg_filters and query.orgao and not self._contains_all_terms([item.orgao], query.orgao):
+        if include_uasg_filters and query.orgao and not self._contains_all_terms([item.orgao, item.uasg], query.orgao):
+            return False
+
+        if include_uasg_filters and query.unidade and not self._matches_unidade_filter(item, query.unidade):
             return False
 
         if query.sub_status and not self._contains_all_terms([item.sub_status], query.sub_status):
             return False
 
-        if query.estado and (item.estado or "").upper() != query.estado.upper():
+        if query.estado and include_uasg_filters and (item.estado or "").upper() != query.estado.upper():
+            return False
+
+        if include_uasg_filters and query.municipio and not self._contains_all_terms([item.cidade], query.municipio):
             return False
 
         if query.modalidade and not self._contains_all_terms([item.modalidade], query.modalidade):
@@ -633,6 +643,15 @@ class ComprasGovProvider(SearchProvider):
         haystack = self._normalize_text(" ".join(str(value or "") for value in values))
         terms = [term for term in self._normalize_text(query).split() if term]
         return any(term in haystack for term in terms)
+
+    def _matches_unidade_filter(self, item: BuscaLicitacaoItem, query: str) -> bool:
+        uasg_digits = "".join(char for char in query if char.isdigit())
+        item_uasg = str(item.uasg or "")
+
+        if uasg_digits and item_uasg == uasg_digits:
+            return True
+
+        return self._contains_all_terms([item.orgao, item.uasg], query)
 
     def _normalize_text(self, value: str) -> str:
         normalized = unicodedata.normalize("NFKD", value)

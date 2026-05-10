@@ -18,6 +18,8 @@ class PncpProvider(SearchProvider):
     supported_filters = {
         "buscar_por",
         "numero_oportunidade",
+        "objeto_licitacao",
+        "orgao",
         "sub_status",
         "tipo_instrumento_convocatorio",
         "unidade",
@@ -26,8 +28,6 @@ class PncpProvider(SearchProvider):
         "esfera",
         "poder",
         "fonte_orcamentaria",
-        "margem_preferencia",
-        "conteudo_nacional",
         "modalidade",
         "data_inicio",
         "data_fim",

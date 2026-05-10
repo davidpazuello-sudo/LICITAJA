@@ -226,6 +226,8 @@ function FiltrosBusca({
   const orgaoSuggestions = suggestions?.orgaos ?? [];
   const unidadeSuggestions = suggestions?.unidades ?? [];
   const municipioSuggestions = suggestions?.municipios ?? [];
+  const supportsField = (field: keyof BuscaLicitacaoFilters) =>
+    filterSupport.supportedFields.includes(field as never);
 
   const activeFiltersCount = useMemo(() => {
     const scalarFilters = [
@@ -337,19 +339,21 @@ function FiltrosBusca({
               </div>
             </div>
 
-            <div className="space-y-2">
-              <FieldLabel>Status</FieldLabel>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {PNCP_STATUS_OPTIONS.map((option) => (
-                  <StatusOption
-                    key={option.label}
-                    label={option.label}
-                    checked={filters.sub_status === option.value}
-                    onClick={() => onChange("sub_status", option.value)}
-                  />
-                ))}
+            {supportsField("sub_status") ? (
+              <div className="space-y-2">
+                <FieldLabel>Status</FieldLabel>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {PNCP_STATUS_OPTIONS.map((option) => (
+                    <StatusOption
+                      key={option.label}
+                      label={option.label}
+                      checked={filters.sub_status === option.value}
+                      onClick={() => onChange("sub_status", option.value)}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
+            ) : null}
 
             <div className="flex items-start gap-3 rounded-2xl border border-blue-100 bg-white/80 px-4 py-3 text-xs text-slate shadow-sm">
               <span className="mt-0.5 text-accent">
@@ -366,99 +370,121 @@ function FiltrosBusca({
 
         <div className="space-y-6 p-6">
           <div className="grid gap-5 md:grid-cols-2">
-            <SelectField
-              label="Tipos de Instrumento Convocatorio"
-              value={filters.tipo_instrumento_convocatorio}
-              placeholder="Selecione"
-              options={TIPO_INSTRUMENTO_OPTIONS}
-              onChange={(value) => onChange("tipo_instrumento_convocatorio", value)}
-            />
+            {supportsField("tipo_instrumento_convocatorio") ? (
+              <SelectField
+                label="Tipos de Instrumento Convocatorio"
+                value={filters.tipo_instrumento_convocatorio}
+                placeholder="Selecione"
+                options={TIPO_INSTRUMENTO_OPTIONS}
+                onChange={(value) => onChange("tipo_instrumento_convocatorio", value)}
+              />
+            ) : null}
 
-            <SelectField
-              label="Modalidades da Contratacao"
-              value={filters.modalidade}
-              placeholder="Selecione"
-              options={MODALIDADE_OPTIONS}
-              onChange={(value) => onChange("modalidade", value)}
-            />
+            {supportsField("modalidade") ? (
+              <SelectField
+                label="Modalidades da Contratacao"
+                value={filters.modalidade}
+                placeholder="Selecione"
+                options={MODALIDADE_OPTIONS}
+                onChange={(value) => onChange("modalidade", value)}
+              />
+            ) : null}
 
-            <TextField
-              label="Orgaos"
-              value={filters.orgao}
-              placeholder="Selecione"
-              listId="orgaos-busca-options"
-              options={orgaoSuggestions}
-              onChange={(value) => onChange("orgao", value)}
-              onEnter={onSearch}
-            />
+            {supportsField("orgao") ? (
+              <TextField
+                label="Orgaos"
+                value={filters.orgao}
+                placeholder="Selecione"
+                listId="orgaos-busca-options"
+                options={orgaoSuggestions}
+                onChange={(value) => onChange("orgao", value)}
+                onEnter={onSearch}
+              />
+            ) : null}
 
-            <TextField
-              label="Unidades"
-              value={filters.unidade}
-              placeholder="Selecione"
-              listId="unidades-busca-options"
-              options={unidadeSuggestions}
-              onChange={(value) => onChange("unidade", value)}
-              onEnter={onSearch}
-            />
+            {supportsField("unidade") ? (
+              <TextField
+                label="Unidades"
+                value={filters.unidade}
+                placeholder="Selecione"
+                listId="unidades-busca-options"
+                options={unidadeSuggestions}
+                onChange={(value) => onChange("unidade", value)}
+                onEnter={onSearch}
+              />
+            ) : null}
 
-            <SelectField
-              label="UFs"
-              value={filters.estado}
-              placeholder="Selecione"
-              options={UF_OPTIONS}
-              onChange={(value) => onChange("estado", value)}
-            />
+            {supportsField("estado") ? (
+              <SelectField
+                label="UFs"
+                value={filters.estado}
+                placeholder="Selecione"
+                options={UF_OPTIONS}
+                onChange={(value) => onChange("estado", value)}
+              />
+            ) : null}
 
-            <TextField
-              label="Municipios"
-              value={filters.municipio}
-              placeholder="Selecione"
-              listId="municipios-busca-options"
-              options={municipioSuggestions}
-              onChange={(value) => onChange("municipio", value)}
-              onEnter={onSearch}
-            />
+            {supportsField("municipio") ? (
+              <TextField
+                label="Municipios"
+                value={filters.municipio}
+                placeholder="Selecione"
+                listId="municipios-busca-options"
+                options={municipioSuggestions}
+                onChange={(value) => onChange("municipio", value)}
+                onEnter={onSearch}
+              />
+            ) : null}
 
-            <SelectField
-              label="Esferas"
-              value={filters.esfera}
-              placeholder="Selecione"
-              options={ESFERA_OPTIONS}
-              onChange={(value) => onChange("esfera", value)}
-            />
+            {supportsField("esfera") ? (
+              <SelectField
+                label="Esferas"
+                value={filters.esfera}
+                placeholder="Selecione"
+                options={ESFERA_OPTIONS}
+                onChange={(value) => onChange("esfera", value)}
+              />
+            ) : null}
 
-            <SelectField
-              label="Poderes"
-              value={filters.poder}
-              placeholder="Selecione"
-              options={PODER_OPTIONS}
-              onChange={(value) => onChange("poder", value)}
-            />
+            {supportsField("poder") ? (
+              <SelectField
+                label="Poderes"
+                value={filters.poder}
+                placeholder="Selecione"
+                options={PODER_OPTIONS}
+                onChange={(value) => onChange("poder", value)}
+              />
+            ) : null}
 
-            <TextField
-              label="Fontes Orcamentarias"
-              value={filters.fonte_orcamentaria}
-              placeholder="Selecione"
-              onChange={(value) => onChange("fonte_orcamentaria", value)}
-              onEnter={onSearch}
-            />
+            {supportsField("fonte_orcamentaria") ? (
+              <TextField
+                label="Fontes Orcamentarias"
+                value={filters.fonte_orcamentaria}
+                placeholder="Selecione"
+                onChange={(value) => onChange("fonte_orcamentaria", value)}
+                onEnter={onSearch}
+              />
+            ) : null}
 
-            <SelectField
-              label="Tipos de Margens de Preferencia"
-              value={filters.margem_preferencia}
-              placeholder="Selecione"
-              options={MARGEM_PREFERENCIA_OPTIONS}
-              onChange={(value) => onChange("margem_preferencia", value)}
-            />
+            {supportsField("margem_preferencia") ? (
+              <SelectField
+                label="Tipos de Margens de Preferencia"
+                value={filters.margem_preferencia}
+                placeholder="Selecione"
+                options={MARGEM_PREFERENCIA_OPTIONS}
+                onChange={(value) => onChange("margem_preferencia", value)}
+              />
+            ) : null}
 
-            <SelectField
-              label="Exigencia de Conteudo Nacional"
-              value={filters.conteudo_nacional}
-              placeholder="Selecione"
-              options={CONTEUDO_NACIONAL_OPTIONS}
-              onChange={(value) => onChange("conteudo_nacional", value)}
-            />
+            {supportsField("conteudo_nacional") ? (
+              <SelectField
+                label="Exigencia de Conteudo Nacional"
+                value={filters.conteudo_nacional}
+                placeholder="Selecione"
+                options={CONTEUDO_NACIONAL_OPTIONS}
+                onChange={(value) => onChange("conteudo_nacional", value)}
+              />
+            ) : null}
           </div>
 
           <div className="space-y-3 rounded-[22px] border border-line/70 bg-white/80 p-4 shadow-sm">
