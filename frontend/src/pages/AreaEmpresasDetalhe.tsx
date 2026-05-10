@@ -173,11 +173,8 @@ function AreaEmpresasDetalhe() {
             {filteredCompanies.map((company) => (
               <Card key={`${area.setor}-${company.nome}`} className="overflow-hidden">
                 <div className="space-y-6 p-6">
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <h2 className="font-heading text-2xl font-extrabold text-ink">{company.nome}</h2>
-                    </div>
-                    <Badge variant="green">Ativa nesta area</Badge>
+                  <div>
+                    <h2 className="font-heading text-2xl font-extrabold text-ink">{company.nome}</h2>
                   </div>
 
                   <div className="grid gap-4 sm:grid-cols-2">
