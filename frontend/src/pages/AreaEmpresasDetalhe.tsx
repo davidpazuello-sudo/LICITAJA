@@ -28,6 +28,10 @@ function AreaEmpresasDetalhe() {
     return companyProfiles.filter((company) => company.areas.includes(area.setor));
   }, [area, companyProfiles]);
 
+  const renderValue = (value: string, fallback = "Nao informado") => {
+    return value.trim() ? value : fallback;
+  };
+
   if (!area) {
     return (
       <div className="space-y-6 px-6 py-8 sm:px-8">
@@ -99,11 +103,11 @@ function AreaEmpresasDetalhe() {
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="rounded-2xl border border-line/80 bg-panel/60 p-4">
                       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate/80">Telefone</p>
-                      <p className="mt-2 text-sm font-medium text-ink">{company.telefone}</p>
+                      <p className="mt-2 text-sm font-medium text-ink">{renderValue(company.telefone)}</p>
                     </div>
                     <div className="rounded-2xl border border-line/80 bg-panel/60 p-4">
                       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate/80">Email</p>
-                      <p className="mt-2 text-sm font-medium text-ink">{company.email}</p>
+                      <p className="mt-2 text-sm font-medium text-ink">{renderValue(company.email)}</p>
                     </div>
                   </div>
 
