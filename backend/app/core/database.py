@@ -163,10 +163,19 @@ def _seed_default_configurations() -> None:
                     url_base="https://www.licitaja.com.br/api/v1",
                     tipo_auth="x-api-key",
                     credencial="",
-                    status="ativa",
+                    status="inativa",
                     criado_em=datetime.now(UTC).isoformat(),
                 ),
             )
+        else:
+            licitaja_rows = session.scalars(
+                select(PortalIntegracaoModel).where(
+                    (PortalIntegracaoModel.nome == "LicitaJa")
+                    | (PortalIntegracaoModel.url_base == "https://www.licitaja.com.br/api/v1"),
+                ),
+            ).all()
+            for row in licitaja_rows:
+                row.status = "inativa"
 
         if "https://www.e-compras.am.gov.br/publico" not in existing_portal_urls:
             session.add(
