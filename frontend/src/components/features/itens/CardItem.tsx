@@ -103,7 +103,7 @@ function CardItem({
               <Badge variant="blue">Item {item.numero_item}</Badge>
               <Badge variant={statusMeta.variant}>{statusMeta.label}</Badge>
             </div>
-            <h3 className="font-heading text-base font-extrabold leading-snug text-ink">{item.descricao}</h3>
+            <h3 className="text-sm font-normal leading-6 text-ink">{item.descricao}</h3>
             <p className="text-sm text-slate/95">
               Quantidade: {item.quantidade ?? "Nao informada"}
               {item.unidade ? ` ${item.unidade}` : ""}
