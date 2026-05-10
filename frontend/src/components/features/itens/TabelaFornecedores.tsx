@@ -1,5 +1,4 @@
 import type { CotacaoType } from "../../../types/cotacao.types";
-import { formatCurrency } from "../../../utils/formatters";
 
 function TabelaFornecedores({ cotacoes }: { cotacoes: CotacaoType[] }) {
   return (
@@ -10,13 +9,32 @@ function TabelaFornecedores({ cotacoes }: { cotacoes: CotacaoType[] }) {
             <th className="px-4 py-3 font-semibold">Fornecedor</th>
             <th className="px-4 py-3 font-semibold">Perfil</th>
             <th className="px-4 py-3 font-semibold">UF</th>
-            <th className="px-4 py-3 font-semibold">Preco unitario</th>
+            <th className="px-4 py-3 font-semibold">Telefone</th>
+            <th className="px-4 py-3 font-semibold">Email comercial</th>
             <th className="px-4 py-3 font-semibold">Fonte</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-line bg-white">
           {cotacoes.map((cotacao) => (
-            <tr key={cotacao.id}>
+            <tr
+              key={cotacao.id}
+              className={cotacao.fonte_url ? "cursor-pointer transition hover:bg-panel/60" : undefined}
+              onClick={() => {
+                if (cotacao.fonte_url) {
+                  window.open(cotacao.fonte_url, "_blank", "noopener,noreferrer");
+                }
+              }}
+              onKeyDown={(event) => {
+                if (!cotacao.fonte_url) {
+                  return;
+                }
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  window.open(cotacao.fonte_url, "_blank", "noopener,noreferrer");
+                }
+              }}
+              tabIndex={cotacao.fonte_url ? 0 : -1}
+            >
               <td className="px-4 py-3 text-ink">
                 <div className="space-y-1">
                   <p className="font-medium text-ink">{cotacao.fornecedor_nome}</p>
@@ -27,17 +45,20 @@ function TabelaFornecedores({ cotacoes }: { cotacoes: CotacaoType[] }) {
               </td>
               <td className="px-4 py-3 text-ink">
                 <div className="space-y-1 text-xs text-slate">
-                  <p className="text-sm font-medium text-ink">{cotacao.fornecedor_tipo ?? cotacao.fonte_nome ?? "Fornecedor"}</p>
-                  {cotacao.fornecedor_cidade ? (
-                    <p>{cotacao.fornecedor_cidade}</p>
-                  ) : null}
+                  <p className="text-sm font-medium text-ink">
+                    {cotacao.fornecedor_tipo ?? cotacao.fonte_nome ?? "Fornecedor"}
+                  </p>
+                  {cotacao.fornecedor_cidade ? <p>{cotacao.fornecedor_cidade}</p> : null}
                 </div>
               </td>
               <td className="px-4 py-3 text-sm text-ink">
-                {cotacao.fornecedor_estado ?? <span className="text-slate">—</span>}
+                {cotacao.fornecedor_estado ?? <span className="text-slate">-</span>}
               </td>
               <td className="px-4 py-3 text-ink">
-                {cotacao.preco_unitario !== null ? formatCurrency(cotacao.preco_unitario) : "Nao informado"}
+                {cotacao.fornecedor_telefone ?? "Nao informado"}
+              </td>
+              <td className="px-4 py-3 text-ink">
+                {cotacao.fornecedor_email_comercial ?? "Nao informado"}
               </td>
               <td className="px-4 py-3">
                 {cotacao.fonte_url ? (
@@ -45,6 +66,7 @@ function TabelaFornecedores({ cotacoes }: { cotacoes: CotacaoType[] }) {
                     href={cotacao.fonte_url}
                     target="_blank"
                     rel="noreferrer"
+                    onClick={(event) => event.stopPropagation()}
                     className="font-medium text-accent transition hover:text-accentDark"
                   >
                     {cotacao.fonte_nome ?? "Abrir fonte"} -&gt;

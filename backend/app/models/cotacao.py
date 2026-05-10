@@ -15,6 +15,8 @@ class CotacaoModel(Base):
     fornecedor_tipo: Mapped[str | None] = mapped_column(String, nullable=True)
     fornecedor_estado: Mapped[str | None] = mapped_column(String, nullable=True)
     fornecedor_cidade: Mapped[str | None] = mapped_column(String, nullable=True)
+    fornecedor_telefone: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fornecedor_email_comercial: Mapped[str | None] = mapped_column(String, nullable=True)
     evidencia_item: Mapped[str | None] = mapped_column(Text, nullable=True)
     preco_unitario: Mapped[float | None] = mapped_column(Float, nullable=True)
     fonte_url: Mapped[str | None] = mapped_column(Text, nullable=True)

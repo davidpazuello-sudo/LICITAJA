@@ -40,6 +40,13 @@ WEB_SUPPLIER_EXCLUDED_DOMAINS = (
     "baidu.",
     "wikipedia.",
 )
+WEB_CONTACT_MAX_URLS_PER_SITE = 3
+WEB_CONTACT_TIMEOUT = 12.0
+PHONE_REGEX = re.compile(
+    r"(?:\+?55\s*)?(?:\(?\d{2}\)?\s*)?(?:9?\d{4}[-\s]?\d{4})",
+    flags=re.I,
+)
+EMAIL_REGEX = re.compile(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", flags=re.I)
 _DENTAL_SUPPLIER_FALLBACKS = (
     {
         "nome": "Dental Cremer",
@@ -192,6 +199,8 @@ class CotacaoColetada:
     fornecedor_tipo: str | None = None
     fornecedor_estado: str | None = None
     fornecedor_cidade: str | None = None
+    fornecedor_telefone: str | None = None
+    fornecedor_email_comercial: str | None = None
 
 
 @dataclass
@@ -298,6 +307,7 @@ class PesquisaService:
             if not fornecedores:
                 return ResultadoPesquisa(status_pesquisa="sem_preco", preco_medio=None, cotacoes=[])
 
+            fornecedores = await self._enriquecer_contatos_fornecedores(fornecedores)
             ordenados = self._priorizar_fornecedores_mercado(fornecedores, licitacao)
             has_price = any(cotacao.preco_unitario is not None for cotacao in ordenados)
             return ResultadoPesquisa(
@@ -643,6 +653,8 @@ class PesquisaService:
                     fornecedor_tipo=tipo,
                     fornecedor_estado=estado,
                     fornecedor_cidade=cidade,
+                    fornecedor_telefone=(fornecedor.get("telefone") or "").strip() or None,
+                    fornecedor_email_comercial=(fornecedor.get("email_comercial") or "").strip() or None,
                     preco_unitario=None,
                     fonte_url=url,
                     fonte_nome="Busca web",
@@ -658,6 +670,136 @@ class PesquisaService:
                 )
             )
         return cotacoes
+
+    async def _enriquecer_contatos_fornecedores(
+        self,
+        cotacoes: list[CotacaoColetada],
+    ) -> list[CotacaoColetada]:
+        contact_targets = [quote for quote in cotacoes if quote.fonte_url]
+        if not contact_targets:
+            return cotacoes
+
+        headers = {"user-agent": WEB_SUPPLIER_USER_AGENT}
+        async with httpx.AsyncClient(
+            timeout=WEB_CONTACT_TIMEOUT,
+            follow_redirects=True,
+            headers=headers,
+        ) as client:
+            contact_results = await asyncio.gather(
+                *(self._buscar_contatos_site(client, quote.fonte_url or "") for quote in contact_targets),
+                return_exceptions=True,
+            )
+
+        for quote, result in zip(contact_targets, contact_results, strict=False):
+            if isinstance(result, Exception) or not isinstance(result, dict):
+                continue
+            quote.fornecedor_telefone = result.get("telefone")
+            quote.fornecedor_email_comercial = result.get("email_comercial")
+
+        return cotacoes
+
+    async def _buscar_contatos_site(
+        self,
+        client: httpx.AsyncClient,
+        url: str,
+    ) -> dict[str, str | None]:
+        candidate_urls = self._build_contact_candidate_urls(url)
+        html_chunks: list[str] = []
+
+        for candidate_url in candidate_urls[:WEB_CONTACT_MAX_URLS_PER_SITE]:
+            try:
+                response = await client.get(candidate_url)
+                response.raise_for_status()
+            except httpx.HTTPError:
+                continue
+
+            if "text/html" not in response.headers.get("content-type", ""):
+                continue
+            html_chunks.append(response.text)
+
+        if not html_chunks:
+            return {"telefone": None, "email_comercial": None}
+
+        merged_html = "\n".join(html_chunks)
+        telefones = self._extract_phone_numbers(merged_html)
+        emails = self._extract_emails(merged_html)
+        return {
+            "telefone": " / ".join(telefones[:4]) if telefones else None,
+            "email_comercial": self._pick_commercial_email(emails),
+        }
+
+    def _build_contact_candidate_urls(self, url: str) -> list[str]:
+        parsed = urlparse(url)
+        if not parsed.scheme or not parsed.netloc:
+            return [url]
+
+        root = f"{parsed.scheme}://{parsed.netloc}"
+        candidates = [
+            url,
+            root,
+            f"{root}/contato",
+            f"{root}/contact",
+            f"{root}/fale-conosco",
+        ]
+        unique: list[str] = []
+        seen: set[str] = set()
+        for candidate in candidates:
+            normalized = candidate.rstrip("/")
+            if normalized in seen:
+                continue
+            seen.add(normalized)
+            unique.append(candidate)
+        return unique
+
+    def _extract_phone_numbers(self, html: str) -> list[str]:
+        text = self._clean_search_html_fragment(html)
+        matches = PHONE_REGEX.findall(text)
+        phones: list[str] = []
+        seen: set[str] = set()
+        for raw in matches:
+            digits = re.sub(r"\D", "", raw)
+            if len(digits) < 10:
+                continue
+            formatted = self._format_phone(digits)
+            if formatted in seen:
+                continue
+            seen.add(formatted)
+            phones.append(formatted)
+        return phones
+
+    def _extract_emails(self, html: str) -> list[str]:
+        matches = EMAIL_REGEX.findall(unescape(html))
+        emails: list[str] = []
+        seen: set[str] = set()
+        for email in matches:
+            normalized = email.strip().lower()
+            if normalized.endswith((".png", ".jpg", ".jpeg", ".svg", ".webp")):
+                continue
+            if normalized in seen:
+                continue
+            seen.add(normalized)
+            emails.append(normalized)
+        return emails
+
+    def _pick_commercial_email(self, emails: list[str]) -> str | None:
+        if not emails:
+            return None
+
+        priority_keywords = ("comercial", "contato", "vendas", "licitacao", "licitacoes", "atendimento")
+        for keyword in priority_keywords:
+            for email in emails:
+                if keyword in email:
+                    return email
+        return emails[0]
+
+    def _format_phone(self, digits: str) -> str:
+        if digits.startswith("55") and len(digits) >= 12:
+            digits = digits[2:]
+        if len(digits) == 11:
+            return f"({digits[:2]}) {digits[2:7]}-{digits[7:]}"
+        if len(digits) == 10:
+            return f"({digits[:2]}) {digits[2:6]}-{digits[6:]}"
+        return digits
 
     def _priorizar_fornecedores_mercado(
         self,

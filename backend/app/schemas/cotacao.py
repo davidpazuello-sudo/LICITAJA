@@ -6,6 +6,8 @@ class CotacaoBase(BaseModel):
     fornecedor_tipo: str | None = None
     fornecedor_estado: str | None = None
     fornecedor_cidade: str | None = None
+    fornecedor_telefone: str | None = None
+    fornecedor_email_comercial: str | None = None
     evidencia_item: str | None = None
     preco_unitario: float | None = None
     fonte_url: str | None = None

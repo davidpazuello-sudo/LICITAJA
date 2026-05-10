@@ -109,6 +109,10 @@ def _ensure_schema_updates() -> None:
             connection.execute(text("ALTER TABLE cotacoes ADD COLUMN fornecedor_cidade TEXT"))
         if "evidencia_item" not in cotacao_columns:
             connection.execute(text("ALTER TABLE cotacoes ADD COLUMN evidencia_item TEXT"))
+        if "fornecedor_telefone" not in cotacao_columns:
+            connection.execute(text("ALTER TABLE cotacoes ADD COLUMN fornecedor_telefone TEXT"))
+        if "fornecedor_email_comercial" not in cotacao_columns:
+            connection.execute(text("ALTER TABLE cotacoes ADD COLUMN fornecedor_email_comercial TEXT"))
 
 
 def _seed_default_configurations() -> None:
