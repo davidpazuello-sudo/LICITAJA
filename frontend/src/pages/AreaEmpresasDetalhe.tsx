@@ -147,7 +147,7 @@ function AreaEmpresasDetalhe() {
           </div>
 
           {showSearch ? (
-            <div className="w-full max-w-4xl">
+            <div className="w-full">
               <Input
                 icon={<SearchIcon />}
                 value={searchTerm}
