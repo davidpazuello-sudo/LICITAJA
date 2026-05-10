@@ -142,12 +142,15 @@ const PORTAL_FILTER_PROFILES: Record<string, PortalFilterProfile> = {
       "orgao",
       "sub_status",
       "estado",
+      "municipio",
       "modalidade",
       "tipo_fornecimento",
       "familia_fornecimento",
+      "data_inicio",
+      "data_fim",
     ],
     guidance:
-      "No Compras Manaus, o layout segue o mesmo visual, mas os filtros continuam limitados ao conjunto que o provider atual ja entende.",
+      "No Compras Manaus, os filtros confiaveis usam a lista publica e o detalhe de cada item para status, UG, modalidade, municipio e data de abertura.",
   },
   licitaja: {
     key: "licitaja",

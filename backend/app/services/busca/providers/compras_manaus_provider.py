@@ -74,9 +74,12 @@ class ComprasManausProvider(SearchProvider):
         "orgao",
         "sub_status",
         "estado",
+        "municipio",
         "modalidade",
         "tipo_fornecimento",
         "familia_fornecimento",
+        "data_inicio",
+        "data_fim",
     }
 
     def __init__(self, portal: PortalIntegracaoModel) -> None:
@@ -87,7 +90,7 @@ class ComprasManausProvider(SearchProvider):
     async def search(self, query: SearchQuery) -> ProviderSearchResult:
         try:
             summaries = await self._load_summaries(query)
-            filtered = [summary for summary in summaries if self._matches_summary(summary, query)]
+            summary_candidates = [summary for summary in summaries if self._matches_summary(summary, query)]
         except httpx.TimeoutException as exc:
             raise ProviderSearchError(
                 provider_id=self.provider_id,
@@ -111,16 +114,24 @@ class ComprasManausProvider(SearchProvider):
                 supported_filters=sorted(self.supported_filters),
             ) from exc
 
-        total_registros = len(filtered)
+        details_map = await self._load_details_map(summary_candidates)
+        filtered_items = [
+            item
+            for summary in summary_candidates
+            if (
+                item := self._build_summary_item(
+                    summary,
+                    details_map.get(str(summary.get("ident") or "")),
+                )
+            )
+            and self._matches_item(item, query)
+        ]
+
+        total_registros = len(filtered_items)
         total_paginas = max((total_registros + query.page_size - 1) // query.page_size, 1)
         start_index = max(query.pagina - 1, 0) * query.page_size
         end_index = start_index + query.page_size
-        page_candidates = filtered[start_index:end_index]
-        details_map = await self._load_details_map(page_candidates)
-        items = [
-            self._build_summary_item(summary, details_map.get(str(summary.get("ident") or "")))
-            for summary in page_candidates
-        ]
+        items = filtered_items[start_index:end_index]
 
         return ProviderSearchResult(
             items=items,
@@ -161,7 +172,7 @@ class ComprasManausProvider(SearchProvider):
             if "futura" in normalized or "abertura" in normalized:
                 return ["futuras"]
             if "andamento" in normalized or "negociacao" in normalized or "classificacao" in normalized:
-                return ["andamento"]
+                return ["inscricao", "andamento"]
             if "suspensa" in normalized:
                 return ["suspensas"]
             if "recurso" in normalized:
@@ -295,6 +306,9 @@ class ComprasManausProvider(SearchProvider):
         if query.estado and query.estado.upper() != "AM":
             return False
 
+        if query.municipio and not self._contains_all_terms(["Manaus"], query.municipio):
+            return False
+
         if query.buscar_por and not self._contains_all_terms(
             [summary.get("numero_compra"), summary.get("objeto"), summary.get("ug"), summary.get("sub_status")],
             query.buscar_por,
@@ -313,9 +327,6 @@ class ComprasManausProvider(SearchProvider):
         if query.orgao and not self._contains_all_terms([summary.get("ug")], query.orgao):
             return False
 
-        if query.sub_status and not self._contains_all_terms([summary.get("sub_status")], query.sub_status):
-            return False
-
         if query.modalidade and not self._contains_all_terms([summary.get("modalidade"), summary.get("numero_compra")], query.modalidade):
             return False
 
@@ -326,6 +337,52 @@ class ComprasManausProvider(SearchProvider):
         if query.familia_fornecimento:
             family_tags = self._infer_family_tags(summary.get("objeto") or "", supply_type)
             if not family_tags.intersection(set(query.familia_fornecimento)):
+                return False
+
+        return True
+
+    def _matches_item(self, item: BuscaLicitacaoItem, query: SearchQuery) -> bool:
+        if query.buscar_por and not self._contains_all_terms(
+            [item.numero_compra, item.objeto, item.orgao, item.sub_status, item.modalidade],
+            query.buscar_por,
+        ):
+            return False
+
+        if query.numero_oportunidade and not self._contains_any_term(
+            [item.numero_controle, item.numero_compra, item.numero_processo],
+            query.numero_oportunidade,
+        ):
+            return False
+
+        if query.objeto_licitacao and not self._contains_all_terms([item.objeto], query.objeto_licitacao):
+            return False
+
+        if query.orgao and not self._contains_all_terms([item.orgao], query.orgao):
+            return False
+
+        if query.sub_status and not self._contains_all_terms([item.sub_status], query.sub_status):
+            return False
+
+        if query.estado and (item.estado or "").upper() != query.estado.upper():
+            return False
+
+        if query.municipio and not self._contains_all_terms([item.cidade], query.municipio):
+            return False
+
+        if query.modalidade and not self._contains_all_terms([item.modalidade], query.modalidade):
+            return False
+
+        supply_type = self._infer_supply_type(item.objeto)
+        if query.tipo_fornecimento and not self._matches_supply_type(supply_type, query.tipo_fornecimento):
+            return False
+
+        if query.familia_fornecimento:
+            family_tags = self._infer_family_tags(item.objeto, supply_type)
+            if not family_tags.intersection(set(query.familia_fornecimento)):
+                return False
+
+        if query.data_inicio or query.data_fim:
+            if not self._is_date_within_range(item.data_abertura or item.data_publicacao, query.data_inicio, query.data_fim):
                 return False
 
         return True
@@ -520,4 +577,41 @@ class ComprasManausProvider(SearchProvider):
                 return datetime.strptime(cleaned, pattern).strftime("%Y-%m-%dT%H:%M:%S")
             except ValueError:
                 continue
+        return None
+
+    def _is_date_within_range(
+        self,
+        raw_date: str | None,
+        data_inicio: str | None,
+        data_fim: str | None,
+    ) -> bool:
+        if raw_date is None:
+            return False
+
+        try:
+            parsed = datetime.fromisoformat(raw_date.replace("Z", "+00:00"))
+        except ValueError:
+            return False
+
+        start = self._parse_filter_date(data_inicio)
+        end = self._parse_filter_date(data_fim)
+
+        if start and parsed.date() < start.date():
+            return False
+
+        if end and parsed.date() > end.date():
+            return False
+
+        return True
+
+    def _parse_filter_date(self, raw_date: str | None) -> datetime | None:
+        if not raw_date:
+            return None
+
+        for fmt in ("%Y-%m-%d", "%Y%m%d"):
+            try:
+                return datetime.strptime(raw_date, fmt)
+            except ValueError:
+                continue
+
         return None
