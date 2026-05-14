@@ -39,12 +39,11 @@ jobs:
         shell: bash
         run: |
           rm -rf hostinger-deploy
-          mkdir -p hostinger-deploy/frontend/dist
+          mkdir -p hostinger-deploy
           cp .htaccess hostinger-deploy/.htaccess
           cp frontend/dist/config.js hostinger-deploy/config.js
-          cp frontend/dist/index.html hostinger-deploy/frontend/dist/index.html
-          cp frontend/dist/.htaccess hostinger-deploy/frontend/dist/.htaccess
-          cp -R frontend/dist/assets hostinger-deploy/frontend/dist/assets
+          cp frontend/dist/index.html hostinger-deploy/index.html
+          cp -R frontend/dist/assets hostinger-deploy/assets
 
       - name: Deploy frontend via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5

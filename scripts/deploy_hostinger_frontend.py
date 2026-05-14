@@ -61,18 +61,15 @@ def deploy_frontend(repo_root: Path, skip_build: bool) -> None:
     ftp = FTP(host, username, password, timeout=30)
     ftp.encoding = "utf-8"
 
-    ensure_remote_dir(ftp, f"{remote_root}/frontend")
-    ensure_remote_dir(ftp, f"{remote_root}/frontend/dist")
-    ensure_remote_dir(ftp, f"{remote_root}/frontend/dist/assets")
+    ensure_remote_dir(ftp, f"{remote_root}/assets")
 
     upload_file(ftp, repo_root / ".htaccess", f"{remote_root}/.htaccess")
     upload_file(ftp, dist_dir / "config.js", f"{remote_root}/config.js")
-    upload_file(ftp, dist_dir / "index.html", f"{remote_root}/frontend/dist/index.html")
-    upload_file(ftp, dist_dir / ".htaccess", f"{remote_root}/frontend/dist/.htaccess")
+    upload_file(ftp, dist_dir / "index.html", f"{remote_root}/index.html")
 
     for asset in (dist_dir / "assets").iterdir():
         if asset.is_file():
-            upload_file(ftp, asset, f"{remote_root}/frontend/dist/assets/{asset.name}")
+            upload_file(ftp, asset, f"{remote_root}/assets/{asset.name}")
 
     ftp.quit()
 
