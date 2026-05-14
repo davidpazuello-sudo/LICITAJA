@@ -28,15 +28,28 @@ jobs:
       - name: Deploy backend service
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        run: >
-          railway up backend
-          --path-as-root
-          --detach
-          --ci
-          --service LICITAJA
-          --environment production
-          --project c6b019f1-a049-4086-b4fd-2ac13211ef6a
-          --message "GitHub Actions deploy ${GITHUB_SHA}"
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            if railway up backend \
+              --path-as-root \
+              --detach \
+              --ci \
+              --service LICITAJA \
+              --environment production \
+              --project c6b019f1-a049-4086-b4fd-2ac13211ef6a \
+              --message "GitHub Actions deploy ${GITHUB_SHA}"; then
+              exit 0
+            fi
+
+            if [ "$attempt" -lt 3 ]; then
+              echo "Railway deploy attempt $attempt failed. Retrying in 15 seconds..."
+              sleep 15
+            fi
+          done
+
+          echo "Railway deploy failed after 3 attempts."
+          exit 1
 
       - name: Verify API healthcheck
         run: |
