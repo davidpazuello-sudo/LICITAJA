@@ -109,11 +109,11 @@ Observacoes:
 - isso evita o erro de publicar build apontando para `127.0.0.1`
 - se frontend e backend ficarem em dominios diferentes, o `config.js` precisa apontar para a URL publica real da API
 
-## Deploy automatico pelo GitHub
+## Deploy automatico
 
-O repositorio agora pode publicar automaticamente os dois ambientes ao receber push na branch `main`:
+O repositorio pode publicar automaticamente os dois ambientes ao receber push na branch `main`:
 
-- backend no Railway via `.github/workflows/deploy-backend-railway.yml`
+- backend no Railway via integracao nativa com GitHub no proprio painel do Railway
 - frontend no Hostinger via deploy local no `post-push`
 
 ### Secrets necessarios no GitHub
@@ -122,7 +122,6 @@ Crie estes `Repository secrets` em `Settings > Secrets and variables > Actions`:
 
 | Secret | Uso |
 |---|---|
-| `RAILWAY_TOKEN` | Autoriza o deploy automatico do backend no Railway |
 | `HOSTINGER_SERVER` | Host FTP/FTPS do site na Hostinger |
 | `HOSTINGER_USERNAME` | Usuario FTP/FTPS da Hostinger |
 | `HOSTINGER_PASSWORD` | Senha FTP/FTPS da Hostinger |
@@ -132,7 +131,7 @@ Crie estes `Repository secrets` em `Settings > Secrets and variables > Actions`:
 
 ### Comportamento
 
-- push com mudancas em `backend/**` dispara deploy no Railway
+- push na branch conectada dispara deploy do backend pelo Railway
 - o workflow do frontend fica disponivel apenas para execucao manual, porque o runner hospedado do GitHub tomou timeout no FTP da Hostinger neste ambiente
 - o frontend passa a subir automaticamente neste computador via hook local `post-push`
 
