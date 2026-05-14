@@ -158,12 +158,27 @@ function PerfilLicitacao() {
             <div className="shrink-0 flex flex-wrap gap-3">
               {perfil.link_site ? (
                 <a href={perfil.link_site} target="_blank" rel="noreferrer">
-                  <Button variant="outline">Acessar no site do orgao</Button>
+                  <Button variant="outline">
+                    <span className="flex items-center gap-2">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        className="h-4 w-4"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M14 5h5v5M10 14 19 5M19 14v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h4"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                      <span>Ir para a plataforma</span>
+                    </span>
+                  </Button>
                 </a>
               ) : null}
-              <Button variant="secondary" onClick={() => setShowRemoveModal(true)}>
-                ...
-              </Button>
             </div>
           </header>
 
