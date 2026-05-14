@@ -63,7 +63,7 @@ def deploy_frontend(repo_root: Path, skip_build: bool) -> None:
 
     ensure_remote_dir(ftp, f"{remote_root}/assets")
 
-    upload_file(ftp, repo_root / ".htaccess", f"{remote_root}/.htaccess")
+    upload_file(ftp, dist_dir / ".htaccess", f"{remote_root}/.htaccess")
     upload_file(ftp, dist_dir / "config.js", f"{remote_root}/config.js")
     upload_file(ftp, dist_dir / "index.html", f"{remote_root}/index.html")
 

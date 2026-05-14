@@ -1,9 +1,10 @@
 Options -MultiViews
 RewriteEngine On
 RewriteBase /
+RewriteCond %{REQUEST_URI} ^/frontend/dist [NC]
+RewriteRule ^ - [L]
 RewriteCond %{REQUEST_URI} ^/api(?:/|$) [NC]
 RewriteRule ^ - [L]
-RewriteCond %{REQUEST_FILENAME} -f [OR]
-RewriteCond %{REQUEST_FILENAME} -d
+RewriteCond %{REQUEST_FILENAME} -f
 RewriteRule ^ - [L]
-RewriteRule ^ index.html [L,QSA]
+RewriteRule ^(.*)$ /frontend/dist/$1 [L,QSA]
