@@ -26,6 +26,7 @@ from app.services.busca.providers.pncp_provider import PncpProvider
 _PROVIDER_TIMEOUT_SECONDS = {
     "pncp": 20.0,
 }
+_SEARCH_DEADLINE_SECONDS = 15.0
 
 
 class BuscaAggregator:
@@ -40,10 +41,29 @@ class BuscaAggregator:
         results: list[ProviderSearchResult] = []
         source_statuses: list[ProviderSourceStatusPayload] = []
 
-        provider_results = await asyncio.gather(
-            *(self._run_provider(provider, query) for provider in providers),
+        tasks_by_provider = {
+            provider: asyncio.create_task(self._run_provider(provider, query))
+            for provider in providers
+        }
+        done, pending = await asyncio.wait(
+            tasks_by_provider.values(),
+            timeout=_SEARCH_DEADLINE_SECONDS,
         )
-        for result, source_status in provider_results:
+
+        task_results: dict[SearchProvider, tuple[ProviderSearchResult | None, ProviderSourceStatusPayload]] = {}
+        for provider, task in tasks_by_provider.items():
+            if task in done:
+                task_results[provider] = task.result()
+                continue
+
+            task.cancel()
+            task_results[provider] = (None, self._build_timeout_status(provider))
+
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
+
+        for provider in providers:
+            result, source_status = task_results[provider]
             source_statuses.append(source_status)
             if result is not None:
                 results.append(result)
@@ -219,3 +239,13 @@ class BuscaAggregator:
                 supported_filters=exc.supported_filters,
                 error_message=exc.message,
             )
+
+    def _build_timeout_status(self, provider: SearchProvider) -> ProviderSourceStatusPayload:
+        return ProviderSourceStatusPayload(
+            provider_id=provider.provider_id,
+            display_name=provider.display_name,
+            status="erro",
+            total_registros=0,
+            supported_filters=sorted(provider.supported_filters),
+            error_message=f"{provider.display_name} demorou mais que o esperado e foi ignorado nesta busca.",
+        )
