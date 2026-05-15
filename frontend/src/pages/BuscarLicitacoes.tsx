@@ -140,50 +140,6 @@ function BuscarLicitacoes() {
             />
           </Card>
 
-          {response.plano_ia ? (
-            <Card className="overflow-hidden border-accent/15 bg-white">
-              <div className="space-y-4 p-6">
-                <div className="space-y-1">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent/80">
-                    Leitura da IA
-                  </p>
-                  <h2 className="font-heading text-xl font-extrabold text-ink">
-                    A pesquisa foi conectada aos filtros automaticamente
-                  </h2>
-                  <p className="text-sm text-slate">{response.plano_ia.resumo_intencao}</p>
-                </div>
-
-                <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
-                  <div className="space-y-2">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate/80">
-                      Termos priorizados
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {response.plano_ia.termos_prioritarios.map((term) => (
-                        <Badge key={term} variant="blue">
-                          {term}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate/80">
-                      Criterios de relevancia
-                    </p>
-                    <div className="space-y-2">
-                      {response.plano_ia.criterios_relevancia.map((criteria) => (
-                        <p key={criteria} className="text-sm text-slate">
-                          {criteria}
-                        </p>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          ) : null}
-
           {status === "loading" ? (
             <div className="flex flex-wrap items-center justify-between gap-3 px-1">
               <div className="inline-flex items-center gap-3 rounded-full border border-line bg-white px-4 py-2 shadow-card">

@@ -40,14 +40,6 @@ function ResultadoBusca({ item, isSaving, onSave }: ResultadoBuscaProps) {
               {item.estado ? ` - ${item.estado}` : ""}
               {item.numero_processo ? ` - Processo ${item.numero_processo}` : ""}
             </p>
-            {item.motivo_match ? (
-              <div className="rounded-2xl border border-blue-100 bg-softBlue/55 px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent/80">
-                  Por que esta oportunidade faz sentido
-                </p>
-                <p className="mt-1 text-sm text-slate">{item.motivo_match}</p>
-              </div>
-            ) : null}
           </div>
         </div>
 
