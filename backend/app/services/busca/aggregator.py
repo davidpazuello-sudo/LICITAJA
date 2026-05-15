@@ -27,7 +27,7 @@ from app.services.busca.providers.pncp_provider import PncpProvider
 _PROVIDER_TIMEOUT_SECONDS = {
     "pncp": 20.0,
 }
-_SEARCH_DEADLINE_SECONDS = 15.0
+_SEARCH_DEADLINE_BUFFER_SECONDS = 2.0
 
 
 class BuscaAggregator:
@@ -46,9 +46,16 @@ class BuscaAggregator:
             provider: asyncio.create_task(self._run_provider(provider, query))
             for provider in providers
         }
+        deadline_seconds = max(
+            (
+                getattr(provider, "timeout_seconds", _PROVIDER_TIMEOUT_SECONDS.get(provider.provider_id, 12.0))
+                for provider in providers
+            ),
+            default=12.0,
+        ) + _SEARCH_DEADLINE_BUFFER_SECONDS
         done, pending = await asyncio.wait(
             tasks_by_provider.values(),
-            timeout=_SEARCH_DEADLINE_SECONDS,
+            timeout=deadline_seconds,
         )
 
         task_results: dict[SearchProvider, tuple[ProviderSearchResult | None, ProviderSourceStatusPayload]] = {}
@@ -70,10 +77,6 @@ class BuscaAggregator:
                 results.append(result)
 
         if not results:
-            error_messages = [status.error_message for status in source_statuses if status.error_message]
-            if error_messages:
-                raise RuntimeError(" | ".join(error_messages))
-
             return self._build_empty_response(numero_pagina=query.pagina, source_statuses=source_statuses)
 
         merged_items = self._merge_items(result.items for result in results)
