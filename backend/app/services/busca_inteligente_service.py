@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import re
 import unicodedata
-from dataclasses import replace
 from datetime import date, datetime
 
 from sqlalchemy.orm import Session
@@ -29,6 +28,8 @@ Objetivo do usuario:
 {objetivo}
 
 Contexto opcional:
+- filtros manuais ja selecionados:
+{filtros_contexto}
 - estado preferencial: {estado}
 - municipio preferencial: {municipio}
 
@@ -82,6 +83,7 @@ class BuscaInteligenteService:
         *,
         objetivo: str,
         portais: list[str],
+        filtros_contexto: BuscaInteligenteFiltros,
         estado: str | None,
         municipio: str | None,
         pagina: int,
@@ -89,30 +91,32 @@ class BuscaInteligenteService:
     ) -> BuscaLicitacoesResponse:
         plano = await self._build_plan(
             objetivo=objetivo,
+            filtros_contexto=filtros_contexto,
             estado=estado,
             municipio=municipio,
         )
+        filtros_finais = self._merge_filters(plano.filtros_aplicados, filtros_contexto, objetivo)
         query = SearchQuery(
-            q=plano.filtros_aplicados.buscar_por or objetivo,
-            buscar_por=plano.filtros_aplicados.buscar_por or objetivo,
+            q=filtros_finais.buscar_por or objetivo,
+            buscar_por=filtros_finais.buscar_por or objetivo,
             portais=portais,
-            numero_oportunidade=plano.filtros_aplicados.numero_oportunidade,
-            objeto_licitacao=plano.filtros_aplicados.objeto_licitacao,
-            orgao=plano.filtros_aplicados.orgao,
-            empresa=plano.filtros_aplicados.empresa,
-            sub_status=plano.filtros_aplicados.sub_status,
-            tipo_instrumento_convocatorio=plano.filtros_aplicados.tipo_instrumento_convocatorio,
-            unidade=plano.filtros_aplicados.unidade,
-            estado=plano.filtros_aplicados.estado or (estado or ""),
-            municipio=plano.filtros_aplicados.municipio or (municipio or ""),
-            esfera=plano.filtros_aplicados.esfera,
-            poder=plano.filtros_aplicados.poder,
-            fonte_orcamentaria=plano.filtros_aplicados.fonte_orcamentaria,
-            margem_preferencia=plano.filtros_aplicados.margem_preferencia,
-            conteudo_nacional=plano.filtros_aplicados.conteudo_nacional,
-            modalidade=plano.filtros_aplicados.modalidade,
-            tipo_fornecimento=plano.filtros_aplicados.tipo_fornecimento,
-            familia_fornecimento=plano.filtros_aplicados.familia_fornecimento,
+            numero_oportunidade=filtros_finais.numero_oportunidade,
+            objeto_licitacao=filtros_finais.objeto_licitacao,
+            orgao=filtros_finais.orgao,
+            empresa=filtros_finais.empresa,
+            sub_status=filtros_finais.sub_status,
+            tipo_instrumento_convocatorio=filtros_finais.tipo_instrumento_convocatorio,
+            unidade=filtros_finais.unidade,
+            estado=filtros_finais.estado or (estado or ""),
+            municipio=filtros_finais.municipio or (municipio or ""),
+            esfera=filtros_finais.esfera,
+            poder=filtros_finais.poder,
+            fonte_orcamentaria=filtros_finais.fonte_orcamentaria,
+            margem_preferencia=filtros_finais.margem_preferencia,
+            conteudo_nacional=filtros_finais.conteudo_nacional,
+            modalidade=filtros_finais.modalidade,
+            tipo_fornecimento=filtros_finais.tipo_fornecimento,
+            familia_fornecimento=filtros_finais.familia_fornecimento,
             data_inicio=None,
             data_fim=None,
             pagina=pagina,
@@ -124,7 +128,7 @@ class BuscaInteligenteService:
             update={
                 "items": reranked_items[:page_size],
                 "modo_busca": "inteligente",
-                "plano_ia": plano,
+                "plano_ia": plano.model_copy(update={"filtros_aplicados": filtros_finais}),
             }
         )
 
@@ -132,11 +136,13 @@ class BuscaInteligenteService:
         self,
         *,
         objetivo: str,
+        filtros_contexto: BuscaInteligenteFiltros,
         estado: str | None,
         municipio: str | None,
     ) -> BuscaInteligentePlano:
         prompt = _SMART_SEARCH_PROMPT_TEMPLATE.format(
             objetivo=objetivo.strip(),
+            filtros_contexto=self._format_context_filters(filtros_contexto),
             estado=estado or "nao informado",
             municipio=municipio or "nao informado",
         )
@@ -204,6 +210,57 @@ class BuscaInteligenteService:
             criterios_relevancia=criterios,
             filtros_aplicados=filters,
         )
+
+    def _merge_filters(
+        self,
+        suggested_filters: BuscaInteligenteFiltros,
+        context_filters: BuscaInteligenteFiltros,
+        objetivo: str,
+    ) -> BuscaInteligenteFiltros:
+        return BuscaInteligenteFiltros(
+            buscar_por=context_filters.buscar_por or suggested_filters.buscar_por or objetivo,
+            numero_oportunidade=context_filters.numero_oportunidade or suggested_filters.numero_oportunidade,
+            objeto_licitacao=context_filters.objeto_licitacao or suggested_filters.objeto_licitacao,
+            orgao=context_filters.orgao or suggested_filters.orgao,
+            empresa=context_filters.empresa or suggested_filters.empresa,
+            sub_status=context_filters.sub_status or suggested_filters.sub_status,
+            tipo_instrumento_convocatorio=context_filters.tipo_instrumento_convocatorio or suggested_filters.tipo_instrumento_convocatorio,
+            unidade=context_filters.unidade or suggested_filters.unidade,
+            estado=context_filters.estado or suggested_filters.estado,
+            municipio=context_filters.municipio or suggested_filters.municipio,
+            esfera=context_filters.esfera or suggested_filters.esfera,
+            poder=context_filters.poder or suggested_filters.poder,
+            fonte_orcamentaria=context_filters.fonte_orcamentaria or suggested_filters.fonte_orcamentaria,
+            margem_preferencia=context_filters.margem_preferencia or suggested_filters.margem_preferencia,
+            conteudo_nacional=context_filters.conteudo_nacional or suggested_filters.conteudo_nacional,
+            modalidade=context_filters.modalidade or suggested_filters.modalidade,
+            tipo_fornecimento=context_filters.tipo_fornecimento or suggested_filters.tipo_fornecimento,
+            familia_fornecimento=context_filters.familia_fornecimento or suggested_filters.familia_fornecimento,
+        )
+
+    def _format_context_filters(self, filters: BuscaInteligenteFiltros) -> str:
+        context_map = {
+            "buscar_por": filters.buscar_por,
+            "numero_oportunidade": filters.numero_oportunidade,
+            "objeto_licitacao": filters.objeto_licitacao,
+            "orgao": filters.orgao,
+            "empresa": filters.empresa,
+            "sub_status": filters.sub_status,
+            "tipo_instrumento_convocatorio": filters.tipo_instrumento_convocatorio,
+            "unidade": filters.unidade,
+            "estado": filters.estado,
+            "municipio": filters.municipio,
+            "esfera": filters.esfera,
+            "poder": filters.poder,
+            "fonte_orcamentaria": filters.fonte_orcamentaria,
+            "margem_preferencia": filters.margem_preferencia,
+            "conteudo_nacional": filters.conteudo_nacional,
+            "modalidade": filters.modalidade,
+            "tipo_fornecimento": ", ".join(filters.tipo_fornecimento),
+            "familia_fornecimento": ", ".join(filters.familia_fornecimento),
+        }
+        filled_items = [f"- {key}: {value}" for key, value in context_map.items() if value]
+        return "\n".join(filled_items) if filled_items else "- nenhum filtro manual informado"
 
     def _rerank_items(
         self,

@@ -78,6 +78,7 @@ class BuscaInteligentePlano(BaseModel):
 class BuscaInteligenteRequest(BaseModel):
     objetivo: str
     portais: list[str] = []
+    filtros_contexto: BuscaInteligenteFiltros = BuscaInteligenteFiltros()
     estado: str | None = None
     municipio: str | None = None
     pagina: int = 1

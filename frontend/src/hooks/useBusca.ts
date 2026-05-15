@@ -48,7 +48,6 @@ export function useBusca() {
   const [response, setResponse] = useState<BuscaLicitacoesResponseType>(EMPTY_RESPONSE);
   const [status, setStatus] = useState<BuscaStatus>("idle");
   const [errorMessage, setErrorMessage] = useState<string>("");
-  const [smartPrompt, setSmartPrompt] = useState("");
   const [hasSearched, setHasSearched] = useState(false);
   const [savingIds, setSavingIds] = useState<string[]>([]);
   const requestIdRef = useRef(0);
@@ -90,6 +89,64 @@ export function useBusca() {
     }
   };
 
+  const runSmartSearch = async (nextFilters: BuscaLicitacaoFilters) => {
+    const validationMessage = validateBuscaFilters(nextFilters);
+    if (validationMessage) {
+      setStatus("error");
+      setErrorMessage(validationMessage);
+      return;
+    }
+
+    const objetivo = nextFilters.buscar_por.trim();
+    if (!objetivo) {
+      await runSearch(nextFilters);
+      return;
+    }
+
+    const requestId = ++requestIdRef.current;
+    setStatus("loading");
+    setErrorMessage("");
+
+    try {
+      const result = await buscarLicitacoesInteligente({
+        objetivo,
+        portais: nextFilters.portais,
+        filtros_contexto: nextFilters,
+        estado: nextFilters.estado,
+        municipio: nextFilters.municipio,
+        pagina: nextFilters.pagina ?? 1,
+      });
+
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+
+      setResponse(result);
+      setStatus("success");
+      if (result.plano_ia?.filtros_aplicados) {
+        skipNextEffectRef.current = true;
+        setFilters((current) => ({
+          ...current,
+          ...result.plano_ia!.filtros_aplicados,
+          buscar_por: objetivo,
+          portais: nextFilters.portais,
+          pagina: nextFilters.pagina ?? 1,
+        }));
+      }
+    } catch (error) {
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Nao foi possivel executar a busca inteligente agora.";
+      setStatus("error");
+      setErrorMessage(message);
+    }
+  };
+
   useEffect(() => {
     if (!debounceReadyRef.current) {
       debounceReadyRef.current = true;
@@ -106,6 +163,11 @@ export function useBusca() {
     }
 
     const timeoutId = window.setTimeout(() => {
+      if (filters.buscar_por.trim()) {
+        void runSmartSearch(filters);
+        return;
+      }
+
       void runSearch(filters);
     }, 300);
 
@@ -128,58 +190,11 @@ export function useBusca() {
     const nextFilters = { ...filters, pagina: 1 };
     skipNextEffectRef.current = true;
     setFilters(nextFilters);
-    await runSearch(nextFilters);
-  };
-
-  const submitSmartSearch = async () => {
-    const objetivo = smartPrompt.trim();
-    if (!objetivo) {
-      setStatus("error");
-      setErrorMessage("Descreva o que voce quer encontrar para usar a busca inteligente.");
+    if (nextFilters.buscar_por.trim()) {
+      await runSmartSearch(nextFilters);
       return;
     }
-
-    const requestId = ++requestIdRef.current;
-    setHasSearched(true);
-    setStatus("loading");
-    setErrorMessage("");
-
-    try {
-      const result = await buscarLicitacoesInteligente({
-        objetivo,
-        portais: filters.portais,
-        estado: filters.estado,
-        municipio: filters.municipio,
-        pagina: 1,
-      });
-
-      if (requestId !== requestIdRef.current) {
-        return;
-      }
-
-      setResponse(result);
-      setStatus("success");
-      if (result.plano_ia?.filtros_aplicados) {
-        skipNextEffectRef.current = true;
-        setFilters((current) => ({
-          ...current,
-          ...result.plano_ia!.filtros_aplicados,
-          portais: current.portais,
-          pagina: 1,
-        }));
-      }
-    } catch (error) {
-      if (requestId !== requestIdRef.current) {
-        return;
-      }
-
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Nao foi possivel executar a busca inteligente agora.";
-      setStatus("error");
-      setErrorMessage(message);
-    }
+    await runSearch(nextFilters);
   };
 
   const goToPage = async (pagina: number) => {
@@ -188,6 +203,10 @@ export function useBusca() {
     skipNextEffectRef.current = true;
     setFilters(nextFilters);
     if (!hasSearched) {
+      return;
+    }
+    if (nextFilters.buscar_por.trim()) {
+      await runSmartSearch(nextFilters);
       return;
     }
     await runSearch(nextFilters);
@@ -243,10 +262,7 @@ export function useBusca() {
     status,
     saveResult,
     setFilters,
-    setSmartPrompt,
-    smartPrompt,
     submitSearch,
-    submitSmartSearch,
     updateFilter,
     goToPage,
   };

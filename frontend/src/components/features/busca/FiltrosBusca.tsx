@@ -295,9 +295,9 @@ function FiltrosBusca({
       <div className="flex flex-col gap-4 xl:flex-row xl:items-end">
         <div className="flex-1">
           <TextField
-            label="Palavra-chave"
+            label="Pesquisa inteligente"
             value={filters.buscar_por}
-            placeholder="Digite um termo para pesquisar"
+            placeholder="Descreva o que voce quer encontrar. Ex.: alimentos hospitalares no Amazonas"
             onChange={(value) => onChange("buscar_por", value)}
             onEnter={onSearch}
           />
@@ -336,6 +336,9 @@ function FiltrosBusca({
               </span>
               <div>
                 <h3 className="font-heading text-lg font-extrabold text-ink">Filtros</h3>
+                <p className="text-xs text-slate">
+                  A IA interpreta a pesquisa principal e cruza isso com os filtros selecionados.
+                </p>
               </div>
             </div>
 

@@ -82,6 +82,7 @@ async def buscar_licitacoes_inteligente(
         return await service.buscar(
             objetivo=payload.objetivo,
             portais=payload.portais,
+            filtros_contexto=payload.filtros_contexto,
             estado=payload.estado,
             municipio=payload.municipio,
             pagina=payload.pagina,
