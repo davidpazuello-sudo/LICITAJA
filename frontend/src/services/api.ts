@@ -1,3 +1,9 @@
+const PRODUCTION_API_BASE_URL = "https://licitaja-production.up.railway.app/api";
+
+function isLocalHost(hostname: string): boolean {
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+}
+
 function resolveApiBaseUrl(): string {
   const runtimeApiBaseUrl =
     typeof window !== "undefined" ? window.__LICITAAI_CONFIG__?.apiBaseUrl?.trim() : undefined;
@@ -14,7 +20,11 @@ function resolveApiBaseUrl(): string {
   }
 
   if (typeof window !== "undefined") {
-    return `${window.location.origin}/api`;
+    if (isLocalHost(window.location.hostname)) {
+      return `${window.location.origin}/api`;
+    }
+
+    return PRODUCTION_API_BASE_URL;
   }
 
   return "http://127.0.0.1:8000/api";
@@ -74,6 +84,12 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
 
   if (response.status === 204) {
     return null as T;
+  }
+
+  const contentType = response.headers.get("content-type") || "";
+
+  if (contentType.includes("text/html")) {
+    throw new Error("A API retornou HTML em vez de JSON. Recarregue a pagina e tente novamente.");
   }
 
   return response.json() as Promise<T>;
