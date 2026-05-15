@@ -44,6 +44,13 @@ def upload_file(ftp: FTP, local_path: Path, remote_path: str) -> None:
         ftp.storbinary(f"STOR {remote_path}", handle)
 
 
+def list_remote_files(ftp: FTP, remote_dir: str) -> list[str]:
+    try:
+        return ftp.nlst(remote_dir)
+    except Exception:
+        return []
+
+
 def deploy_frontend(repo_root: Path, skip_build: bool) -> None:
     frontend_dir = repo_root / "frontend"
     dist_dir = frontend_dir / "dist"
@@ -67,9 +74,20 @@ def deploy_frontend(repo_root: Path, skip_build: bool) -> None:
     upload_file(ftp, dist_dir / "config.js", f"{remote_root}/config.js")
     upload_file(ftp, dist_dir / "index.html", f"{remote_root}/index.html")
 
-    for asset in (dist_dir / "assets").iterdir():
-        if asset.is_file():
-            upload_file(ftp, asset, f"{remote_root}/assets/{asset.name}")
+    built_assets = [asset for asset in (dist_dir / "assets").iterdir() if asset.is_file()]
+    current_js_asset = next((asset for asset in built_assets if asset.suffix == ".js"), None)
+    current_css_asset = next((asset for asset in built_assets if asset.suffix == ".css"), None)
+
+    remote_assets = list_remote_files(ftp, f"{remote_root}/assets")
+    for remote_asset in remote_assets:
+        remote_name = Path(remote_asset).name
+        if current_js_asset is not None and remote_name.startswith("index-") and remote_name.endswith(".js"):
+            upload_file(ftp, current_js_asset, f"{remote_root}/assets/{remote_name}")
+        elif current_css_asset is not None and remote_name.startswith("index-") and remote_name.endswith(".css"):
+            upload_file(ftp, current_css_asset, f"{remote_root}/assets/{remote_name}")
+
+    for asset in built_assets:
+        upload_file(ftp, asset, f"{remote_root}/assets/{asset.name}")
 
     ftp.quit()
 
