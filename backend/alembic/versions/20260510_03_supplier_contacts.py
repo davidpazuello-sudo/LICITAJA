@@ -1,7 +1,7 @@
 """add supplier contact fields to cotacoes
 
 Revision ID: 20260510_03
-Revises: 20260429_02
+Revises: 20260429_02_processing_jobs
 Create Date: 2026-05-10
 """
 
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 revision = "20260510_03"
-down_revision = "20260429_02"
+down_revision = "20260429_02_processing_jobs"
 branch_labels = None
 depends_on = None
 
