@@ -4,7 +4,6 @@ import asyncio
 import json
 import re
 import time
-import unicodedata
 from datetime import UTC, datetime, timedelta
 
 import httpx
@@ -18,6 +17,7 @@ from app.services.busca.contracts import (
     SearchProvider,
     SearchQuery,
 )
+from app.services.text_matching import contains_all_terms, contains_any_term, normalize_text
 
 SERVICE_HINTS = (
     "servico",
@@ -635,14 +635,10 @@ class ComprasGovProvider(SearchProvider):
             return None
 
     def _contains_all_terms(self, values: list[str | None | object], query: str) -> bool:
-        haystack = self._normalize_text(" ".join(str(value or "") for value in values))
-        terms = [term for term in self._normalize_text(query).split() if term]
-        return all(term in haystack for term in terms)
+        return contains_all_terms(values, query)
 
     def _contains_any_term(self, values: list[str | None | object], query: str) -> bool:
-        haystack = self._normalize_text(" ".join(str(value or "") for value in values))
-        terms = [term for term in self._normalize_text(query).split() if term]
-        return any(term in haystack for term in terms)
+        return contains_any_term(values, query)
 
     def _matches_unidade_filter(self, item: BuscaLicitacaoItem, query: str) -> bool:
         uasg_digits = "".join(char for char in query if char.isdigit())
@@ -654,8 +650,7 @@ class ComprasGovProvider(SearchProvider):
         return self._contains_all_terms([item.orgao, item.uasg], query)
 
     def _normalize_text(self, value: str) -> str:
-        normalized = unicodedata.normalize("NFKD", value)
-        return "".join(char for char in normalized if not unicodedata.combining(char)).lower()
+        return normalize_text(value)
 
     def _infer_supply_type(self, text: str) -> str:
         normalized_text = self._normalize_text(text)

@@ -1,5 +1,4 @@
 import json
-import unicodedata
 import asyncio
 from datetime import UTC, datetime, timedelta
 
@@ -10,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.models.licitacao import LicitacaoModel
 from app.schemas.busca import BuscaLicitacaoItem, BuscaLicitacoesResponse
+from app.services.text_matching import contains_all_terms, contains_any_term, normalize_text
 
 MODALIDADE_CODES = {
     "Leilao - Eletronico": 1,
@@ -52,6 +52,8 @@ STATUS_FILTER_ENCERRADA = "encerrada"
 
 FALLBACK_PUBLICACAO_CODES = list(MODALIDADE_CODES.values())
 MAX_TARGETED_SCAN_PAGES = 2
+MAX_PROPOSTA_SCAN_PAGES = 8
+PROPOSTA_SCAN_PAGE_SIZE = 10
 
 FAMILY_KEYWORDS = {
     "bens": ["aquisicao", "fornecimento", "material", "equipamento", "bem", "bens"],
@@ -133,6 +135,49 @@ class PncpService:
         page_size: int = 10,
     ) -> BuscaLicitacoesResponse:
         status_mode = self._resolve_status_filter_mode(sub_status)
+        text_query = buscar_por or q
+        publication_only_filters = any(
+            [
+                numero_oportunidade,
+                objeto_licitacao,
+                orgao,
+                unidade,
+                municipio,
+                esfera,
+                poder,
+                fonte_orcamentaria,
+                tipo_instrumento_convocatorio,
+            ]
+        )
+
+        if text_query and not publication_only_filters and status_mode in ("todos", STATUS_FILTER_RECEBENDO):
+            proposal_response = await self._buscar_propostas_por_texto(
+                buscar_por=text_query,
+                numero_oportunidade=numero_oportunidade,
+                objeto_licitacao=objeto_licitacao,
+                orgao=orgao,
+                empresa=empresa,
+                sub_status=sub_status,
+                tipo_instrumento_convocatorio=tipo_instrumento_convocatorio,
+                unidade=unidade,
+                estado=estado,
+                municipio=municipio,
+                esfera=esfera,
+                poder=poder,
+                fonte_orcamentaria=fonte_orcamentaria,
+                margem_preferencia=margem_preferencia,
+                conteudo_nacional=conteudo_nacional,
+                modalidade=modalidade,
+                tipo_fornecimento=tipo_fornecimento,
+                familia_fornecimento=familia_fornecimento,
+                data_inicio=data_inicio,
+                data_fim=data_fim,
+                pagina=pagina,
+                page_size=page_size,
+            )
+            if proposal_response.items:
+                return proposal_response
+
         requires_publicacao_scan = any(
             [
                 q,
@@ -245,6 +290,117 @@ class PncpService:
 
         return self._build_response(
             matched_items[:page_size],
+            total_registros=total_registros,
+            numero_pagina=current_page,
+            total_paginas=total_paginas,
+        )
+
+    async def _buscar_propostas_por_texto(
+        self,
+        *,
+        buscar_por: str | None,
+        numero_oportunidade: str | None,
+        objeto_licitacao: str | None,
+        orgao: str | None,
+        empresa: str | None,
+        sub_status: str | None,
+        tipo_instrumento_convocatorio: str | None,
+        unidade: str | None,
+        estado: str | None,
+        municipio: str | None,
+        esfera: str | None,
+        poder: str | None,
+        fonte_orcamentaria: str | None,
+        margem_preferencia: str | None,
+        conteudo_nacional: str | None,
+        modalidade: str | None,
+        tipo_fornecimento: list[str],
+        familia_fornecimento: list[str],
+        data_inicio: str | None,
+        data_fim: str | None,
+        pagina: int,
+        page_size: int,
+    ) -> BuscaLicitacoesResponse:
+        effective_data_inicio = data_inicio
+        effective_data_fim = data_fim or self._resolve_data_final(None)
+        current_page = max(pagina, 1)
+        required_count = current_page * page_size
+        matched_by_id: dict[str, dict] = {}
+        proposal_results = await asyncio.gather(
+            *(
+                self._fetch_page(
+                    pagina=api_page,
+                    data_inicio=effective_data_inicio,
+                    data_fim=effective_data_fim,
+                    estado=estado,
+                    modalidade=modalidade,
+                    strategy="proposta",
+                    tamanho_pagina=PROPOSTA_SCAN_PAGE_SIZE,
+                    timeout_seconds=8.0,
+                )
+                for api_page in range(1, MAX_PROPOSTA_SCAN_PAGES + 1)
+            ),
+            return_exceptions=True,
+        )
+
+        for result in proposal_results:
+            if isinstance(result, Exception):
+                continue
+
+            payload = result
+            data = payload.get("data", [])
+            if not data:
+                continue
+
+            for item in data:
+                if not self._matches_filters(
+                    item=item,
+                    buscar_por=buscar_por,
+                    numero_oportunidade=numero_oportunidade,
+                    objeto_licitacao=objeto_licitacao,
+                    orgao=orgao,
+                    empresa=empresa,
+                    sub_status=sub_status,
+                    tipo_instrumento_convocatorio=tipo_instrumento_convocatorio,
+                    unidade=unidade,
+                    estado=estado,
+                    municipio=municipio,
+                    esfera=esfera,
+                    poder=poder,
+                    fonte_orcamentaria=fonte_orcamentaria,
+                    margem_preferencia=margem_preferencia,
+                    conteudo_nacional=conteudo_nacional,
+                    modalidade=modalidade,
+                    tipo_fornecimento=tipo_fornecimento,
+                    familia_fornecimento=familia_fornecimento,
+                    data_inicio=effective_data_inicio,
+                    data_fim=effective_data_fim,
+                ):
+                    continue
+
+                numero_controle = item.get("numeroControlePNCP")
+                if numero_controle:
+                    matched_by_id[numero_controle] = item
+
+            if len(matched_by_id) >= required_count:
+                break
+
+        if not matched_by_id:
+            return self._build_response(
+                [],
+                total_registros=0,
+                numero_pagina=current_page,
+                total_paginas=1,
+            )
+
+        matched_items = list(matched_by_id.values())
+        start_index = (current_page - 1) * page_size
+        end_index = start_index + page_size
+        page_items = matched_items[start_index:end_index]
+        total_registros = len(matched_items)
+        total_paginas = max((total_registros + page_size - 1) // page_size, 1)
+        return self._build_response(
+            page_items,
             total_registros=total_registros,
             numero_pagina=current_page,
             total_paginas=total_paginas,
@@ -706,18 +862,13 @@ class PncpService:
         return numero_compra
 
     def _contains_all_terms(self, values: list[str | None], query: str) -> bool:
-        haystack = self._normalize_text(" ".join(value or "" for value in values))
-        terms = [term for term in self._normalize_text(query).split() if term]
-        return all(term in haystack for term in terms)
+        return contains_all_terms(values, query)
 
     def _contains_any_term(self, values: list[str | None], query: str) -> bool:
-        haystack = self._normalize_text(" ".join(value or "" for value in values))
-        terms = [term for term in self._normalize_text(query).split() if term]
-        return any(term in haystack for term in terms)
+        return contains_any_term(values, query)
 
     def _normalize_text(self, value: str) -> str:
-        normalized = unicodedata.normalize("NFKD", value)
-        return "".join(char for char in normalized if not unicodedata.combining(char)).lower()
+        return normalize_text(value)
 
     def _resolve_modalidade_code(self, modalidade: str | None) -> int | None:
         if not modalidade:
