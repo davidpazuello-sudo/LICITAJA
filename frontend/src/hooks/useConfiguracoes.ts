@@ -1,19 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 
 import {
-  ativarConfiguracaoIA,
   createPortalIntegracao,
   getConfiguracaoIA,
   getPortalIntegracoes,
   getPncpConfig,
   testarPncp,
-  updateConfiguracaoIA,
+  updateConfiguracaoIAAgent,
+  updateConfiguracaoIAProvider,
   updatePortalIntegracaoStatus,
   updatePncpStatus,
   updatePncpUrl,
 } from "../services/configuracoes.service";
 import type {
   ConfiguracoesIA,
+  IAAgentUpdate,
   IAProviderUpdate,
   PortalIntegracaoCreateInput,
   PortalIntegracaoType,
@@ -93,9 +94,8 @@ export function useConfiguracaoIA() {
   const [config, setConfig] = useState<ConfiguracoesIA | null>(null);
   const [status, setStatus] = useState<LoadStatus>("idle");
   const [errorMessage, setErrorMessage] = useState("");
-  const [saveIndicators, setSaveIndicators] = useState<Record<string, SaveIndicator>>({});
-  const [promptSaveIndicators, setPromptSaveIndicators] = useState<Record<string, SaveIndicator>>({});
-  const [activatingProviderId, setActivatingProviderId] = useState<string | null>(null);
+  const [providerSaveIndicators, setProviderSaveIndicators] = useState<Record<string, SaveIndicator>>({});
+  const [agentSaveIndicators, setAgentSaveIndicators] = useState<Record<string, SaveIndicator>>({});
   const promptDebounceRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
@@ -111,59 +111,64 @@ export function useConfiguracaoIA() {
       });
   }, []);
 
-  const salvarIA = async (providerId: string, update: IAProviderUpdate) => {
-    setSaveIndicators((current) => ({ ...current, [providerId]: "saving" }));
+  const salvarProvider = async (providerId: string, update: IAProviderUpdate) => {
+    setProviderSaveIndicators((current) => ({ ...current, [providerId]: "saving" }));
     try {
-      const updated = await updateConfiguracaoIA(providerId, update);
+      const updated = await updateConfiguracaoIAProvider(providerId, update);
       setConfig(updated);
-      setSaveIndicators((current) => ({ ...current, [providerId]: "saved" }));
+      setProviderSaveIndicators((current) => ({ ...current, [providerId]: "saved" }));
       window.setTimeout(() => {
-        setSaveIndicators((current) => ({ ...current, [providerId]: "idle" }));
+        setProviderSaveIndicators((current) => ({ ...current, [providerId]: "idle" }));
       }, 2000);
     } catch (err) {
-      setSaveIndicators((current) => ({ ...current, [providerId]: "idle" }));
+      setProviderSaveIndicators((current) => ({ ...current, [providerId]: "idle" }));
       throw err;
     }
   };
 
-  const ativarIA = async (providerId: string) => {
-    setActivatingProviderId(providerId);
+  const salvarAgente = async (agentId: string, update: IAAgentUpdate) => {
+    setAgentSaveIndicators((current) => ({ ...current, [agentId]: "saving" }));
     try {
-      const updated = await ativarConfiguracaoIA(providerId);
+      const updated = await updateConfiguracaoIAAgent(agentId, update);
       setConfig(updated);
-    } finally {
-      setActivatingProviderId(null);
+      setAgentSaveIndicators((current) => ({ ...current, [agentId]: "saved" }));
+      window.setTimeout(() => {
+        setAgentSaveIndicators((current) => ({ ...current, [agentId]: "idle" }));
+      }, 2000);
+    } catch (err) {
+      setAgentSaveIndicators((current) => ({ ...current, [agentId]: "idle" }));
+      throw err;
     }
   };
 
-  const atualizarPrompt = (providerId: string, novoPrompt: string) => {
+  const atualizarPromptAgente = (agentId: string, novoPrompt: string) => {
     setConfig((prev) => {
       if (!prev) return prev;
 
       return {
         ...prev,
-        providers: prev.providers.map((provider) =>
-          provider.id === providerId ? { ...provider, prompt_extracao: novoPrompt } : provider,
+        agentes: prev.agentes.map((agente) =>
+          agente.id === agentId ? { ...agente, prompt: novoPrompt } : agente,
         ),
       };
     });
 
-    const existingTimeout = promptDebounceRef.current[providerId];
+    const existingTimeout = promptDebounceRef.current[agentId];
     if (existingTimeout) {
       window.clearTimeout(existingTimeout);
     }
 
-    setPromptSaveIndicators((current) => ({ ...current, [providerId]: "saving" }));
-    promptDebounceRef.current[providerId] = window.setTimeout(async () => {
+    setAgentSaveIndicators((current) => ({ ...current, [agentId]: "saving" }));
+    promptDebounceRef.current[agentId] = window.setTimeout(async () => {
       try {
-        const updated = await updateConfiguracaoIA(providerId, { prompt_extracao: novoPrompt });
+        const updated = await updateConfiguracaoIAAgent(agentId, { prompt: novoPrompt });
         setConfig(updated);
-        setPromptSaveIndicators((current) => ({ ...current, [providerId]: "saved" }));
+        setAgentSaveIndicators((current) => ({ ...current, [agentId]: "saved" }));
         window.setTimeout(() => {
-          setPromptSaveIndicators((current) => ({ ...current, [providerId]: "idle" }));
+          setAgentSaveIndicators((current) => ({ ...current, [agentId]: "idle" }));
         }, 2000);
       } catch {
-        setPromptSaveIndicators((current) => ({ ...current, [providerId]: "idle" }));
+        setAgentSaveIndicators((current) => ({ ...current, [agentId]: "idle" }));
       }
     }, 1000);
   };
@@ -172,12 +177,11 @@ export function useConfiguracaoIA() {
     config,
     status,
     errorMessage,
-    saveIndicators,
-    promptSaveIndicators,
-    activatingProviderId,
-    salvarIA,
-    ativarIA,
-    atualizarPrompt,
+    providerSaveIndicators,
+    agentSaveIndicators,
+    salvarProvider,
+    salvarAgente,
+    atualizarPromptAgente,
   };
 }
 

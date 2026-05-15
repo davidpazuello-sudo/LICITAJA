@@ -40,20 +40,32 @@ export interface IAProviderConfig {
   vendor: string;
   nome: string;
   descricao: string;
-  modelo: string;
+  modelo_padrao: string;
   api_key_masked: string;
-  prompt_extracao: string;
-  ativo: boolean;
   configurada: boolean;
 }
 
+export interface IAAgentConfig {
+  id: string;
+  nome: string;
+  descricao: string;
+  provider_id: string;
+  modelo: string;
+  prompt: string;
+}
+
 export interface ConfiguracoesIA {
-  provider_ativo: string;
   providers: IAProviderConfig[];
+  agentes: IAAgentConfig[];
 }
 
 export interface IAProviderUpdate {
   modelo?: string;
   api_key?: string;
-  prompt_extracao?: string;
+}
+
+export interface IAAgentUpdate {
+  provider_id?: string;
+  modelo?: string;
+  prompt?: string;
 }

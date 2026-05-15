@@ -25,6 +25,35 @@ export interface BuscaLicitacaoFilters {
   pagina?: number;
 }
 
+export interface BuscaInteligenteFiltrosType {
+  buscar_por: string;
+  numero_oportunidade: string;
+  objeto_licitacao: string;
+  orgao: string;
+  empresa: string;
+  sub_status: string;
+  tipo_instrumento_convocatorio: string;
+  unidade: string;
+  estado: string;
+  municipio: string;
+  esfera: string;
+  poder: string;
+  fonte_orcamentaria: string;
+  margem_preferencia: string;
+  conteudo_nacional: string;
+  modalidade: string;
+  tipo_fornecimento: string[];
+  familia_fornecimento: string[];
+}
+
+export interface BuscaInteligentePlanoType {
+  resumo_intencao: string;
+  justificativa: string;
+  termos_prioritarios: string[];
+  criterios_relevancia: string[];
+  filtros_aplicados: BuscaInteligenteFiltrosType;
+}
+
 export interface BuscaLicitacaoItemType {
   numero_controle: string;
   numero_compra: string | null;
@@ -45,6 +74,8 @@ export interface BuscaLicitacaoItemType {
   fonte: string;
   salva: boolean;
   dados_brutos: string | null;
+  score_inteligencia?: number | null;
+  motivo_match?: string | null;
 }
 
 export interface BuscaLicitacoesResponseType {
@@ -54,6 +85,8 @@ export interface BuscaLicitacoesResponseType {
   numero_pagina: number;
   paginas_restantes: number;
   origem: string;
+  modo_busca?: string;
+  plano_ia?: BuscaInteligentePlanoType | null;
   fontes?: Array<{
     id: string;
     nome: string;

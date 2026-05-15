@@ -9,6 +9,7 @@ from app.core.config import get_settings
 from app.core.database import get_db_session
 from app.schemas.configuracao import (
     ConfiguracoesIARead,
+    IAAgentUpdate,
     IAProviderUpdate,
     PortalIntegracaoCreate,
     PortalIntegracoesListRead,
@@ -20,8 +21,9 @@ from app.schemas.configuracao import (
     PncpUrlUpdate,
 )
 from app.services.ia_config_service import (
-    activate_ai_provider,
+    list_ai_agents,
     list_ai_providers,
+    save_ai_agent_config,
     save_ai_provider_config,
 )
 
@@ -234,12 +236,13 @@ async def testar_pncp(db: Session = Depends(get_db_session)) -> PncpTesteResult:
 
 @router.get("/ia", response_model=ConfiguracoesIARead)
 def get_config_ia(db: Session = Depends(get_db_session)) -> ConfiguracoesIARead:
-    provider_ativo, providers = list_ai_providers(db, get_settings())
-    return ConfiguracoesIARead(provider_ativo=provider_ativo, providers=providers)
+    providers = list_ai_providers(db, get_settings())
+    agentes = list_ai_agents(db)
+    return ConfiguracoesIARead(providers=providers, agentes=agentes)
 
 
-@router.patch("/ia/{provider_id}", response_model=ConfiguracoesIARead)
-def update_config_ia(
+@router.patch("/ia/provedores/{provider_id}", response_model=ConfiguracoesIARead)
+def update_config_ia_provider(
     provider_id: str,
     body: IAProviderUpdate,
     db: Session = Depends(get_db_session),
@@ -251,7 +254,6 @@ def update_config_ia(
             get_settings(),
             modelo=body.modelo,
             api_key=body.api_key,
-            prompt_extracao=body.prompt_extracao,
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -260,10 +262,20 @@ def update_config_ia(
     return get_config_ia(db)
 
 
-@router.post("/ia/{provider_id}/ativar", response_model=ConfiguracoesIARead)
-def ativar_ia(provider_id: str, db: Session = Depends(get_db_session)) -> ConfiguracoesIARead:
+@router.patch("/ia/agentes/{agent_id}", response_model=ConfiguracoesIARead)
+def update_config_ia_agent(
+    agent_id: str,
+    body: IAAgentUpdate,
+    db: Session = Depends(get_db_session),
+) -> ConfiguracoesIARead:
     try:
-        activate_ai_provider(db, provider_id)
+        save_ai_agent_config(
+            db,
+            agent_id,
+            provider_id=body.provider_id,
+            modelo=body.modelo,
+            prompt=body.prompt,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 

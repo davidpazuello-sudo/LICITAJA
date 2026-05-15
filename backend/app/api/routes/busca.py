@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db_session
-from app.schemas.busca import BuscaLicitacoesResponse
+from app.schemas.busca import BuscaInteligenteRequest, BuscaLicitacoesResponse
+from app.services.busca_inteligente_service import BuscaInteligenteService
 from app.services.busca_service import BuscaService
 
 router = APIRouter(tags=["busca"])
@@ -63,6 +64,28 @@ async def buscar_licitacoes(
             data_fim=data_fim,
             pagina=pagina,
             page_size=page_size,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.post("/busca/licitacoes/inteligente", response_model=BuscaLicitacoesResponse)
+async def buscar_licitacoes_inteligente(
+    payload: BuscaInteligenteRequest,
+    db: Session = Depends(get_db_session),
+) -> BuscaLicitacoesResponse:
+    service = BuscaInteligenteService(db)
+    try:
+        return await service.buscar(
+            objetivo=payload.objetivo,
+            portais=payload.portais,
+            estado=payload.estado,
+            municipio=payload.municipio,
+            pagina=payload.pagina,
+            page_size=payload.page_size,
         )
     except RuntimeError as exc:
         raise HTTPException(

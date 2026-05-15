@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.models.item import ItemModel
 from app.models.licitacao import LicitacaoModel
-from app.services.ia_config_service import get_active_provider_id, get_ai_provider_internal_config
+from app.services.ia_config_service import resolve_ai_agent_runtime_config
 from app.services.storage_service import StorageError, StorageService
 
 _SUMMARY_SYSTEM_INSTRUCTION = (
@@ -30,6 +30,12 @@ _CHAT_SYSTEM_INSTRUCTION = (
     "Voce e um assistente especialista em licitacoes publicas brasileiras. "
     "Responda em portugues do Brasil, de forma pratica, objetiva e fiel ao contexto da licitacao. "
     "Nao invente informacoes ausentes. Quando algo nao estiver claro, diga explicitamente."
+)
+
+_SMART_SEARCH_SYSTEM_INSTRUCTION = (
+    "Voce e um agente de busca inteligente de licitacoes brasileiras. "
+    "Recebera a intencao do usuario e deve convertela em um plano de busca objetivo, pratico e reutilizavel. "
+    "Responda APENAS com JSON valido, sem markdown, sem comentarios e sem texto fora do JSON."
 )
 
 _BRAND_SYSTEM_INSTRUCTION = (
@@ -332,8 +338,7 @@ class IaService:
                 "Nao foi possivel ler texto deste PDF. Se o edital estiver escaneado como imagem, a extracao com IA nao vai funcionar nesta etapa."
             )
 
-        provider_id = get_active_provider_id(self.db)
-        provider = get_ai_provider_internal_config(self.db, provider_id, self.settings)
+        provider_id, provider = resolve_ai_agent_runtime_config(self.db, "extracao_itens", self.settings)
         if not provider["api_key"]:
             raise ExtracaoItensError(
                 f"A chave da IA ativa ({provider['nome']}) nao esta configurada. Configure-a antes de extrair itens."
@@ -406,8 +411,7 @@ class IaService:
         if self.db is None:
             raise ExtracaoItensError("Servico de IA sem acesso ao banco para enriquecer marcas dos itens.")
 
-        provider_id = get_active_provider_id(self.db)
-        provider = get_ai_provider_internal_config(self.db, provider_id, self.settings)
+        provider_id, provider = resolve_ai_agent_runtime_config(self.db, "resumo_licitacao", self.settings)
         if not provider["api_key"]:
             return
 
@@ -474,8 +478,7 @@ class IaService:
         if self.db is None:
             raise ExtracaoItensError("Servico de IA sem acesso ao banco para gerar resumo da licitacao.")
 
-        provider_id = get_active_provider_id(self.db)
-        provider = get_ai_provider_internal_config(self.db, provider_id, self.settings)
+        provider_id, provider = resolve_ai_agent_runtime_config(self.db, "resumo_licitacao", self.settings)
         if not provider["api_key"]:
             raise ExtracaoItensError(
                 f"A chave da IA ativa ({provider['nome']}) nao esta configurada. Configure-a antes de gerar o resumo."
@@ -506,8 +509,7 @@ class IaService:
         if self.db is None:
             raise ExtracaoItensError("Servico de IA sem acesso ao banco para responder o chat da licitacao.")
 
-        provider_id = get_active_provider_id(self.db)
-        provider = get_ai_provider_internal_config(self.db, provider_id, self.settings)
+        provider_id, provider = resolve_ai_agent_runtime_config(self.db, "busca_inteligente", self.settings)
         if not provider["api_key"]:
             raise ExtracaoItensError(
                 f"A chave da IA ativa ({provider['nome']}) nao esta configurada. Configure-a antes de usar o chat."
@@ -538,6 +540,39 @@ class IaService:
             return await self._generate_text_anthropic(provider, prompt, _CHAT_SYSTEM_INSTRUCTION)
         if provider_id == "gemini":
             return await self._generate_text_gemini(provider, prompt, _CHAT_SYSTEM_INSTRUCTION)
+
+        raise ExtracaoItensError(f"IA ativa nao suportada: {provider['nome']}.")
+
+    async def gerar_texto_estruturado(self, prompt: str, system_instruction: str) -> str:
+        if self.db is None:
+            raise ExtracaoItensError("Servico de IA sem acesso ao banco para gerar texto estruturado.")
+
+        provider_id, provider = resolve_ai_agent_runtime_config(self.db, "extracao_itens", self.settings)
+        if not provider["api_key"]:
+            raise ExtracaoItensError(
+                f"A chave da IA ativa ({provider['nome']}) nao esta configurada. Configure-a antes de usar a busca inteligente."
+            )
+
+        if provider_id == "openai":
+            return self._generate_text_openai(provider, prompt, system_instruction)
+        if provider_id == "deepseek":
+            return self._generate_text_openai_compatible_chat(
+                provider,
+                prompt,
+                system_instruction,
+                base_url="https://api.deepseek.com/v1",
+            )
+        if provider_id == "groq":
+            return self._generate_text_openai_compatible_chat(
+                provider,
+                prompt,
+                system_instruction,
+                base_url="https://api.groq.com/openai/v1",
+            )
+        if provider_id == "anthropic":
+            return await self._generate_text_anthropic(provider, prompt, system_instruction)
+        if provider_id == "gemini":
+            return await self._generate_text_gemini(provider, prompt, system_instruction)
 
         raise ExtracaoItensError(f"IA ativa nao suportada: {provider['nome']}.")
 

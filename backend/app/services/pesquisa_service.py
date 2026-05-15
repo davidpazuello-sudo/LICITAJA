@@ -538,13 +538,12 @@ class PesquisaService:
         search_text: str,
         web_results: list[dict[str, str]],
     ) -> list[CotacaoColetada]:
-        config_service = __import__("app.services.ia_config_service", fromlist=["get_ai_provider_internal_config", "get_active_provider_id"])
+        config_service = __import__("app.services.ia_config_service", fromlist=["resolve_ai_agent_runtime_config"])
         from app.core.database import SessionLocal
 
         db = SessionLocal()
         try:
-            active_id = config_service.get_active_provider_id(db)
-            provider = config_service.get_ai_provider_internal_config(db, active_id, self.settings)
+            active_id, provider = config_service.resolve_ai_agent_runtime_config(db, "fornecedores_item", self.settings)
         finally:
             db.close()
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import { buscarLicitacoes } from "../services/busca.service";
+import { buscarLicitacoes, buscarLicitacoesInteligente } from "../services/busca.service";
 import { salvarLicitacao } from "../services/licitacoes.service";
 import type {
   BuscaLicitacaoFilters,
@@ -48,6 +48,7 @@ export function useBusca() {
   const [response, setResponse] = useState<BuscaLicitacoesResponseType>(EMPTY_RESPONSE);
   const [status, setStatus] = useState<BuscaStatus>("idle");
   const [errorMessage, setErrorMessage] = useState<string>("");
+  const [smartPrompt, setSmartPrompt] = useState("");
   const [hasSearched, setHasSearched] = useState(false);
   const [savingIds, setSavingIds] = useState<string[]>([]);
   const requestIdRef = useRef(0);
@@ -130,6 +131,57 @@ export function useBusca() {
     await runSearch(nextFilters);
   };
 
+  const submitSmartSearch = async () => {
+    const objetivo = smartPrompt.trim();
+    if (!objetivo) {
+      setStatus("error");
+      setErrorMessage("Descreva o que voce quer encontrar para usar a busca inteligente.");
+      return;
+    }
+
+    const requestId = ++requestIdRef.current;
+    setHasSearched(true);
+    setStatus("loading");
+    setErrorMessage("");
+
+    try {
+      const result = await buscarLicitacoesInteligente({
+        objetivo,
+        portais: filters.portais,
+        estado: filters.estado,
+        municipio: filters.municipio,
+        pagina: 1,
+      });
+
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+
+      setResponse(result);
+      setStatus("success");
+      if (result.plano_ia?.filtros_aplicados) {
+        skipNextEffectRef.current = true;
+        setFilters((current) => ({
+          ...current,
+          ...result.plano_ia!.filtros_aplicados,
+          portais: current.portais,
+          pagina: 1,
+        }));
+      }
+    } catch (error) {
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Nao foi possivel executar a busca inteligente agora.";
+      setStatus("error");
+      setErrorMessage(message);
+    }
+  };
+
   const goToPage = async (pagina: number) => {
     const nextPage = Math.max(1, pagina);
     const nextFilters = { ...filters, pagina: nextPage };
@@ -191,7 +243,10 @@ export function useBusca() {
     status,
     saveResult,
     setFilters,
+    setSmartPrompt,
+    smartPrompt,
     submitSearch,
+    submitSmartSearch,
     updateFilter,
     goToPage,
   };

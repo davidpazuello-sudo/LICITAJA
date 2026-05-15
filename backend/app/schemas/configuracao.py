@@ -55,19 +55,31 @@ class IAProviderRead(BaseModel):
     vendor: str
     nome: str
     descricao: str
-    modelo: str
+    modelo_padrao: str
     api_key_masked: str
-    prompt_extracao: str
-    ativo: bool
     configurada: bool
 
 
+class IAAgentRead(BaseModel):
+    id: str
+    nome: str
+    descricao: str
+    provider_id: str
+    modelo: str
+    prompt: str
+
+
 class ConfiguracoesIARead(BaseModel):
-    provider_ativo: str
     providers: list[IAProviderRead]
+    agentes: list[IAAgentRead]
 
 
 class IAProviderUpdate(BaseModel):
     modelo: str | None = None
     api_key: str | None = None
-    prompt_extracao: str | None = None
+
+
+class IAAgentUpdate(BaseModel):
+    provider_id: str | None = None
+    modelo: str | None = None
+    prompt: str | None = None

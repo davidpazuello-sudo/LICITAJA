@@ -1,7 +1,7 @@
 import { type ReactNode, useEffect, useState } from "react";
 
 import { useConfiguracaoIA, usePncp, usePortalIntegracoes } from "../hooks/useConfiguracoes";
-import type { IAProviderConfig, PortalIntegracaoCreateInput, PortalIntegracaoType } from "../types/configuracao.types";
+import type { IAAgentConfig, IAProviderConfig, PortalIntegracaoCreateInput, PortalIntegracaoType } from "../types/configuracao.types";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
@@ -631,53 +631,50 @@ function TabPortais() {
 interface IAProviderCardProps {
   provider: IAProviderConfig;
   saveIndicator: "idle" | "saving" | "saved";
-  promptSaveIndicator: "idle" | "saving" | "saved";
-  isActivating: boolean;
   onSave: (providerId: string, update: { modelo?: string; api_key?: string }) => Promise<void>;
-  onActivate: (providerId: string) => Promise<void>;
-  onPromptChange: (providerId: string, prompt: string) => void;
 }
 
-function IAProviderCard({
-  provider,
-  saveIndicator,
-  promptSaveIndicator,
-  isActivating,
-  onSave,
-  onActivate,
-  onPromptChange,
-}: IAProviderCardProps) {
+function IAProviderCard({ provider, saveIndicator, onSave }: IAProviderCardProps) {
   const modelosPredefinidos = MODELOS_POR_PROVIDER[provider.id] ?? [];
-  const isModeloPredefinido = modelosPredefinidos.some((m) => m.value === provider.modelo);
-
+  const isModeloPredefinido = modelosPredefinidos.some((m) => m.value === provider.modelo_padrao);
   const [selectValue, setSelectValue] = useState(
-    isModeloPredefinido ? provider.modelo : modelosPredefinidos.length > 0 ? MODELO_PERSONALIZADO : provider.modelo,
+    isModeloPredefinido
+      ? provider.modelo_padrao
+      : modelosPredefinidos.length > 0
+        ? MODELO_PERSONALIZADO
+        : provider.modelo_padrao,
   );
-  const [modelo, setModelo] = useState(provider.modelo);
+  const [modelo, setModelo] = useState(provider.modelo_padrao);
   const [apiKey, setApiKey] = useState("");
   const [showKey, setShowKey] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
-    const predefinido = modelosPredefinidos.some((m) => m.value === provider.modelo);
-    setSelectValue(predefinido ? provider.modelo : modelosPredefinidos.length > 0 ? MODELO_PERSONALIZADO : provider.modelo);
-    setModelo(provider.modelo);
-  }, [provider.modelo]); // eslint-disable-line react-hooks/exhaustive-deps
+    const predefinido = modelosPredefinidos.some((m) => m.value === provider.modelo_padrao);
+    setSelectValue(
+      predefinido
+        ? provider.modelo_padrao
+        : modelosPredefinidos.length > 0
+          ? MODELO_PERSONALIZADO
+          : provider.modelo_padrao,
+    );
+    setModelo(provider.modelo_padrao);
+  }, [provider.modelo_padrao]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <Card className={`p-6 ${provider.ativo ? "border-accent/30 shadow-soft" : ""}`}>
+    <Card className="p-6">
       <div className="space-y-5">
         <button
           type="button"
           onClick={() => setIsOpen((value) => !value)}
           className="flex w-full flex-wrap items-center justify-between gap-4 text-left"
         >
-          <div className="flex min-w-0 items-center gap-3">
+          <div className="min-w-0">
             <p className="font-heading text-xl font-extrabold text-ink">{provider.nome}</p>
+            <p className="mt-1 text-sm text-slate">{provider.descricao}</p>
           </div>
 
           <div className="flex items-center gap-3">
-            <Badge variant={provider.ativo ? "green" : "slate"}>{provider.ativo ? "Ativa" : "Inativa"}</Badge>
             <Badge variant={provider.configurada ? "blue" : "amber"}>
               {provider.configurada ? "Chave configurada" : "Chave pendente"}
             </Badge>
@@ -687,27 +684,20 @@ function IAProviderCard({
 
         {isOpen ? (
           <div className="space-y-5 border-t border-line/70 pt-5">
-            <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-sm leading-6 text-slate">{provider.descricao}</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate/80">Provedor LLM</p>
+                <p className="mt-1 text-sm text-slate">Cadastre a chave e defina o modelo base sugerido deste provedor.</p>
               </div>
-
               <div className="flex items-center gap-3">
                 {saveIndicator === "saving" ? <span className="text-xs font-semibold text-amber-700">Salvando...</span> : null}
                 {saveIndicator === "saved" ? <span className="text-xs font-semibold text-emerald-700">Salvo</span> : null}
-                {!provider.ativo ? (
-                  <Button variant="outline" isLoading={isActivating} onClick={() => onActivate(provider.id)}>
-                    Ativar esta IA
-                  </Button>
-                ) : (
-                  <Badge variant="green">IA em uso na extracao</Badge>
-                )}
               </div>
             </div>
 
             <div className="grid gap-4 lg:grid-cols-2">
               <div className="block">
-                <span className="mb-1.5 block text-sm font-semibold text-ink">Modelo</span>
+                <span className="mb-1.5 block text-sm font-semibold text-ink">Modelo base sugerido</span>
                 {modelosPredefinidos.length > 0 ? (
                   <>
                     <select
@@ -746,7 +736,7 @@ function IAProviderCard({
               </div>
 
               <label className="block">
-                <span className="mb-1.5 block text-sm font-semibold text-ink">API Key</span>
+                <span className="mb-1.5 block text-sm font-semibold text-ink">Chave da API</span>
                 <div className="relative">
                   <input
                     type={showKey ? "text" : "password"}
@@ -779,29 +769,168 @@ function IAProviderCard({
                 }}
                 isLoading={saveIndicator === "saving"}
               >
-                Salvar configuracoes desta IA
+                Salvar provedor
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </Card>
+  );
+}
+
+interface IAAgentCardProps {
+  agent: IAAgentConfig;
+  providers: IAProviderConfig[];
+  saveIndicator: "idle" | "saving" | "saved";
+  onSave: (agentId: string, update: { provider_id?: string; modelo?: string }) => Promise<void>;
+  onPromptChange: (agentId: string, prompt: string) => void;
+}
+
+function IAAgentCard({ agent, providers, saveIndicator, onSave, onPromptChange }: IAAgentCardProps) {
+  const selectedProvider = providers.find((provider) => provider.id === agent.provider_id);
+  const modelosPredefinidos = MODELOS_POR_PROVIDER[agent.provider_id] ?? [];
+  const isModeloPredefinido = modelosPredefinidos.some((m) => m.value === agent.modelo);
+  const [isOpen, setIsOpen] = useState(false);
+  const [providerId, setProviderId] = useState(agent.provider_id);
+  const [selectValue, setSelectValue] = useState(
+    isModeloPredefinido ? agent.modelo : modelosPredefinidos.length > 0 ? MODELO_PERSONALIZADO : agent.modelo,
+  );
+  const [modelo, setModelo] = useState(agent.modelo);
+
+  useEffect(() => {
+    setProviderId(agent.provider_id);
+    const providerModels = MODELOS_POR_PROVIDER[agent.provider_id] ?? [];
+    const predefinido = providerModels.some((m) => m.value === agent.modelo);
+    setSelectValue(predefinido ? agent.modelo : providerModels.length > 0 ? MODELO_PERSONALIZADO : agent.modelo);
+    setModelo(agent.modelo);
+  }, [agent.provider_id, agent.modelo]);
+
+  const availableModels = MODELOS_POR_PROVIDER[providerId] ?? [];
+
+  return (
+    <Card className="p-6">
+      <div className="space-y-5">
+        <button
+          type="button"
+          onClick={() => setIsOpen((value) => !value)}
+          className="flex w-full flex-wrap items-center justify-between gap-4 text-left"
+        >
+          <div className="min-w-0">
+            <p className="font-heading text-xl font-extrabold text-ink">{agent.nome}</p>
+            <p className="mt-1 text-sm text-slate">{agent.descricao}</p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {selectedProvider ? <Badge variant="green">LLM: {selectedProvider.nome}</Badge> : null}
+            <ChevronIcon isOpen={isOpen} />
+          </div>
+        </button>
+
+        {isOpen ? (
+          <div className="space-y-5 border-t border-line/70 pt-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate/80">Agente configuravel</p>
+                <p className="mt-1 text-sm text-slate">Escolha qual LLM este agente usa e ajuste o comportamento dele.</p>
+              </div>
+              <div className="flex items-center gap-3">
+                {saveIndicator === "saving" ? <span className="text-xs font-semibold text-amber-700">Salvando...</span> : null}
+                {saveIndicator === "saved" ? <span className="text-xs font-semibold text-emerald-700">Salvo</span> : null}
+              </div>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <label className="block">
+                <span className="mb-1.5 block text-sm font-semibold text-ink">LLM deste agente</span>
+                <select
+                  value={providerId}
+                  onChange={(event) => {
+                    const nextProviderId = event.target.value;
+                    setProviderId(nextProviderId);
+                    const nextModels = MODELOS_POR_PROVIDER[nextProviderId] ?? [];
+                    if (nextModels.length > 0) {
+                      setSelectValue(nextModels[0].value);
+                      setModelo(nextModels[0].value);
+                    } else {
+                      setSelectValue(MODELO_PERSONALIZADO);
+                      setModelo("");
+                    }
+                  }}
+                  className="h-12 w-full rounded-2xl border border-line bg-panel px-4 text-sm text-ink outline-none transition focus:border-accent/40 focus:ring-4 focus:ring-accent/10"
+                >
+                  {providers.map((provider) => (
+                    <option key={provider.id} value={provider.id}>
+                      {provider.nome}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="block">
+                <span className="mb-1.5 block text-sm font-semibold text-ink">Modelo usado pelo agente</span>
+                {availableModels.length > 0 ? (
+                  <>
+                    <select
+                      value={selectValue}
+                      onChange={(event) => {
+                        const val = event.target.value;
+                        setSelectValue(val);
+                        if (val !== MODELO_PERSONALIZADO) setModelo(val);
+                        else setModelo("");
+                      }}
+                      className="h-12 w-full rounded-2xl border border-line bg-panel px-4 text-sm text-ink outline-none transition focus:border-accent/40 focus:ring-4 focus:ring-accent/10"
+                    >
+                      {availableModels.map((m) => (
+                        <option key={m.value} value={m.value}>
+                          {m.label}
+                        </option>
+                      ))}
+                      <option value={MODELO_PERSONALIZADO}>Personalizado...</option>
+                    </select>
+                    {selectValue === MODELO_PERSONALIZADO ? (
+                      <input
+                        value={modelo}
+                        onChange={(event) => setModelo(event.target.value)}
+                        placeholder="Digite o identificador do modelo"
+                        className="mt-2 h-12 w-full rounded-2xl border border-line bg-panel px-4 text-sm text-ink outline-none transition focus:border-accent/40 focus:ring-4 focus:ring-accent/10"
+                      />
+                    ) : null}
+                  </>
+                ) : (
+                  <input
+                    value={modelo}
+                    onChange={(event) => setModelo(event.target.value)}
+                    className="h-12 w-full rounded-2xl border border-line bg-panel px-4 text-sm text-ink outline-none transition focus:border-accent/40 focus:ring-4 focus:ring-accent/10"
+                  />
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <Button
+                isLoading={saveIndicator === "saving"}
+                onClick={() => onSave(agent.id, { provider_id: providerId, modelo: modelo.trim() || undefined })}
+              >
+                Salvar agente
               </Button>
             </div>
 
             <div className="rounded-[24px] border border-line bg-panel/60 p-5">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h4 className="font-heading text-lg font-extrabold text-ink">Treinamento desta IA</h4>
+                  <h4 className="font-heading text-lg font-extrabold text-ink">Instrucao do agente</h4>
                   <p className="mt-1 text-sm text-slate">
-                    Este prompt sera usado apenas quando {provider.nome} estiver ativa.
+                    Este texto orienta apenas o comportamento do agente <strong>{agent.nome}</strong>.
                   </p>
                 </div>
-                {promptSaveIndicator === "saving" ? (
-                  <span className="text-xs font-semibold text-amber-700">Salvando...</span>
-                ) : promptSaveIndicator === "saved" ? (
-                  <span className="text-xs font-semibold text-emerald-700">Salvo</span>
-                ) : null}
+                {saveIndicator === "saving" ? <span className="text-xs font-semibold text-amber-700">Salvando...</span> : null}
               </div>
 
               <textarea
-                value={provider.prompt_extracao}
-                onChange={(event) => onPromptChange(provider.id, event.target.value)}
-                rows={12}
+                value={agent.prompt}
+                onChange={(event) => onPromptChange(agent.id, event.target.value)}
+                rows={10}
                 className="mt-4 w-full rounded-2xl border border-line bg-white px-4 py-4 text-sm leading-7 text-ink outline-none transition focus:border-accent/40 focus:ring-4 focus:ring-accent/10"
               />
             </div>
@@ -813,17 +942,8 @@ function IAProviderCard({
 }
 
 function TabIA() {
-  const {
-    config,
-    status,
-    errorMessage,
-    saveIndicators,
-    promptSaveIndicators,
-    activatingProviderId,
-    salvarIA,
-    ativarIA,
-    atualizarPrompt,
-  } = useConfiguracaoIA();
+  const { config, status, errorMessage, providerSaveIndicators, agentSaveIndicators, salvarProvider, salvarAgente, atualizarPromptAgente } =
+    useConfiguracaoIA();
 
   if (status === "loading") {
     return (
@@ -849,31 +969,52 @@ function TabIA() {
 
   if (!config) return null;
 
-  const activeProvider = config.providers.find((provider) => provider.ativo);
-
   return (
     <div className="space-y-6">
       <div>
         <div className="flex flex-wrap items-center gap-3">
           <h2 className="font-heading text-2xl font-extrabold text-ink">Inteligencia Artificial</h2>
-          {activeProvider ? <Badge variant="green">Ativa: {activeProvider.nome}</Badge> : null}
+          <Badge variant="blue">{config.agentes.length} agentes configuraveis</Badge>
         </div>
         <p className="mt-1 text-sm text-slate">
-          Configure varias IAs, mas mantenha apenas uma ativa por vez. O treinamento fica dentro de cada card.
+          Agora a IA fica dividida por funcao. Voce configura o provedor uma vez e escolhe qual LLM cada agente usa.
         </p>
       </div>
 
-      <div className="space-y-5">
+      <div className="space-y-4">
+        <div>
+          <h3 className="font-heading text-xl font-extrabold text-ink">Agentes</h3>
+          <p className="mt-1 text-sm text-slate">
+            Cada agente tem um papel claro no sistema e pode usar um LLM diferente.
+          </p>
+        </div>
+
+        {config.agentes.map((agent) => (
+          <IAAgentCard
+            key={agent.id}
+            agent={agent}
+            providers={config.providers}
+            saveIndicator={agentSaveIndicators[agent.id] ?? "idle"}
+            onSave={salvarAgente}
+            onPromptChange={atualizarPromptAgente}
+          />
+        ))}
+      </div>
+
+      <div className="space-y-4">
+        <div>
+          <h3 className="font-heading text-xl font-extrabold text-ink">Provedores LLM</h3>
+          <p className="mt-1 text-sm text-slate">
+            Cadastre chaves e modelos base dos provedores disponiveis para os agentes.
+          </p>
+        </div>
+
         {config.providers.map((provider) => (
           <IAProviderCard
             key={provider.id}
             provider={provider}
-            saveIndicator={saveIndicators[provider.id] ?? "idle"}
-            promptSaveIndicator={promptSaveIndicators[provider.id] ?? "idle"}
-            isActivating={activatingProviderId === provider.id}
-            onSave={salvarIA}
-            onActivate={ativarIA}
-            onPromptChange={atualizarPrompt}
+            saveIndicator={providerSaveIndicators[provider.id] ?? "idle"}
+            onSave={salvarProvider}
           />
         ))}
       </div>

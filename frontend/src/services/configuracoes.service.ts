@@ -1,6 +1,7 @@
 import { apiRequest } from "./api";
 import type {
   ConfiguracoesIA,
+  IAAgentUpdate,
   IAProviderUpdate,
   PortalIntegracaoCreateInput,
   PortalIntegracoesListType,
@@ -37,16 +38,17 @@ export async function getConfiguracaoIA(): Promise<ConfiguracoesIA> {
   return apiRequest<ConfiguracoesIA>("/configuracoes/ia");
 }
 
-export async function updateConfiguracaoIA(providerId: string, body: IAProviderUpdate): Promise<ConfiguracoesIA> {
-  return apiRequest<ConfiguracoesIA>(`/configuracoes/ia/${providerId}`, {
+export async function updateConfiguracaoIAProvider(providerId: string, body: IAProviderUpdate): Promise<ConfiguracoesIA> {
+  return apiRequest<ConfiguracoesIA>(`/configuracoes/ia/provedores/${providerId}`, {
     method: "PATCH",
     body: JSON.stringify(body),
   });
 }
 
-export async function ativarConfiguracaoIA(providerId: string): Promise<ConfiguracoesIA> {
-  return apiRequest<ConfiguracoesIA>(`/configuracoes/ia/${providerId}/ativar`, {
-    method: "POST",
+export async function updateConfiguracaoIAAgent(agentId: string, body: IAAgentUpdate): Promise<ConfiguracoesIA> {
+  return apiRequest<ConfiguracoesIA>(`/configuracoes/ia/agentes/${agentId}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
   });
 }
 

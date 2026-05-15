@@ -21,8 +21,11 @@ function BuscarLicitacoes() {
     savingIds,
     status,
     saveResult,
+    smartPrompt,
     setFilters,
+    setSmartPrompt,
     submitSearch,
+    submitSmartSearch,
     updateFilter,
   } = useBusca();
   const { items: portalItems } = usePortalIntegracoes();
@@ -129,6 +132,83 @@ function BuscarLicitacoes() {
 
       <div className="px-6 py-8 sm:px-8">
         <section className="space-y-5">
+          <Card className="overflow-hidden border-accent/15 bg-white">
+            <div className="space-y-5 p-6">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent/80">
+                    Agente de Busca IA
+                  </p>
+                  <h2 className="font-heading text-2xl font-extrabold text-ink">
+                    Encontre licitacoes que realmente fazem sentido
+                  </h2>
+                  <p className="max-w-3xl text-sm text-slate">
+                    Descreva o que voce quer vender, fornecer ou monitorar. A IA monta a estrategia,
+                    aplica filtros e reranqueia os resultados por aderencia.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3 lg:flex-row">
+                <label className="flex-1">
+                  <span className="sr-only">Objetivo da busca inteligente</span>
+                  <textarea
+                    value={smartPrompt}
+                    onChange={(event) => setSmartPrompt(event.target.value)}
+                    placeholder="Ex.: quero licitacoes de alimentacao hospitalar no Amazonas, com abertura proxima e orgaos de saude"
+                    className="min-h-[112px] w-full rounded-[22px] border border-line bg-panel/45 px-5 py-4 text-sm text-ink outline-none transition placeholder:text-slate/80 focus:border-accent/35 focus:ring-4 focus:ring-accent/10"
+                  />
+                </label>
+
+                <div className="flex shrink-0 flex-col justify-end gap-3 lg:w-[220px]">
+                  <Button size="lg" isLoading={status === "loading"} onClick={submitSmartSearch}>
+                    Buscar com IA
+                  </Button>
+                  <p className="text-xs text-slate">
+                    A IA usa o provedor ativo do sistema e, se indisponivel, cai em heuristica local.
+                  </p>
+                </div>
+              </div>
+
+              {response.plano_ia ? (
+                <div className="space-y-3 rounded-[24px] border border-line/70 bg-panel/45 p-5">
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-ink">Leitura da intencao</p>
+                    <p className="text-sm text-slate">{response.plano_ia.resumo_intencao}</p>
+                  </div>
+
+                  <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate/80">
+                        Termos priorizados
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {response.plano_ia.termos_prioritarios.map((term) => (
+                          <Badge key={term} variant="blue">
+                            {term}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate/80">
+                        Criterios de relevancia
+                      </p>
+                      <div className="space-y-2">
+                        {response.plano_ia.criterios_relevancia.map((criteria) => (
+                          <p key={criteria} className="text-sm text-slate">
+                            {criteria}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </Card>
+
           <Card className="overflow-hidden">
             <FiltrosBusca
               filters={filters}

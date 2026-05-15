@@ -33,3 +33,23 @@ export async function buscarLicitacoes(
     },
   });
 }
+
+export async function buscarLicitacoesInteligente(payload: {
+  objetivo: string;
+  portais: string[];
+  estado?: string;
+  municipio?: string;
+  pagina?: number;
+}): Promise<BuscaLicitacoesResponseType> {
+  return apiRequest<BuscaLicitacoesResponseType>("/busca/licitacoes/inteligente", {
+    method: "POST",
+    body: JSON.stringify({
+      objetivo: payload.objetivo,
+      portais: payload.portais,
+      estado: payload.estado || null,
+      municipio: payload.municipio || null,
+      pagina: payload.pagina ?? 1,
+      page_size: 10,
+    }),
+  });
+}

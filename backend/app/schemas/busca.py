@@ -21,6 +21,8 @@ class BuscaLicitacaoItem(BaseModel):
     fonte: str = "pncp"
     salva: bool = False
     dados_brutos: str | None = None
+    score_inteligencia: float | None = None
+    motivo_match: str | None = None
 
 
 class BuscaFonteStatus(BaseModel):
@@ -40,3 +42,46 @@ class BuscaLicitacoesResponse(BaseModel):
     paginas_restantes: int
     origem: str = "pncp"
     fontes: list[BuscaFonteStatus] = []
+    modo_busca: str = "padrao"
+    plano_ia: "BuscaInteligentePlano | None" = None
+
+
+class BuscaInteligenteFiltros(BaseModel):
+    buscar_por: str = ""
+    numero_oportunidade: str = ""
+    objeto_licitacao: str = ""
+    orgao: str = ""
+    empresa: str = ""
+    sub_status: str = ""
+    tipo_instrumento_convocatorio: str = ""
+    unidade: str = ""
+    estado: str = ""
+    municipio: str = ""
+    esfera: str = ""
+    poder: str = ""
+    fonte_orcamentaria: str = ""
+    margem_preferencia: str = ""
+    conteudo_nacional: str = ""
+    modalidade: str = ""
+    tipo_fornecimento: list[str] = []
+    familia_fornecimento: list[str] = []
+
+
+class BuscaInteligentePlano(BaseModel):
+    resumo_intencao: str
+    justificativa: str
+    termos_prioritarios: list[str] = []
+    criterios_relevancia: list[str] = []
+    filtros_aplicados: BuscaInteligenteFiltros
+
+
+class BuscaInteligenteRequest(BaseModel):
+    objetivo: str
+    portais: list[str] = []
+    estado: str | None = None
+    municipio: str | None = None
+    pagina: int = 1
+    page_size: int = 10
+
+
+BuscaLicitacoesResponse.model_rebuild()
