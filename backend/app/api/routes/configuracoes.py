@@ -40,6 +40,13 @@ BUILTIN_PORTAIS = [
         "credencial": "",
         "status": "inativa",
     },
+    {
+        "nome": "Petronect",
+        "url_base": "https://www.petronect.com.br",
+        "tipo_auth": "token",
+        "credencial": "",
+        "status": "inativa",
+    },
 ]
 
 

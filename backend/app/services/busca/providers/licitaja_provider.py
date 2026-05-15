@@ -49,17 +49,12 @@ FAMILY_KEYWORDS = {
 class LicitaJaProvider(SearchProvider):
     supported_filters = {
         "buscar_por",
-        "numero_oportunidade",
         "objeto_licitacao",
         "orgao",
-        "empresa",
-        "sub_status",
         "estado",
-        "modalidade",
+        "municipio",
         "tipo_fornecimento",
         "familia_fornecimento",
-        "data_inicio",
-        "data_fim",
     }
 
     def __init__(self, portal: PortalIntegracaoModel) -> None:
@@ -250,7 +245,7 @@ class LicitaJaProvider(SearchProvider):
         return None
 
     def _serialize_item(self, raw: dict) -> BuscaLicitacaoItem | None:
-        tender_id = str(raw.get("tenderId") or "").strip()
+        tender_id = str(raw.get("tenderId") or raw.get("url") or raw.get("tender_object") or "").strip()
         if not tender_id:
             return None
 
@@ -342,6 +337,9 @@ class LicitaJaProvider(SearchProvider):
             return False
 
         if query.estado and (item.estado or "").upper() != query.estado.upper():
+            return False
+
+        if query.municipio and not self._contains_all_terms([item.cidade], query.municipio):
             return False
 
         if query.modalidade and not self._contains_all_terms([item.modalidade], query.modalidade):

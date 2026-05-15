@@ -21,6 +21,7 @@ from app.services.busca.providers.compras_gov_provider import ComprasGovProvider
 from app.services.busca.providers.compras_manaus_provider import ComprasManausProvider
 from app.services.busca.providers.ecompras_am_provider import EComprasAMProvider
 from app.services.busca.providers.licitaja_provider import LicitaJaProvider
+from app.services.busca.providers.petronect_provider import PetronectProvider
 from app.services.busca.providers.pncp_provider import PncpProvider
 
 _PROVIDER_TIMEOUT_SECONDS = {
@@ -154,6 +155,9 @@ class BuscaAggregator:
 
         if "licitaja.com.br" in url:
             return LicitaJaProvider(portal=portal)
+
+        if "petronect.com.br" in url:
+            return PetronectProvider(portal=portal)
 
         if "dadosabertos.compras.gov.br" in url or "compras.dados.gov.br" in url:
             return ComprasGovProvider(portal=portal)

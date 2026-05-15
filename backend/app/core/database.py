@@ -205,4 +205,16 @@ def _seed_default_configurations() -> None:
                 ),
             )
 
+        if "https://www.petronect.com.br" not in existing_portal_urls:
+            session.add(
+                PortalIntegracaoModel(
+                    nome="Petronect",
+                    url_base="https://www.petronect.com.br",
+                    tipo_auth="token",
+                    credencial="",
+                    status="inativa",
+                    criado_em=datetime.now(UTC).isoformat(),
+                ),
+            )
+
         session.commit()

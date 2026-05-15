@@ -152,24 +152,35 @@ const PORTAL_FILTER_PROFILES: Record<string, PortalFilterProfile> = {
     guidance:
       "No Compras Manaus, os filtros confiaveis usam a lista publica e o detalhe de cada item para status, UG, modalidade, municipio e data de abertura.",
   },
-  licitaja: {
-    key: "licitaja",
+  petronect: {
+    key: "petronect",
     reliableFilters: [
       "buscar_por",
       "numero_oportunidade",
       "objeto_licitacao",
       "orgao",
-      "empresa",
       "sub_status",
       "estado",
       "modalidade",
-      "tipo_fornecimento",
-      "familia_fornecimento",
       "data_inicio",
       "data_fim",
     ],
     guidance:
-      "Na LicitaJa, os filtros atuais continuam centralizados no provider proprio. Os campos com nomenclatura do PNCP ainda nao foram mapeados um a um.",
+      "Na Petronect, os filtros confiaveis usam a consulta publica de oportunidades para numero, objeto, empresa responsavel, status, modalidade, UF e janela de datas.",
+  },
+  licitaja: {
+    key: "licitaja",
+    reliableFilters: [
+      "buscar_por",
+      "objeto_licitacao",
+      "orgao",
+      "estado",
+      "municipio",
+      "tipo_fornecimento",
+      "familia_fornecimento",
+    ],
+    guidance:
+      "Na LicitaJa, a API publica sem chave retorna um payload reduzido. Por isso, os filtros confiaveis ficam restritos a objeto, orgao, municipio, estado e classificacao do fornecimento.",
   },
 };
 
@@ -190,6 +201,10 @@ function inferPortalProfile(portal: PortalOption): PortalFilterProfile {
 
   if (normalizedLabel.includes("compras manaus")) {
     return PORTAL_FILTER_PROFILES.compras_manaus;
+  }
+
+  if (normalizedLabel.includes("petronect")) {
+    return PORTAL_FILTER_PROFILES.petronect;
   }
 
   if (normalizedLabel.includes("licitaja")) {
