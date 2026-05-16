@@ -52,8 +52,8 @@ STATUS_FILTER_ENCERRADA = "encerrada"
 
 FALLBACK_PUBLICACAO_CODES = list(MODALIDADE_CODES.values())
 MAX_TARGETED_SCAN_PAGES = 2
-MAX_PROPOSTA_SCAN_PAGES = 8
-PROPOSTA_SCAN_PAGE_SIZE = 10
+MAX_PROPOSTA_SCAN_PAGES = 15
+PROPOSTA_SCAN_PAGE_SIZE = 20
 
 FAMILY_KEYWORDS = {
     "bens": ["aquisicao", "fornecimento", "material", "equipamento", "bem", "bens"],
@@ -175,8 +175,35 @@ class PncpService:
                 pagina=pagina,
                 page_size=page_size,
             )
-            if proposal_response.items:
+            if len(proposal_response.items) >= page_size:
                 return proposal_response
+            # Proposta trouxe menos que page_size: complementar com publicacoes
+            if proposal_response.items:
+                publicacao_response = await self._buscar_publicacoes_direcionadas(
+                    buscar_por=buscar_por or q,
+                    numero_oportunidade=numero_oportunidade,
+                    objeto_licitacao=objeto_licitacao,
+                    orgao=orgao,
+                    empresa=None,
+                    sub_status=sub_status,
+                    tipo_instrumento_convocatorio=tipo_instrumento_convocatorio,
+                    unidade=unidade,
+                    estado=estado,
+                    municipio=municipio,
+                    esfera=esfera,
+                    poder=poder,
+                    fonte_orcamentaria=fonte_orcamentaria,
+                    margem_preferencia=margem_preferencia,
+                    conteudo_nacional=conteudo_nacional,
+                    modalidade=modalidade,
+                    tipo_fornecimento=tipo_fornecimento,
+                    familia_fornecimento=familia_fornecimento,
+                    data_inicio=data_inicio,
+                    data_fim=data_fim,
+                    pagina=pagina,
+                    page_size=page_size,
+                )
+                return self._merge_responses(proposal_response, publicacao_response, pagina=pagina, page_size=page_size)
 
         requires_publicacao_scan = any(
             [
@@ -336,7 +363,7 @@ class PncpService:
                     modalidade=modalidade,
                     strategy="proposta",
                     tamanho_pagina=PROPOSTA_SCAN_PAGE_SIZE,
-                    timeout_seconds=8.0,
+                    timeout_seconds=14.0,
                 )
                 for api_page in range(1, MAX_PROPOSTA_SCAN_PAGES + 1)
             ),
@@ -545,6 +572,44 @@ class PncpService:
             total_paginas=total_paginas,
         )
 
+    def _merge_responses(
+        self,
+        proposal_response: BuscaLicitacoesResponse,
+        publicacao_response: BuscaLicitacoesResponse,
+        *,
+        pagina: int,
+        page_size: int,
+    ) -> BuscaLicitacoesResponse:
+        """Mescla resultados de proposta (prioridade) com publicacao, deduplicando por numero_controle."""
+        seen_ids: set[str] = set()
+        merged: list = []
+
+        for item in proposal_response.items:
+            key = item.numero_controle or ""
+            if key not in seen_ids:
+                seen_ids.add(key)
+                merged.append(item)
+
+        for item in publicacao_response.items:
+            key = item.numero_controle or ""
+            if key not in seen_ids:
+                seen_ids.add(key)
+                merged.append(item)
+
+        total_registros = len(merged)
+        total_paginas = max((total_registros + page_size - 1) // page_size, 1)
+        current_page = max(pagina, 1)
+        start = (current_page - 1) * page_size
+        page_items = merged[start : start + page_size]
+
+        return BuscaLicitacoesResponse(
+            items=page_items,
+            total_registros=total_registros,
+            total_paginas=total_paginas,
+            numero_pagina=current_page,
+            paginas_restantes=max(total_paginas - current_page, 0),
+        )
+
     def _resolve_targeted_query_hint(
         self,
         *,
@@ -609,6 +674,7 @@ class PncpService:
             endpoint = "proposta"
             params = {
                 "pagina": pagina,
+                "dataInicial": self._resolve_data_inicial(data_inicio),
                 "dataFinal": self._resolve_data_final(data_fim),
                 "tamanhoPagina": tamanho_pagina or (20 if estado else 50),
             }
@@ -850,7 +916,7 @@ class PncpService:
         if data_inicio:
             return data_inicio.replace("-", "")
 
-        return (datetime.now(UTC) - timedelta(days=90)).strftime("%Y%m%d")
+        return (datetime.now(UTC) - timedelta(days=180)).strftime("%Y%m%d")
 
     def _compose_numero_compra(self, item: dict) -> str | None:
         numero_compra = item.get("numeroCompra")

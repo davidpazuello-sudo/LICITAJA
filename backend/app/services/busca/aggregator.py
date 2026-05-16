@@ -25,7 +25,7 @@ from app.services.busca.providers.petronect_provider import PetronectProvider
 from app.services.busca.providers.pncp_provider import PncpProvider
 
 _PROVIDER_TIMEOUT_SECONDS = {
-    "pncp": 20.0,
+    "pncp": 48.0,
 }
 _SEARCH_DEADLINE_BUFFER_SECONDS = 2.0
 
