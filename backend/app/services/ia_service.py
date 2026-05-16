@@ -1022,6 +1022,14 @@ class IaService:
                 ) from None
             payload = json.loads(cleaned[start : end + 1])
 
+        # Normaliza aliases de campos antes de validar
+        if isinstance(payload, list):
+            payload = [self._normalize_item_dict(item) if isinstance(item, dict) else item for item in payload]
+        elif isinstance(payload, dict):
+            # Pode ser {"itens": [...]}
+            if "itens" in payload and isinstance(payload["itens"], list):
+                payload = [self._normalize_item_dict(item) if isinstance(item, dict) else item for item in payload["itens"]]
+
         try:
             parsed = ItensExtraidosSchema.model_validate(payload)
         except Exception as exc:  # noqa: BLE001
@@ -1033,6 +1041,50 @@ class IaService:
             raise ExtracaoItensError(f"A IA ativa ({provider_name}) nao retornou itens validos para este edital.")
 
         return parsed.root
+
+    @staticmethod
+    def _normalize_item_dict(raw: dict) -> dict:
+        """Mapeia campos com nomes alternativos retornados pela IA para os campos canônicos do ItemExtraidoSchema.
+
+        Aliases mapeados:
+          numero_item  ← Nº, N, No, Num, Item, Numero, numero, item_numero, num_item, id
+          descricao    ← Grupo, Descricao, Descricão, Objeto, descr, descricao_item, nome, title
+          quantidade   ← Qtd, Quant, qtd, quant, qty, Quantidade
+          unidade      ← Unidade, Un, und, unit, Und
+          especificacoes ← Especificacoes, specs, especificacoes_tecnicas, detalhes
+          marcas_fabricantes ← Marcas, Fabricantes, marcas, fabricantes, brands
+        """
+        _NUMERO_ITEM_ALIASES = {
+            "nº", "n", "no", "num", "item", "numero", "item_numero",
+            "num_item", "id", "n°", "n.º", "numero_item",
+        }
+        _DESCRICAO_ALIASES = {
+            "grupo", "descricao", "descrição", "objeto", "descr",
+            "descricao_item", "nome", "title", "descricao_completa",
+        }
+        _QUANTIDADE_ALIASES = {"qtd", "quant", "qty", "quantidade"}
+        _UNIDADE_ALIASES = {"un", "und", "unit", "unidade"}
+        _ESPEC_ALIASES = {"especificacoes", "specs", "especificacoes_tecnicas", "detalhes", "especificações"}
+        _MARCAS_ALIASES = {"marcas", "fabricantes", "brands", "marcas_fabricantes"}
+
+        result: dict = {}
+        for key, value in raw.items():
+            normalized_key = key.strip().lower().replace(" ", "_")
+            if normalized_key in _NUMERO_ITEM_ALIASES:
+                result.setdefault("numero_item", value)
+            elif normalized_key in _DESCRICAO_ALIASES:
+                result.setdefault("descricao", value)
+            elif normalized_key in _QUANTIDADE_ALIASES:
+                result.setdefault("quantidade", value)
+            elif normalized_key in _UNIDADE_ALIASES:
+                result.setdefault("unidade", value)
+            elif normalized_key in _ESPEC_ALIASES:
+                result.setdefault("especificacoes", value)
+            elif normalized_key in _MARCAS_ALIASES:
+                result.setdefault("marcas_fabricantes", value)
+            else:
+                result[key] = value
+        return result
 
     async def _extract_propostas_payload(
         self,
