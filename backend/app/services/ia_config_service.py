@@ -239,9 +239,10 @@ def get_ai_agent_internal_config(db: Session, agent_id: str) -> dict[str, str]:
 
 def resolve_ai_agent_runtime_config(db: Session, agent_id: str, settings: Settings) -> tuple[str, dict[str, str]]:
     agent_config = get_ai_agent_internal_config(db, agent_id)
-    provider_id = agent_config["provider_id"]
-    provider = get_ai_provider_internal_config(db, provider_id, settings)
-    provider["modelo"] = agent_config["modelo"] or provider["modelo"]
+    requested_provider_id = agent_config["provider_id"]
+    provider_id, provider = _resolve_best_provider_for_agent(db, settings, requested_provider_id)
+    if provider_id == requested_provider_id:
+        provider["modelo"] = agent_config["modelo"] or provider["modelo"]
     provider["prompt_extracao"] = agent_config["prompt"]
     provider["agent_id"] = agent_id
     provider["agent_nome"] = agent_config["nome"]
@@ -293,7 +294,7 @@ def activate_ai_provider(db: Session, provider_id: str) -> None:
 
 def seed_ai_provider_defaults(existing_values: dict[str, str]) -> dict[str, str]:
     defaults: dict[str, str] = {}
-    defaults.setdefault(IA_ACTIVE_PROVIDER_KEY, "openai")
+    defaults.setdefault(IA_ACTIVE_PROVIDER_KEY, "groq")
 
     for provider_id, provider_meta in SUPPORTED_IA_PROVIDERS.items():
         legacy_api_key = existing_values.get("openai_api_key", "") if provider_id == "openai" else ""
@@ -311,12 +312,43 @@ def seed_ai_provider_defaults(existing_values: dict[str, str]) -> dict[str, str]
             "prompt": agent_meta["prompt_padrao"],
         }
         if agent_id == "extracao_itens":
-            payload["provider_id"] = "openai"
-            payload["modelo"] = existing_values.get("openai_modelo", "") or agent_meta["modelo_padrao"]
             payload["prompt"] = existing_values.get("prompt_extracao", "") or agent_meta["prompt_padrao"]
         defaults.setdefault(_agent_key(agent_id), json.dumps(payload, ensure_ascii=False))
 
     return defaults
+
+
+def _resolve_best_provider_for_agent(
+    db: Session,
+    settings: Settings,
+    requested_provider_id: str,
+) -> tuple[str, dict[str, str]]:
+    candidate_ids: list[str] = []
+
+    if requested_provider_id in SUPPORTED_IA_PROVIDERS:
+        candidate_ids.append(requested_provider_id)
+
+    active_provider_id = _get_config_value(db, IA_ACTIVE_PROVIDER_KEY, "groq")
+    if active_provider_id in SUPPORTED_IA_PROVIDERS and active_provider_id not in candidate_ids:
+        candidate_ids.append(active_provider_id)
+
+    for provider_id in SUPPORTED_IA_PROVIDERS:
+        if provider_id not in candidate_ids:
+            candidate_ids.append(provider_id)
+
+    first_provider: tuple[str, dict[str, str]] | None = None
+    for provider_id in candidate_ids:
+        provider = get_ai_provider_internal_config(db, provider_id, settings)
+        if first_provider is None:
+            first_provider = (provider_id, provider)
+        if provider["api_key"]:
+            return provider_id, provider
+
+    if first_provider is not None:
+        return first_provider
+
+    fallback_provider_id = requested_provider_id if requested_provider_id in SUPPORTED_IA_PROVIDERS else "groq"
+    return fallback_provider_id, get_ai_provider_internal_config(db, fallback_provider_id, settings)
 
 
 def _provider_key(provider_id: str) -> str:
