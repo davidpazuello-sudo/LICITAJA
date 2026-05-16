@@ -1,8 +1,4 @@
-import type { ReactNode } from "react";
-
-import { Spinner } from "../../ui/Spinner";
-import type { BackgroundJobType, ItemType } from "../../../types/item.types";
-import type { EditalType, LicitacaoDetailType } from "../../../types/licitacao.types";
+import type { ItemType } from "../../../types/item.types";
 import { formatCurrency } from "../../../utils/formatters";
 
 function formatQuantity(value: number | null, unidade: string | null) {
@@ -64,32 +60,6 @@ function SummaryBadge({
   );
 }
 
-function CompactButton({
-  children,
-  variant = "default",
-  onClick,
-  disabled = false,
-}: {
-  children: ReactNode;
-  variant?: "default" | "primary" | "outline";
-  onClick?: () => void;
-  disabled?: boolean;
-}) {
-  const className = `inline-flex items-center gap-[5px] rounded-[7px] border px-[12px] py-[7px] text-[12px] font-medium ${
-    variant === "primary"
-      ? "border-[#2563EB] bg-[#2563EB] text-white"
-      : variant === "outline"
-        ? "border-[#BFCFFE] bg-[#EFF4FF] text-[#2563EB]"
-        : "border-[#E2E6EF] bg-white text-[#5A6478]"
-  } ${disabled ? "cursor-not-allowed opacity-60" : ""}`;
-
-  return (
-    <button type="button" onClick={onClick} disabled={disabled} className={className}>
-      {children}
-    </button>
-  );
-}
-
 function ItemStatusBadge({ status }: { status: string }) {
   if (status === "encontrado") {
     return <span className="rounded-[20px] bg-[#DCFCE7] px-[7px] py-[2px] text-[10px] font-semibold text-[#16A34A]">Pesquisado</span>;
@@ -139,49 +109,14 @@ function ItemRow({ item, expanded }: { item: ItemType; expanded: boolean }) {
   );
 }
 
-function InlineNotice({ children, tone = "blue" }: { children: ReactNode; tone?: "blue" | "red" }) {
-  const className =
-    tone === "red"
-      ? "border-rose-100 bg-rose-50 text-rose-700"
-      : "border-sky-100 bg-sky-50 text-sky-700";
-
-  return <div className={`rounded-[7px] border px-4 py-3 text-sm ${className}`}>{children}</div>;
-}
-
 function TabItensLicitacao({
   items,
   resumo,
-  pesquisarTodos,
-  isSearchingAll,
-  isExtracting,
-  isUploading,
-  isExporting,
-  exportarTabela,
-  iniciarExtracao,
-  latestEdital,
-  perfil,
-  itensStatus,
-  itensErrorMessage,
-  backgroundJob,
 }: {
   items: ItemType[];
   resumo: { total: number; aguardando: number; pesquisados: number };
-  pesquisarTodos: () => Promise<void>;
-  isSearchingAll: boolean;
-  isExtracting: boolean;
-  isUploading: boolean;
-  isExporting: boolean;
-  exportarTabela: () => Promise<void>;
-  iniciarExtracao: () => Promise<void>;
-  latestEdital: EditalType | null;
-  perfil: LicitacaoDetailType;
-  itensStatus: "idle" | "loading" | "ready" | "error";
-  itensErrorMessage: string;
-  backgroundJob: BackgroundJobType | null;
 }) {
   const visibleItems = items.slice(0, 5);
-  const loadingAny = isSearchingAll || isExtracting || isUploading || isExporting;
-  const canExtractAutomatically = Boolean(latestEdital || perfil.link_edital || perfil.link_site);
 
   return (
     <>
@@ -204,40 +139,6 @@ function TabItensLicitacao({
           <SummaryBadge count={resumo.pesquisados} label="Pesquisados" tone="green" />
           <SummaryBadge count={resumo.aguardando} label="Aguardando" tone="yellow" />
         </div>
-
-        <div className="mb-[14px] flex flex-wrap gap-[7px]">
-          <CompactButton variant="primary" onClick={() => void iniciarExtracao()} disabled={!canExtractAutomatically || loadingAny}>
-            <svg viewBox="0 0 24 24" fill="none" className="h-3 w-3" aria-hidden="true">
-              <path d="M4 4v5h5M20 20v-5h-5M4.07 15A9 9 0 1 0 20 9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            Extrair itens do edital
-          </CompactButton>
-          <CompactButton variant="outline" onClick={() => void pesquisarTodos()} disabled={loadingAny || items.length === 0}>
-            <svg viewBox="0 0 24 24" fill="none" className="h-3 w-3" aria-hidden="true">
-              <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2.5" />
-              <path d="M21 21 16.65 16.65" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-            </svg>
-            Pesquisar todos
-          </CompactButton>
-          <CompactButton onClick={() => void exportarTabela()} disabled={loadingAny || items.length === 0}>
-            <svg viewBox="0 0 24 24" fill="none" className="h-3 w-3" aria-hidden="true">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            Exportar
-          </CompactButton>
-        </div>
-
-        {itensErrorMessage ? <InlineNotice tone="red">{itensErrorMessage}</InlineNotice> : null}
-        {!canExtractAutomatically ? <InlineNotice>Esta licitacao ainda nao tem edital ou portal publico disponivel para extracao automatica.</InlineNotice> : null}
-        {backgroundJob && (backgroundJob.status === "queued" || backgroundJob.status === "processing") ? (
-          <InlineNotice>{backgroundJob.mensagem || "Enriquecendo marcas e fabricantes em segundo plano."}</InlineNotice>
-        ) : null}
-        {itensStatus === "loading" && items.length === 0 ? (
-          <div className="flex items-center gap-3 py-4 text-sm text-[#5A6478]">
-            <Spinner className="text-[#2563EB]" />
-            Lendo edital e extraindo itens...
-          </div>
-        ) : null}
       </section>
 
       <section className="rounded-[10px] border border-[#E2E6EF] bg-white p-[15px]">

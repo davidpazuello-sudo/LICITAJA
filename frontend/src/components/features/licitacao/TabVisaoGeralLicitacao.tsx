@@ -1,5 +1,19 @@
 import type { EditalType } from "../../../types/licitacao.types";
 
+function getVisibleEdital(editais: EditalType[]): EditalType | null {
+  if (editais.length === 0) {
+    return null;
+  }
+
+  return [...editais].sort((a, b) => {
+    const dateDiff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    if (dateDiff !== 0) {
+      return dateDiff;
+    }
+    return b.id - a.id;
+  })[0] ?? null;
+}
+
 function PanelTitle({
   title,
   subtitle,
@@ -32,6 +46,7 @@ function TabVisaoGeralLicitacao({
 }) {
   const saveText =
     saveIndicator === "saving" ? "Salvando..." : saveIndicator === "saved" ? "Salvo" : "Edicao automatica";
+  const visibleEdital = getVisibleEdital(editais);
 
   return (
     <>
@@ -70,17 +85,15 @@ function TabVisaoGeralLicitacao({
           </label>
         </div>
 
-        {editais.length > 0 ? (
+        {visibleEdital ? (
           <div className="space-y-[7px]">
-            {editais.map((edital) => (
-              <div key={edital.id} className="rounded-[7px] border border-[#E2E6EF] bg-[#F5F7FB] px-[12px] py-[11px]">
-                <div className="text-[12.5px] font-medium text-[#0F1724]">
-                  {edital.arquivo_nome ?? "PDF enviado manualmente"}
-                </div>
-                <div className="mt-1 text-[11px] text-[#9AA3B5]">Status: {edital.status_extracao}</div>
-                {edital.erro_mensagem ? <div className="mt-1 text-[11px] text-rose-700">{edital.erro_mensagem}</div> : null}
+            <div className="rounded-[7px] border border-[#E2E6EF] bg-[#F5F7FB] px-[12px] py-[11px]">
+              <div className="text-[12.5px] font-medium text-[#0F1724]">
+                {visibleEdital.arquivo_nome ?? "PDF enviado manualmente"}
               </div>
-            ))}
+              <div className="mt-1 text-[11px] text-[#9AA3B5]">Status: {visibleEdital.status_extracao}</div>
+              {visibleEdital.erro_mensagem ? <div className="mt-1 text-[11px] text-rose-700">{visibleEdital.erro_mensagem}</div> : null}
+            </div>
           </div>
         ) : (
           <div className="rounded-[7px] border border-dashed border-[#E2E6EF] bg-[#F5F7FB] px-[12px] py-[18px] text-[12px] text-[#5A6478]">

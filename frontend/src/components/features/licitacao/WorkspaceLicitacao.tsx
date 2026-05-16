@@ -125,18 +125,6 @@ function WorkspaceLicitacao({
           <TabItensLicitacao
             items={items}
             resumo={resumo}
-            pesquisarTodos={pesquisarTodos}
-            isSearchingAll={isSearchingAll}
-            isExtracting={isExtracting}
-            isUploading={isUploading}
-            isExporting={isExporting}
-            exportarTabela={exportarTabela}
-            iniciarExtracao={iniciarExtracao}
-            latestEdital={latestEdital}
-            perfil={perfil}
-            itensStatus={itensStatus}
-            itensErrorMessage={itensErrorMessage}
-            backgroundJob={backgroundJob}
           />
         ) : null}
 

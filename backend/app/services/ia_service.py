@@ -362,12 +362,12 @@ class IaService:
             raise ExtracaoItensError("Servico de IA sem acesso ao banco para carregar a configuracao ativa.")
 
         try:
-            arquivo_bytes = self.storage.read_bytes(arquivo_path)
+            arquivo_bytes, arquivo_path_efetivo = await self._read_edital_bytes_with_recovery(arquivo_path)
         except StorageError as exc:
             raise ExtracaoItensError(f"Nao foi possivel ler o edital no storage configurado: {exc}") from exc
 
         texto = self._extrair_texto_pdf_bytes(arquivo_bytes)
-        texto = await self._enriquecer_texto_com_anexos(arquivo_path, texto)
+        texto = await self._enriquecer_texto_com_anexos(arquivo_path_efetivo, texto)
         if not texto.strip():
             raise ExtracaoItensError(
                 "Nao foi possivel ler texto deste PDF. Se o edital estiver escaneado como imagem, a extracao com IA nao vai funcionar nesta etapa."
@@ -1411,14 +1411,14 @@ class IaService:
             return ""
 
         try:
-            arquivo_bytes = self.storage.read_bytes(arquivo_path)
+            arquivo_bytes, arquivo_path_efetivo = await self._read_edital_bytes_with_recovery(arquivo_path)
         except StorageError:
             return ""
 
         texto = self._extrair_texto_pdf_bytes(arquivo_bytes)
         if not texto.strip():
             return ""
-        return await self._enriquecer_texto_com_anexos(arquivo_path, texto)
+        return await self._enriquecer_texto_com_anexos(arquivo_path_efetivo, texto)
 
     async def _collect_portal_text_for_propostas(
         self,
@@ -1567,11 +1567,8 @@ class IaService:
             if not arquivo_path:
                 continue
 
-            if not self.storage.exists(arquivo_path):
-                continue
-
             try:
-                arquivo_bytes = self.storage.read_bytes(arquivo_path)
+                arquivo_bytes, _ = await self._read_edital_bytes_with_recovery(arquivo_path)
             except StorageError:
                 continue
             texto = self._extrair_texto_pdf_bytes(arquivo_bytes)
@@ -2474,6 +2471,46 @@ class IaService:
         if edital is None:
             return None
         return self.db.get(LicitacaoModel, edital.licitacao_id)
+
+    def _find_edital_by_path(self, arquivo_path: str) -> EditalModel | None:
+        from sqlalchemy import select
+
+        if self.db is None:
+            return None
+        return self.db.scalar(select(EditalModel).where(EditalModel.arquivo_path == arquivo_path))
+
+    async def _read_edital_bytes_with_recovery(self, arquivo_path: str) -> tuple[bytes, str]:
+        try:
+            return self.storage.read_bytes(arquivo_path), arquivo_path
+        except StorageError as original_exc:
+            if self.db is None:
+                raise
+
+            edital = self._find_edital_by_path(arquivo_path)
+            if edital is None:
+                raise
+
+            licitacao = self.db.get(LicitacaoModel, edital.licitacao_id)
+            if licitacao is None or (not licitacao.link_edital and not licitacao.link_site):
+                raise
+
+            try:
+                novo_arquivo_path, novo_arquivo_nome = await self.baixar_edital_principal(licitacao)
+                arquivo_bytes = self.storage.read_bytes(novo_arquivo_path)
+            except (ExtracaoItensError, StorageError):
+                raise original_exc
+
+            edital.arquivo_path = novo_arquivo_path
+            if not edital.arquivo_nome:
+                edital.arquivo_nome = novo_arquivo_nome
+            if edital.status_extracao == "erro" and edital.erro_mensagem and "storage configurado" in edital.erro_mensagem:
+                edital.status_extracao = "pendente"
+                edital.erro_mensagem = None
+
+            self.db.add(edital)
+            self.db.commit()
+            self.db.refresh(edital)
+            return arquivo_bytes, novo_arquivo_path
 
     def _texto_ja_parece_detalhado(self, texto: str) -> bool:
         normalized = texto.lower()
