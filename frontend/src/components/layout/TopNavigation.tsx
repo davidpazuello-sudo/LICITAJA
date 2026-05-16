@@ -31,11 +31,38 @@ function TopNavigation({ pageTitle, sidebarCollapsed, onToggleSidebar }: TopNavi
             className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-line bg-white text-slate transition hover:border-accent/30 hover:text-accent focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent/15"
           >
             <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
+              <rect x="4.75" y="4.75" width="14.5" height="14.5" rx="3.25" stroke="currentColor" strokeWidth="1.5" />
               <path
-                d="M4 7h16M4 12h16M4 17h16"
+                d={sidebarCollapsed ? "M10.5 8.5v7" : "M8.75 8.5v7"}
                 stroke="currentColor"
                 strokeWidth="1.8"
                 strokeLinecap="round"
+              />
+              <path
+                d={sidebarCollapsed ? "M13.75 12h3.25" : "M12 12h3.25"}
+                stroke="#2563EB"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+              <path
+                d={sidebarCollapsed ? "m15 9.5 2.25 2.5L15 14.5" : "m15.25 9.5-2.25 2.5 2.25 2.5"}
+                stroke="#2563EB"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M10.75 8.5h1"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+              <path
+                d="M10.75 15.5h1"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                opacity="0.65"
               />
             </svg>
           </button>

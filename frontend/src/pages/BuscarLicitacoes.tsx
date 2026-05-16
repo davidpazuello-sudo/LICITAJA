@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef } from "react";
 
 import { FiltrosBusca } from "../components/features/busca/FiltrosBusca";
 import { ResultadoBusca } from "../components/features/busca/ResultadoBusca";
-import { PageHeader } from "../components/layout/PageHeader";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
@@ -122,10 +121,6 @@ function BuscarLicitacoes() {
 
   return (
     <div className="h-full">
-      <PageHeader
-        title="Buscar Licitacoes"
-      />
-
       <div className="px-6 py-8 sm:px-8">
         <section className="space-y-5">
           <Card className="overflow-hidden">
