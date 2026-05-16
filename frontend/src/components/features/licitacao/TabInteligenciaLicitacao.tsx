@@ -42,9 +42,11 @@ function TabInteligenciaLicitacao({
           ) : null}
         </div>
 
-        <div className="rounded-[7px] border border-[#E2E6EF] bg-[#F5F7FB] px-[12px] py-[11px] text-[12px] leading-[1.7] text-[#5A6478]">
-          {resumoIA ?? ""}
-        </div>
+        {resumoIA ? (
+          <div className="mt-2 rounded-[7px] border border-[#E2E6EF] bg-[#F5F7FB] px-[12px] py-[11px] text-[12px] leading-[1.7] text-[#5A6478]">
+            {resumoIA}
+          </div>
+        ) : null}
       </section>
 
       <section className="rounded-[10px] border border-[#E2E6EF] bg-white p-4">
@@ -60,32 +62,30 @@ function TabInteligenciaLicitacao({
           </div>
         ) : null}
 
-        <div className="mb-3 space-y-3 rounded-[10px] border border-[#E2E6EF] bg-[#F5F7FB] p-4">
-          {chatStatus === "loading" ? <div className="text-[12px] text-[#5A6478]">Carregando historico do chat...</div> : null}
+        {(chatMessages.length > 0 || chatStatus === "loading") && (
+          <div className="mb-3 space-y-3 rounded-[10px] border border-[#E2E6EF] bg-[#F5F7FB] p-4">
+            {chatStatus === "loading" ? <div className="text-[12px] text-[#5A6478]">Carregando historico do chat...</div> : null}
 
-          {chatMessages.length === 0 && chatStatus !== "loading" ? (
-            <div className="text-[12px] text-[#5A6478]"></div>
-          ) : null}
+            {chatMessages.map((message) => {
+              const isUser = message.role === "user";
 
-          {chatMessages.map((message) => {
-            const isUser = message.role === "user";
-
-            return (
-              <div key={message.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-                <div
-                  className={`max-w-[85%] rounded-[10px] px-[12px] py-[10px] text-[12px] leading-[1.65] ${
-                    isUser ? "bg-[#2563EB] text-white" : "border border-[#E2E6EF] bg-white text-[#0F1724]"
-                  }`}
-                >
-                  <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.07em] opacity-80">
-                    {isUser ? "Voce" : "IA"}
+              return (
+                <div key={message.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+                  <div
+                    className={`max-w-[85%] rounded-[10px] px-[12px] py-[10px] text-[12px] leading-[1.65] ${
+                      isUser ? "bg-[#2563EB] text-white" : "border border-[#E2E6EF] bg-white text-[#0F1724]"
+                    }`}
+                  >
+                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.07em] opacity-80">
+                      {isUser ? "Voce" : "IA"}
+                    </div>
+                    <div className="whitespace-pre-line">{message.content}</div>
                   </div>
-                  <div className="whitespace-pre-line">{message.content}</div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
 
         <div className="space-y-3">
           <textarea
