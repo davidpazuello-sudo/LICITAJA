@@ -690,7 +690,7 @@ class IaService:
         try:
             parsed = json.loads(content)
             lista_itens = parsed.get("itens", [])
-            return [ItemExtraidoSchema(**item) for item in lista_itens]
+            return [ItemExtraidoSchema(**self._normalize_item_dict(item)) for item in lista_itens]
         except Exception as exc:  # noqa: BLE001
             raise ExtracaoItensError(f"Falha ao interpretar a resposta da IA como JSON: {exc}") from exc
 
@@ -722,7 +722,7 @@ class IaService:
         try:
             parsed = json.loads(content)
             lista_itens = parsed.get("itens", [])
-            return [ItemExtraidoSchema(**item) for item in lista_itens]
+            return [ItemExtraidoSchema(**self._normalize_item_dict(item)) for item in lista_itens]
         except Exception as exc:  # noqa: BLE001
             raise ExtracaoItensError(f"Falha ao interpretar a resposta da IA como JSON: {exc}") from exc
 
