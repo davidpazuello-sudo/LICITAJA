@@ -30,7 +30,7 @@ function ActionButton({
   danger?: boolean;
   disabled?: boolean;
 }) {
-  const className = `mb-[5px] flex w-full items-center gap-2 rounded-[7px] border px-[11px] py-[8px] text-left font-["DM_Sans"] text-[12.5px] font-medium ${
+  const className = `mb-[5px] flex w-full items-center gap-2 rounded-[7px] border px-[11px] py-[8px] text-left font-["Plus_Jakarta_Sans"] text-[12.5px] font-medium ${
     primary
       ? "border-[#2563EB] bg-[#2563EB] font-semibold text-white"
       : danger
@@ -130,7 +130,7 @@ function PainelLateralLicitacao({
     : "";
 
   return (
-    <aside className='h-full min-w-[268px] border-l border-[#E2E6EF] bg-white font-["DM_Sans"]'>
+    <aside className="h-full min-w-[268px] border-l border-[#E2E6EF] bg-white">
       <section className="border-b border-[#E2E6EF] px-[15px] py-[15px]">
         <div className="mb-[11px] text-[10px] font-semibold uppercase tracking-[0.07em] text-[#9AA3B5]">
           Acoes Rapidas

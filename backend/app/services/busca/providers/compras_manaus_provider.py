@@ -159,7 +159,7 @@ class ComprasManausProvider(SearchProvider):
     async def _load_summaries(self, query: SearchQuery) -> list[dict[str, str | None]]:
         categories = self._resolve_categories(query)
         summaries: list[dict[str, str | None]] = []
-        async with httpx.AsyncClient(timeout=25.0, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=45.0, follow_redirects=True) as client:
             for category in categories:
                 summaries.extend(await self._load_category_page(client, category, query))
         return summaries

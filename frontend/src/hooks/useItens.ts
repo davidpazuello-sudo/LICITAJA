@@ -10,8 +10,9 @@ import {
   pesquisarMercado,
   pesquisarTodosItens,
   uploadEdital,
+  obterPropostasPorItem,
 } from "../services/itens.service";
-import type { BackgroundJobType, ItemType } from "../types/item.types";
+import type { BackgroundJobType, ItemType, PropostasExtraidasPayloadType } from "../types/item.types";
 import type { EditalType, LicitacaoDetailType } from "../types/licitacao.types";
 
 type ItensStatus = "idle" | "loading" | "ready" | "error";
@@ -32,6 +33,7 @@ export function useItens(params: {
   const [isExtractingProposals, setIsExtractingProposals] = useState(false);
   const [searchingItemIds, setSearchingItemIds] = useState<number[]>([]);
   const [backgroundJob, setBackgroundJob] = useState<BackgroundJobType | null>(null);
+  const [propostasPayload, setPropostasPayload] = useState<PropostasExtraidasPayloadType | null>(null);
 
   const refreshItemsSilently = async (targetLicitacaoId: number) => {
     const response = await listarItens(targetLicitacaoId);
@@ -278,10 +280,31 @@ export function useItens(params: {
     }
   };
 
+  const carregarPropostas = async () => {
+    if (!licitacaoId) {
+      return;
+    }
+
+    setIsExtractingProposals(true);
+    try {
+      const payload = await obterPropostasPorItem(licitacaoId);
+      setPropostasPayload(payload);
+      setErrorMessage("");
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Nao foi possivel carregar as propostas agora.",
+      );
+    } finally {
+      setIsExtractingProposals(false);
+    }
+  };
+
   return {
     errorMessage,
     exportarTabela,
     exportarPropostas,
+    carregarPropostas,
+    propostasPayload,
     isExtracting,
     isExtractingProposals,
     isExporting,

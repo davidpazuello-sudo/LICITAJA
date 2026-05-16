@@ -16,7 +16,7 @@ from app.models.processamento_job import ProcessamentoJobModel
 from app.schemas.edital import EditalRead
 from app.schemas.job import JobRead
 from app.schemas.item import ItemListResponse, ItemRead
-from app.services.ia_service import ExtracaoItensError, IaService
+from app.services.ia_service import ExtracaoItensError, IaService, PropostasExtraidasPayload
 from app.services.job_service import criar_job_processamento, enriquecer_marcas_em_segundo_plano
 from app.services.pesquisa_service import PesquisaService
 from app.services.propostas_item_export_service import (
@@ -168,6 +168,22 @@ async def exportar_propostas_por_item(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers=headers,
     )
+
+
+@router.get("/licitacoes/{licitacao_id}/propostas-item", response_model=PropostasExtraidasPayload)
+async def obter_propostas_por_item(
+    licitacao_id: int,
+    db: Session = Depends(get_db_session),
+) -> PropostasExtraidasPayload:
+    licitacao = db.get(LicitacaoModel, licitacao_id)
+    if licitacao is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Licitacao nao encontrada.")
+
+    service = IaService(db)
+    try:
+        return await service.extrair_propostas_por_item(licitacao)
+    except ExtracaoItensError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.get("/itens/{item_id}", response_model=ItemRead)

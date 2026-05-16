@@ -73,3 +73,6 @@ export async function exportarTabelaItens(licitacaoId: number): Promise<Blob> {
 
   return response.blob();
 }
+export async function obterPropostasPorItem(licitacaoId: number): Promise<any> {
+  return apiRequest<any>(`/licitacoes/${licitacaoId}/propostas-item`);
+}

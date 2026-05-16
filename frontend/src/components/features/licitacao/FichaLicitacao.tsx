@@ -43,9 +43,9 @@ function FichaField({
     <div>
       <div className="mb-px text-[10px] font-medium uppercase tracking-[0.05em] text-[#9AA3B5]">{label}</div>
       <div
-        className={`leading-[1.4] text-[#0F1724] ${
-          mono ? 'font-["DM_Mono"] text-[11.5px]' : "text-[12.5px]"
-        } ${highlight ? "text-[15px] font-bold text-[#16A34A]" : ""}`}
+        className={`leading-[1.5] text-[#0F1724] ${
+          mono ? 'font-["DM_Mono"] text-[11px]' : "text-[12.5px]"
+        } ${highlight ? "text-[16px] font-bold text-[#16A34A]" : ""}`}
       >
         {value}
       </div>
@@ -121,14 +121,14 @@ function FichaLicitacao({ perfil }: { perfil: LicitacaoDetailType }) {
     .join(", ") || "Nao informado";
 
   return (
-    <aside className='h-full min-w-[264px] border-r border-[#E2E6EF] bg-white font-["DM_Sans"]'>
+    <aside className="h-full min-w-[264px] border-r border-[#E2E6EF] bg-white">
       <div className="border-b border-[#E2E6EF] px-[15px] pb-[15px] pt-[18px]">
         <div className="mb-[7px] inline-flex items-center gap-[5px] rounded-[20px] bg-[#FEF3C7] px-[8px] py-[2px] text-[10.5px] font-semibold text-[#D97706]">
           <span className="h-[5px] w-[5px] rounded-full bg-current" />
           Nova
         </div>
-        <div className="mb-[5px] text-[13.5px] font-semibold leading-[1.3] text-[#0F1724]">{perfil.orgao}</div>
-        <div className='font-["DM_Mono"] text-[10px] text-[#9AA3B5]'>{perfil.numero_controle}</div>
+        <div className="mb-[6px] text-[14px] font-semibold leading-[1.4] text-[#0F1724]">{perfil.orgao}</div>
+        <div className='font-["DM_Mono"] text-[10.5px] tracking-tight text-[#9AA3B5]'>{perfil.numero_controle}</div>
       </div>
 
       <FichaSection title="Sobre a Licitacao">

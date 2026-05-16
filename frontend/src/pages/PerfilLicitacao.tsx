@@ -45,6 +45,8 @@ function PerfilLicitacao() {
     enviarEdital,
     iniciarExtracao,
     pesquisarTodos,
+    carregarPropostas,
+    propostasPayload,
     status: itensStatus,
   } = useItens({
     licitacaoId,
@@ -77,7 +79,7 @@ function PerfilLicitacao() {
 
   return (
     <div className="h-full">
-      <div className='flex items-center gap-[8px] px-5 pt-6 text-[12px] font-medium text-[#9AA3B5] sm:px-6 lg:px-8 font-["DM_Sans"]'>
+      <div className='flex items-center gap-[8px] px-5 pt-6 text-[12px] font-medium text-[#9AA3B5] sm:px-6 lg:px-8 font-["Plus_Jakarta_Sans"]'>
         <Link to="/minhas-licitacoes" className="transition hover:text-accent">
           Minhas Licitacoes
         </Link>
@@ -159,6 +161,8 @@ function PerfilLicitacao() {
                   setChatDraft={setChatDraft}
                   enviarMensagem={enviarMensagem}
                   isSendingChat={isSendingChat}
+                  propostasPayload={propostasPayload}
+                  carregarPropostas={carregarPropostas}
                 />
               </div>
 

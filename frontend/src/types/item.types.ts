@@ -40,3 +40,24 @@ export interface ItemListResponseType {
   items: ItemType[];
   background_job?: BackgroundJobType | null;
 }
+export interface PropostaEmpresaType {
+  cnpj: string;
+  nome_empresa: string;
+  valor_unitario_ofertado: string | number;
+}
+
+export interface PropostaItemType {
+  numero_item: number;
+  descricao: string;
+  descricao_detalhada: string;
+  quantidade_solicitada: string | number;
+  valor_estimado_unitario: string | number;
+  propostas: PropostaEmpresaType[];
+  observacoes?: string | null;
+}
+
+export interface PropostasExtraidasPayloadType {
+  portal: string;
+  numero_processo: string;
+  itens: PropostaItemType[];
+}

@@ -28,7 +28,7 @@ function TabInteligenciaLicitacao({
       <section className="rounded-[10px] border border-[#E2E6EF] bg-white p-4">
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
-            <h2 className='text-[12.5px] font-semibold text-[#0F1724] font-["DM_Sans"]'>Resumo com IA</h2>
+            <h2 className='text-[12.5px] font-semibold text-[#0F1724] font-["Plus_Jakarta_Sans"]'>Resumo com IA</h2>
           </div>
           {!resumoIA ? (
             <button
@@ -50,7 +50,7 @@ function TabInteligenciaLicitacao({
       <section className="rounded-[10px] border border-[#E2E6EF] bg-white p-4">
         <div className="mb-4 flex items-center justify-between gap-4">
           <div>
-            <h2 className='text-[12.5px] font-semibold text-[#0F1724] font-["DM_Sans"]'>Chat da oportunidade</h2>
+            <h2 className='text-[12.5px] font-semibold text-[#0F1724] font-["Plus_Jakarta_Sans"]'>Chat da oportunidade</h2>
           </div>
         </div>
 

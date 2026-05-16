@@ -2,7 +2,7 @@ import { TabInteligenciaLicitacao } from "./TabInteligenciaLicitacao";
 import { TabItensLicitacao } from "./TabItensLicitacao";
 import { TabPropostasLicitacao } from "./TabPropostasLicitacao";
 import { TabVisaoGeralLicitacao } from "./TabVisaoGeralLicitacao";
-import type { BackgroundJobType, ItemType } from "../../../types/item.types";
+import type { BackgroundJobType, ItemType, PropostasExtraidasPayloadType } from "../../../types/item.types";
 import type { ChatMessageType } from "../../../types/chat.types";
 import type { EditalType, LicitacaoDetailType } from "../../../types/licitacao.types";
 
@@ -41,6 +41,8 @@ function WorkspaceLicitacao({
   setChatDraft,
   enviarMensagem,
   isSendingChat,
+  propostasPayload,
+  carregarPropostas,
 }: {
   activeTab: string;
   setActiveTab: (value: string) => void;
@@ -76,6 +78,8 @@ function WorkspaceLicitacao({
   setChatDraft: (value: string) => void;
   enviarMensagem: () => Promise<void>;
   isSendingChat: boolean;
+  propostasPayload: PropostasExtraidasPayloadType | null;
+  carregarPropostas: () => Promise<void>;
 }) {
   const tabs = [
     { id: "visao-geral", label: "Visao Geral" },
@@ -85,7 +89,7 @@ function WorkspaceLicitacao({
   ];
 
   return (
-    <main className='flex min-w-0 flex-1 flex-col overflow-hidden bg-[#EEF1F8] font-["DM_Sans"]'>
+    <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#EEF1F8]">
       <div className="flex shrink-0 border-b border-[#E2E6EF] bg-white px-[18px]">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
@@ -141,6 +145,8 @@ function WorkspaceLicitacao({
             canExtractProposalsByPortal={canExtractProposalsByPortal}
             isExtractingProposals={isExtractingProposals}
             onExportarPropostas={exportarPropostas}
+            propostasPayload={propostasPayload}
+            onCarregarPropostas={carregarPropostas}
           />
         ) : null}
 
