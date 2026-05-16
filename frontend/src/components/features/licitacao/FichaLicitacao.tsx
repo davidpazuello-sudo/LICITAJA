@@ -1,20 +1,59 @@
 import { useState, type ReactNode } from "react";
 
-import { Badge } from "../../ui/Badge";
-import { Card } from "../../ui/Card";
 import type { LicitacaoDetailType } from "../../../types/licitacao.types";
-import { formatCurrency, formatDateTime } from "../../../utils/formatters";
+import { formatCurrency } from "../../../utils/formatters";
 
-function SectionItem({ label, value }: { label: string; value: ReactNode }) {
+function formatMockDateTime(value: string | null | undefined) {
+  if (!value) {
+    return "Prazo nao informado";
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  const dayMonthYear = new Intl.DateTimeFormat("pt-BR", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(parsed);
+  const time = new Intl.DateTimeFormat("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+    .format(parsed)
+    .replace(":", "h");
+
+  return `${dayMonthYear} · ${time}`;
+}
+
+function FichaField({
+  label,
+  value,
+  mono = false,
+  highlight = false,
+}: {
+  label: string;
+  value: ReactNode;
+  mono?: boolean;
+  highlight?: boolean;
+}) {
   return (
-    <div className="space-y-1.5">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate/75">{label}</p>
-      <div className="text-sm leading-6 text-ink">{value}</div>
+    <div>
+      <div className="mb-px text-[10px] font-medium uppercase tracking-[0.05em] text-[#9AA3B5]">{label}</div>
+      <div
+        className={`leading-[1.4] text-[#0F1724] ${
+          mono ? 'font-["DM_Mono"] text-[11.5px]' : "text-[12.5px]"
+        } ${highlight ? "text-[15px] font-bold text-[#16A34A]" : ""}`}
+      >
+        {value}
+      </div>
     </div>
   );
 }
 
-function Section({
+function FichaSection({
   title,
   children,
   defaultOpen = true,
@@ -26,99 +65,95 @@ function Section({
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <div className="border-t border-line first:border-t-0">
+    <div className="border-b border-[#ECEEF5]">
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
-        className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
+        className="flex w-full items-center justify-between px-[15px] py-[10px] text-left"
       >
-        <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate/80">{title}</span>
+        <span className="text-[10px] font-semibold uppercase tracking-[0.07em] text-[#9AA3B5]">{title}</span>
         <svg
           viewBox="0 0 24 24"
           fill="none"
-          className={`h-4 w-4 text-slate transition ${open ? "rotate-180" : ""}`}
+          className={`h-3 w-3 text-[#9AA3B5] transition ${open ? "rotate-180" : ""}`}
           aria-hidden="true"
         >
           <path
-            d="m6 9 6 6 6-6"
+            d="M19 9 12 16 5 9"
             stroke="currentColor"
-            strokeWidth="1.8"
+            strokeWidth="2.5"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
         </svg>
       </button>
-      {open ? <div className="space-y-5 px-5 pb-5">{children}</div> : null}
+      {open ? <div className="flex flex-col gap-[9px] px-[15px] pb-[13px] pt-[3px]">{children}</div> : null}
     </div>
   );
 }
 
-function FichaLicitacao({
-  perfil,
-  statusMeta,
-}: {
-  perfil: LicitacaoDetailType;
-  statusMeta: { label: string; variant: "blue" | "green" | "amber" | "slate" };
-}) {
-  const local = [perfil.cidade, perfil.estado].filter(Boolean).join(" - ") || "Nao informado";
+function FichaLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className='mb-[5px] flex items-center gap-[7px] rounded-[7px] border border-[#E2E6EF] px-[10px] py-[8px] text-[12px] font-medium text-[#5A6478]'
+    >
+      <svg viewBox="0 0 24 24" fill="none" className="h-[13px] w-[13px] shrink-0 text-[#2563EB]" aria-hidden="true">
+        <path
+          d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+      {children}
+    </a>
+  );
+}
+
+function FichaLicitacao({ perfil }: { perfil: LicitacaoDetailType }) {
+  const localCurto = [perfil.cidade, perfil.estado].filter(Boolean).join(" - ") || "Nao informado";
+  const localEntrega = [perfil.cidade, perfil.estado === perfil.cidade ? null : perfil.estado]
+    .filter(Boolean)
+    .join(", ") || "Nao informado";
 
   return (
-    <Card className="overflow-hidden">
-      <div className="space-y-3 border-b border-line px-5 py-5">
-        <Badge variant={statusMeta.variant}>{statusMeta.label}</Badge>
-        <div className="space-y-2">
-          <h2 className="font-heading text-[1.8rem] font-extrabold leading-tight text-ink">
-            {perfil.orgao}
-          </h2>
-          <p className="text-sm text-slate">{perfil.numero_controle}</p>
+    <aside className='h-full min-w-[264px] border-r border-[#E2E6EF] bg-white font-["DM_Sans"]'>
+      <div className="border-b border-[#E2E6EF] px-[15px] pb-[15px] pt-[18px]">
+        <div className="mb-[7px] inline-flex items-center gap-[5px] rounded-[20px] bg-[#FEF3C7] px-[8px] py-[2px] text-[10.5px] font-semibold text-[#D97706]">
+          <span className="h-[5px] w-[5px] rounded-full bg-current" />
+          Nova
         </div>
+        <div className="mb-[5px] text-[13.5px] font-semibold leading-[1.3] text-[#0F1724]">{perfil.orgao}</div>
+        <div className='font-["DM_Mono"] text-[10px] text-[#9AA3B5]'>{perfil.numero_controle}</div>
       </div>
 
-      <Section title="Sobre a Licitacao" defaultOpen>
-        <SectionItem label="Objeto" value={perfil.objeto} />
-        <SectionItem label="Modalidade" value={perfil.modalidade ?? "Nao informada"} />
-        <SectionItem label="Portal / Fonte" value={perfil.fonte} />
-        <SectionItem label="UASG" value={perfil.uasg ?? "Nao informado"} />
-        <SectionItem label="Nº do processo" value={perfil.numero_processo ?? "Nao informado"} />
-      </Section>
+      <FichaSection title="Sobre a Licitacao">
+        <FichaField label="Objeto" value={perfil.objeto} />
+        <FichaField label="Modalidade" value={perfil.modalidade ?? "Nao informada"} />
+        <FichaField label="Portal / Fonte" value={perfil.fonte} />
+        <FichaField label="UASG" value={perfil.uasg ?? "Nao informado"} mono />
+        <FichaField label="Nº do Processo" value={perfil.numero_processo ?? "Nao informado"} mono />
+      </FichaSection>
 
-      <Section title="Datas e Valores" defaultOpen>
-        <SectionItem label="Data de abertura" value={formatDateTime(perfil.data_abertura)} />
-        <SectionItem label="Valor estimado" value={formatCurrency(perfil.valor_estimado)} />
-      </Section>
+      <FichaSection title="Datas e Valores">
+        <FichaField label="Data de Abertura" value={formatMockDateTime(perfil.data_abertura)} />
+        <FichaField label="Valor Estimado" value={formatCurrency(perfil.valor_estimado)} highlight />
+      </FichaSection>
 
-      <Section title="Local" defaultOpen>
-        <SectionItem label="Cidade / Estado" value={local} />
-        <SectionItem label="Local de entrega" value={local} />
-      </Section>
+      <FichaSection title="Local">
+        <FichaField label="Cidade / Estado" value={localCurto} />
+        <FichaField label="Local de Entrega" value={localEntrega} />
+      </FichaSection>
 
-      <Section title="Links" defaultOpen={false}>
-        <SectionItem
-          label="Ir para a plataforma"
-          value={
-            perfil.link_site ? (
-              <a href={perfil.link_site} target="_blank" rel="noreferrer" className="text-accent hover:text-accentDark">
-                Abrir link do portal
-              </a>
-            ) : (
-              "Nao informado"
-            )
-          }
-        />
-        <SectionItem
-          label="Baixar edital"
-          value={
-            perfil.link_edital ? (
-              <a href={perfil.link_edital} target="_blank" rel="noreferrer" className="text-accent hover:text-accentDark">
-                Abrir edital
-              </a>
-            ) : (
-              "Nao informado"
-            )
-          }
-        />
-      </Section>
-    </Card>
+      <FichaSection title="Links">
+        {perfil.link_site ? <FichaLink href={perfil.link_site}>Ir para a plataforma</FichaLink> : null}
+        {perfil.link_edital ? <FichaLink href={perfil.link_edital}>Baixar edital</FichaLink> : null}
+      </FichaSection>
+    </aside>
   );
 }
 

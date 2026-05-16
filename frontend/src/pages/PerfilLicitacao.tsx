@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { FichaLicitacao } from "../components/features/licitacao/FichaLicitacao";
@@ -9,14 +9,6 @@ import { Spinner } from "../components/ui/Spinner";
 import { useItens } from "../hooks/useItens";
 import { useLicitacaoChat } from "../hooks/useLicitacaoChat";
 import { usePerfilLicitacao } from "../hooks/usePerfilLicitacao";
-
-const STATUS_META: Record<string, { label: string; variant: "blue" | "green" | "amber" | "slate" }> = {
-  nova: { label: "Nova", variant: "blue" },
-  em_analise: { label: "Em analise", variant: "blue" },
-  itens_extraidos: { label: "Itens extraidos", variant: "green" },
-  fornecedores_encontrados: { label: "Fornecedores encontrados", variant: "green" },
-  concluida: { label: "Concluida", variant: "slate" },
-};
 
 function PerfilLicitacao() {
   const { id } = useParams();
@@ -52,10 +44,7 @@ function PerfilLicitacao() {
     resumo,
     enviarEdital,
     iniciarExtracao,
-    pesquisarItemPorId,
-    pesquisarMercadoPorId,
     pesquisarTodos,
-    searchingItemIds,
     status: itensStatus,
   } = useItens({
     licitacaoId,
@@ -72,24 +61,16 @@ function PerfilLicitacao() {
     status: chatStatus,
   } = useLicitacaoChat(licitacaoId);
 
-  const statusMeta = useMemo(() => {
-    if (!perfil) {
-      return STATUS_META.nova;
-    }
-
-    return STATUS_META[perfil.status] ?? STATUS_META.nova;
-  }, [perfil]);
-
-  const canExtractProposalsByPortal = useMemo(() => Boolean(perfil?.link_site), [perfil]);
+  const canExtractProposalsByPortal = Boolean(perfil?.link_site);
 
   return (
     <div className="h-full">
-      <div className="px-5 pt-6 text-sm font-medium text-slate sm:px-6 lg:px-8">
+      <div className='px-5 pt-6 text-[12px] font-medium text-[#9AA3B5] sm:px-6 lg:px-8 font-["DM_Sans"]'>
         <Link to="/minhas-licitacoes" className="transition hover:text-accent">
           Minhas Licitacoes
         </Link>
-        <span className="mx-2 text-slate/70">&gt;</span>
-        <span className="text-ink">{perfil ? perfil.orgao.slice(0, 64) : `Licitacao ${id ?? ""}`}</span>
+        <span className="mx-[5px] text-[#9AA3B5]">&gt;</span>
+        <span className="text-[#0F1724]">{perfil ? perfil.orgao.slice(0, 64) : `Licitacao ${id ?? ""}`}</span>
       </div>
 
       {status === "loading" ? (
@@ -124,9 +105,9 @@ function PerfilLicitacao() {
       {status === "success" && perfil ? (
         <>
           <div className="px-5 py-6 sm:px-6 lg:px-8">
-            <div className="grid gap-5 xl:grid-cols-[300px_minmax(0,1fr)_320px]">
+            <div className='grid overflow-hidden rounded-[10px] border border-[#E2E6EF] bg-white xl:grid-cols-[264px_minmax(0,1fr)_268px]'>
               <div>
-                <FichaLicitacao perfil={perfil} statusMeta={statusMeta} />
+                <FichaLicitacao perfil={perfil} />
               </div>
 
               <div className="min-w-0">
@@ -147,9 +128,6 @@ function PerfilLicitacao() {
                   isExporting={isExporting}
                   exportarTabela={exportarTabela}
                   iniciarExtracao={iniciarExtracao}
-                  pesquisarItemPorId={pesquisarItemPorId}
-                  pesquisarMercadoPorId={pesquisarMercadoPorId}
-                  searchingItemIds={searchingItemIds}
                   latestEdital={latestEdital}
                   perfil={perfil}
                   itensStatus={itensStatus}
@@ -175,15 +153,12 @@ function PerfilLicitacao() {
                 <PainelLateralLicitacao
                   perfil={perfil}
                   isRemoving={isRemoving}
-                  isGeneratingSummary={isGeneratingSummary}
-                  isExtracting={isExtracting}
-                  isSearchingAll={isSearchingAll}
                   totalItens={resumo.total}
                   pesquisados={resumo.pesquisados}
                   onOpenRemove={() => setShowRemoveModal(true)}
-                  onGerarResumoIA={gerarResumoIA}
                   onExtrairItens={iniciarExtracao}
                   onPesquisarTodos={pesquisarTodos}
+                  onOpenIA={() => setActiveTab("ia")}
                 />
               </div>
             </div>

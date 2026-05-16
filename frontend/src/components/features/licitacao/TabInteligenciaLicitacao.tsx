@@ -1,7 +1,3 @@
-import { Badge } from "../../ui/Badge";
-import { Button } from "../../ui/Button";
-import { Card } from "../../ui/Card";
-import { Spinner } from "../../ui/Spinner";
 import type { ChatMessageType } from "../../../types/chat.types";
 
 function TabInteligenciaLicitacao({
@@ -28,91 +24,98 @@ function TabInteligenciaLicitacao({
   isSendingChat: boolean;
 }) {
   return (
-    <div className="space-y-5">
-      <Card className="p-6">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h2 className="font-heading text-2xl font-extrabold text-ink">Resumo com IA</h2>
-            </div>
-            {resumoIA ? <Badge variant="green">Resumo salvo</Badge> : null}
+    <>
+      <section className="rounded-[10px] border border-[#E2E6EF] bg-white p-4">
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <div>
+            <h2 className='text-[12.5px] font-semibold text-[#0F1724] font-["DM_Sans"]'>Resumo com IA</h2>
+            <p className="mt-1 text-[12px] leading-[1.6] text-[#5A6478]">
+              Gere ou revise a leitura executiva desta oportunidade com o agente configurado.
+            </p>
           </div>
-
-          {resumoIA ? (
-            <div className="rounded-2xl border border-line bg-panel px-4 py-4">
-              <p className="whitespace-pre-line text-sm leading-7 text-ink">{resumoIA}</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="rounded-2xl border border-dashed border-line bg-panel/70 px-4 py-5 text-sm leading-7 text-slate">
-                Gere um resumo executivo desta oportunidade com a IA ativa. O resultado fica salvo e pode ser reutilizado depois.
-              </div>
-              <Button isLoading={isGeneratingSummary} onClick={onGerarResumoIA}>
-                Gerar resumo com IA
-              </Button>
-            </div>
-          )}
+          {!resumoIA ? (
+            <button
+              type="button"
+              onClick={() => void onGerarResumoIA()}
+              disabled={isGeneratingSummary}
+              className="inline-flex items-center gap-[5px] rounded-[7px] border border-[#2563EB] bg-[#2563EB] px-[12px] py-[7px] text-[12px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isGeneratingSummary ? "Gerando..." : "Gerar resumo"}
+            </button>
+          ) : null}
         </div>
-      </Card>
 
-      <Card className="p-6">
-        <div className="space-y-5">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h2 className="font-heading text-2xl font-extrabold text-ink">Chat IA da licitacao</h2>
-            </div>
-            <Badge variant="blue">{chatMessages.length} mensagens</Badge>
+        <div className="rounded-[7px] border border-[#E2E6EF] bg-[#F5F7FB] px-[12px] py-[11px] text-[12px] leading-[1.7] text-[#5A6478]">
+          {resumoIA ?? "Ainda nao existe resumo salvo desta oportunidade."}
+        </div>
+      </section>
+
+      <section className="rounded-[10px] border border-[#E2E6EF] bg-white p-4">
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <div>
+            <h2 className='text-[12.5px] font-semibold text-[#0F1724] font-["DM_Sans"]'>Chat da oportunidade</h2>
+            <p className="mt-1 text-[12px] leading-[1.6] text-[#5A6478]">
+              Converse com a IA sobre edital, riscos, estrategia e priorizacao dos itens.
+            </p>
           </div>
+          <div className="rounded-[20px] border border-[#E2E6EF] bg-[#F5F7FB] px-[11px] py-[5px] text-[12px] text-[#5A6478]">
+            {chatMessages.length} mensagens
+          </div>
+        </div>
 
-          {chatErrorMessage ? (
-            <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-              {chatErrorMessage}
-            </div>
+        {chatErrorMessage ? (
+          <div className="mb-3 rounded-[7px] border border-rose-100 bg-rose-50 px-4 py-3 text-[12px] text-rose-700">
+            {chatErrorMessage}
+          </div>
+        ) : null}
+
+        <div className="mb-3 space-y-3 rounded-[10px] border border-[#E2E6EF] bg-[#F5F7FB] p-4">
+          {chatStatus === "loading" ? <div className="text-[12px] text-[#5A6478]">Carregando historico do chat...</div> : null}
+
+          {chatMessages.length === 0 && chatStatus !== "loading" ? (
+            <div className="text-[12px] text-[#5A6478]">Nenhuma mensagem ainda. Comece pedindo um resumo, risco ou leitura comercial desta licitacao.</div>
           ) : null}
 
-          <div className="space-y-3 rounded-[28px] border border-line bg-panel/50 p-4">
-            {chatStatus === "loading" ? (
-              <div className="flex items-center gap-3 py-6">
-                <Spinner className="text-accent" />
-                <p className="text-sm text-slate">Carregando historico do chat...</p>
-              </div>
-            ) : null}
+          {chatMessages.map((message) => {
+            const isUser = message.role === "user";
 
-            {chatMessages.map((message) => {
-              const isUser = message.role === "user";
-              return (
-                <div key={message.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-                  <div
-                    className={`max-w-[85%] rounded-[24px] px-4 py-3 text-sm leading-7 ${
-                      isUser ? "bg-accent text-white" : "border border-line bg-white text-ink"
-                    }`}
-                  >
-                    <p className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] opacity-80">
-                      {isUser ? "Voce" : "IA"}
-                    </p>
-                    <p className="whitespace-pre-line">{message.content}</p>
+            return (
+              <div key={message.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+                <div
+                  className={`max-w-[85%] rounded-[10px] px-[12px] py-[10px] text-[12px] leading-[1.65] ${
+                    isUser ? "bg-[#2563EB] text-white" : "border border-[#E2E6EF] bg-white text-[#0F1724]"
+                  }`}
+                >
+                  <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.07em] opacity-80">
+                    {isUser ? "Voce" : "IA"}
                   </div>
+                  <div className="whitespace-pre-line">{message.content}</div>
                 </div>
-              );
-            })}
-          </div>
+              </div>
+            );
+          })}
+        </div>
 
-          <div className="space-y-3">
-            <textarea
-              value={chatDraft}
-              onChange={(event) => setChatDraft(event.target.value)}
-              placeholder="Digite sua pergunta sobre esta licitacao..."
-              className="min-h-[140px] w-full rounded-[24px] border border-line bg-white px-4 py-4 text-sm leading-7 text-ink outline-none transition focus:border-accent/40 focus:ring-4 focus:ring-accent/10"
-            />
-            <div className="flex justify-end">
-              <Button isLoading={isSendingChat} disabled={!chatDraft.trim()} onClick={enviarMensagem}>
-                Enviar pergunta
-              </Button>
-            </div>
+        <div className="space-y-3">
+          <textarea
+            value={chatDraft}
+            onChange={(event) => setChatDraft(event.target.value)}
+            placeholder="Digite sua pergunta sobre esta licitacao..."
+            className="min-h-[130px] w-full rounded-[7px] border border-[#E2E6EF] bg-white px-[12px] py-[11px] text-[12.5px] leading-[1.65] text-[#0F1724] outline-none transition focus:border-[#BFCFFE] focus:ring-4 focus:ring-[#EFF4FF]"
+          />
+          <div className="flex justify-end">
+            <button
+              type="button"
+              disabled={!chatDraft.trim() || isSendingChat}
+              onClick={() => void enviarMensagem()}
+              className="inline-flex items-center gap-[5px] rounded-[7px] border border-[#2563EB] bg-[#2563EB] px-[12px] py-[7px] text-[12px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isSendingChat ? "Enviando..." : "Enviar pergunta"}
+            </button>
           </div>
         </div>
-      </Card>
-    </div>
+      </section>
+    </>
   );
 }
 

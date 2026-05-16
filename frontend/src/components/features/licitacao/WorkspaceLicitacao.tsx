@@ -1,4 +1,3 @@
-import { Tabs } from "../../ui/Tabs";
 import { TabInteligenciaLicitacao } from "./TabInteligenciaLicitacao";
 import { TabItensLicitacao } from "./TabItensLicitacao";
 import { TabPropostasLicitacao } from "./TabPropostasLicitacao";
@@ -24,9 +23,6 @@ function WorkspaceLicitacao({
   isExporting,
   exportarTabela,
   iniciarExtracao,
-  pesquisarItemPorId,
-  pesquisarMercadoPorId,
-  searchingItemIds,
   latestEdital,
   perfil,
   itensStatus,
@@ -62,9 +58,6 @@ function WorkspaceLicitacao({
   isExporting: boolean;
   exportarTabela: () => Promise<void>;
   iniciarExtracao: () => Promise<void>;
-  pesquisarItemPorId: (itemId: number) => Promise<void>;
-  pesquisarMercadoPorId: (itemId: number) => Promise<void>;
-  searchingItemIds: number[];
   latestEdital: EditalType | null;
   perfil: LicitacaoDetailType;
   itensStatus: "idle" | "loading" | "ready" | "error";
@@ -86,71 +79,87 @@ function WorkspaceLicitacao({
 }) {
   const tabs = [
     { id: "visao-geral", label: "Visao Geral" },
-    { id: "itens", label: "Itens", count: items.length },
+    { id: "itens", label: "Itens" },
     { id: "propostas", label: "Propostas" },
     { id: "ia", label: "IA" },
   ];
 
   return (
-    <div className="space-y-5">
-      <Tabs items={tabs} activeTab={activeTab} onChange={setActiveTab} />
+    <main className='flex min-w-0 flex-1 flex-col overflow-hidden bg-[#EEF1F8] font-["DM_Sans"]'>
+      <div className="flex shrink-0 border-b border-[#E2E6EF] bg-white px-[18px]">
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.id;
 
-      {activeTab === "visao-geral" ? (
-        <TabVisaoGeralLicitacao
-          observacoes={observacoes}
-          onObservacoesChange={setObservacoes}
-          saveIndicator={saveIndicator}
-          editais={editais}
-          onUploadEdital={enviarEdital}
-          isUploading={isUploading}
-        />
-      ) : null}
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`mb-[-1px] border-b-2 px-[15px] pb-[10px] pt-[12px] text-[12.5px] font-medium ${
+                isActive ? "border-[#2563EB] font-semibold text-[#2563EB]" : "border-transparent text-[#9AA3B5]"
+              }`}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
 
-      {activeTab === "itens" ? (
-        <TabItensLicitacao
-          items={items}
-          resumo={resumo}
-          pesquisarTodos={pesquisarTodos}
-          isSearchingAll={isSearchingAll}
-          isExtracting={isExtracting}
-          isUploading={isUploading}
-          isExporting={isExporting}
-          exportarTabela={exportarTabela}
-          iniciarExtracao={iniciarExtracao}
-          pesquisarItemPorId={pesquisarItemPorId}
-          pesquisarMercadoPorId={pesquisarMercadoPorId}
-          searchingItemIds={searchingItemIds}
-          latestEdital={latestEdital}
-          perfil={perfil}
-          itensStatus={itensStatus}
-          itensErrorMessage={itensErrorMessage}
-          backgroundJob={backgroundJob}
-        />
-      ) : null}
+      <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-[18px]">
+        {activeTab === "visao-geral" ? (
+          <TabVisaoGeralLicitacao
+            observacoes={observacoes}
+            onObservacoesChange={setObservacoes}
+            saveIndicator={saveIndicator}
+            editais={editais}
+            onUploadEdital={enviarEdital}
+            isUploading={isUploading}
+          />
+        ) : null}
 
-      {activeTab === "propostas" ? (
-        <TabPropostasLicitacao
-          canExtractProposalsByPortal={canExtractProposalsByPortal}
-          isExtractingProposals={isExtractingProposals}
-          onExportarPropostas={exportarPropostas}
-        />
-      ) : null}
+        {activeTab === "itens" ? (
+          <TabItensLicitacao
+            items={items}
+            resumo={resumo}
+            pesquisarTodos={pesquisarTodos}
+            isSearchingAll={isSearchingAll}
+            isExtracting={isExtracting}
+            isUploading={isUploading}
+            isExporting={isExporting}
+            exportarTabela={exportarTabela}
+            iniciarExtracao={iniciarExtracao}
+            latestEdital={latestEdital}
+            perfil={perfil}
+            itensStatus={itensStatus}
+            itensErrorMessage={itensErrorMessage}
+            backgroundJob={backgroundJob}
+          />
+        ) : null}
 
-      {activeTab === "ia" ? (
-        <TabInteligenciaLicitacao
-          resumoIA={resumoIA}
-          isGeneratingSummary={isGeneratingSummary}
-          onGerarResumoIA={gerarResumoIA}
-          chatErrorMessage={chatErrorMessage}
-          chatStatus={chatStatus}
-          chatMessages={chatMessages}
-          chatDraft={chatDraft}
-          setChatDraft={setChatDraft}
-          enviarMensagem={enviarMensagem}
-          isSendingChat={isSendingChat}
-        />
-      ) : null}
-    </div>
+        {activeTab === "propostas" ? (
+          <TabPropostasLicitacao
+            canExtractProposalsByPortal={canExtractProposalsByPortal}
+            isExtractingProposals={isExtractingProposals}
+            onExportarPropostas={exportarPropostas}
+          />
+        ) : null}
+
+        {activeTab === "ia" ? (
+          <TabInteligenciaLicitacao
+            resumoIA={resumoIA}
+            isGeneratingSummary={isGeneratingSummary}
+            onGerarResumoIA={gerarResumoIA}
+            chatErrorMessage={chatErrorMessage}
+            chatStatus={chatStatus}
+            chatMessages={chatMessages}
+            chatDraft={chatDraft}
+            setChatDraft={setChatDraft}
+            enviarMensagem={enviarMensagem}
+            isSendingChat={isSendingChat}
+          />
+        ) : null}
+      </div>
+    </main>
   );
 }
 
