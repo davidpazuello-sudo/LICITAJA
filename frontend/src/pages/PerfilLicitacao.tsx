@@ -62,15 +62,28 @@ function PerfilLicitacao() {
   } = useLicitacaoChat(licitacaoId);
 
   const canExtractProposalsByPortal = Boolean(perfil?.link_site);
+  const isPageBusy =
+    status === "loading" ||
+    saveIndicator === "saving" ||
+    isGeneratingSummary ||
+    isRemoving ||
+    isExtracting ||
+    isExtractingProposals ||
+    isExporting ||
+    isSearchingAll ||
+    isUploading ||
+    chatStatus === "loading" ||
+    isSendingChat;
 
   return (
     <div className="h-full">
-      <div className='px-5 pt-6 text-[12px] font-medium text-[#9AA3B5] sm:px-6 lg:px-8 font-["DM_Sans"]'>
+      <div className='flex items-center gap-[8px] px-5 pt-6 text-[12px] font-medium text-[#9AA3B5] sm:px-6 lg:px-8 font-["DM_Sans"]'>
         <Link to="/minhas-licitacoes" className="transition hover:text-accent">
           Minhas Licitacoes
         </Link>
         <span className="mx-[5px] text-[#9AA3B5]">&gt;</span>
         <span className="text-[#0F1724]">{perfil ? perfil.orgao.slice(0, 64) : `Licitacao ${id ?? ""}`}</span>
+        {isPageBusy ? <Spinner size="sm" className="text-[#2563EB]" /> : null}
       </div>
 
       {status === "loading" ? (
