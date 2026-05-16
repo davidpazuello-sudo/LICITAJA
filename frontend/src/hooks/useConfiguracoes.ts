@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
+import { useAppNotifications } from "../contexts/AppNotificationsContext";
 import {
   createPortalIntegracao,
   getConfiguracaoIA,
@@ -26,6 +27,7 @@ type LoadStatus = "idle" | "loading" | "success" | "error";
 type SaveIndicator = "idle" | "saving" | "saved";
 
 export function usePncp() {
+  const { notifyError, notifySuccess } = useAppNotifications();
   const [config, setConfig] = useState<PncpConfig | null>(null);
   const [status, setStatus] = useState<LoadStatus>("idle");
   const [errorMessage, setErrorMessage] = useState("");
@@ -71,6 +73,25 @@ export function usePncp() {
       const updated = await updatePncpUrl(url);
       setConfig(updated);
       setTesteResult(null);
+      notifySuccess({
+        title: "Configuracao do PNCP salva",
+        message: "A URL base do PNCP foi atualizada com sucesso.",
+        action: {
+          label: "Abrir Configuracoes",
+          to: "/configuracoes",
+        },
+      });
+    } catch (error) {
+      notifyError({
+        title: "Falha ao salvar PNCP",
+        message:
+          error instanceof Error ? error.message : "Nao foi possivel salvar a configuracao do PNCP.",
+        action: {
+          label: "Abrir Configuracoes",
+          to: "/configuracoes",
+        },
+      });
+      throw error;
     } finally {
       setIsSavingUrl(false);
     }
@@ -81,7 +102,26 @@ export function usePncp() {
     try {
       const updated = await updatePncpStatus(nextStatus);
       setConfig(updated);
+      notifySuccess({
+        title: "Status do PNCP atualizado",
+        message: `A integracao PNCP foi marcada como ${nextStatus}.`,
+        action: {
+          label: "Abrir Configuracoes",
+          to: "/configuracoes",
+        },
+      });
       return updated;
+    } catch (error) {
+      notifyError({
+        title: "Falha ao atualizar PNCP",
+        message:
+          error instanceof Error ? error.message : "Nao foi possivel alterar o status do PNCP.",
+        action: {
+          label: "Abrir Configuracoes",
+          to: "/configuracoes",
+        },
+      });
+      throw error;
     } finally {
       setIsTogglingStatus(false);
     }
@@ -91,6 +131,7 @@ export function usePncp() {
 }
 
 export function useConfiguracaoIA() {
+  const { notifyError, notifySuccess } = useAppNotifications();
   const [config, setConfig] = useState<ConfiguracoesIA | null>(null);
   const [status, setStatus] = useState<LoadStatus>("idle");
   const [errorMessage, setErrorMessage] = useState("");
@@ -117,11 +158,27 @@ export function useConfiguracaoIA() {
       const updated = await updateConfiguracaoIAProvider(providerId, update);
       setConfig(updated);
       setProviderSaveIndicators((current) => ({ ...current, [providerId]: "saved" }));
+      notifySuccess({
+        title: "Provedor de IA salvo",
+        message: `As configuracoes do provedor ${providerId} foram atualizadas.`,
+        action: {
+          label: "Abrir Configuracoes",
+          to: "/configuracoes",
+        },
+      });
       window.setTimeout(() => {
         setProviderSaveIndicators((current) => ({ ...current, [providerId]: "idle" }));
       }, 2000);
     } catch (err) {
       setProviderSaveIndicators((current) => ({ ...current, [providerId]: "idle" }));
+      notifyError({
+        title: "Falha ao salvar provedor de IA",
+        message: err instanceof Error ? err.message : "Nao foi possivel salvar este provedor agora.",
+        action: {
+          label: "Abrir Configuracoes",
+          to: "/configuracoes",
+        },
+      });
       throw err;
     }
   };
@@ -132,11 +189,27 @@ export function useConfiguracaoIA() {
       const updated = await updateConfiguracaoIAAgent(agentId, update);
       setConfig(updated);
       setAgentSaveIndicators((current) => ({ ...current, [agentId]: "saved" }));
+      notifySuccess({
+        title: "Agente de IA salvo",
+        message: `As configuracoes do agente ${agentId} foram atualizadas.`,
+        action: {
+          label: "Abrir Configuracoes",
+          to: "/configuracoes",
+        },
+      });
       window.setTimeout(() => {
         setAgentSaveIndicators((current) => ({ ...current, [agentId]: "idle" }));
       }, 2000);
     } catch (err) {
       setAgentSaveIndicators((current) => ({ ...current, [agentId]: "idle" }));
+      notifyError({
+        title: "Falha ao salvar agente de IA",
+        message: err instanceof Error ? err.message : "Nao foi possivel salvar este agente agora.",
+        action: {
+          label: "Abrir Configuracoes",
+          to: "/configuracoes",
+        },
+      });
       throw err;
     }
   };
@@ -186,6 +259,7 @@ export function useConfiguracaoIA() {
 }
 
 export function usePortalIntegracoes() {
+  const { notifyError, notifySuccess } = useAppNotifications();
   const [items, setItems] = useState<PortalIntegracaoType[]>([]);
   const [status, setStatus] = useState<LoadStatus>("idle");
   const [errorMessage, setErrorMessage] = useState("");
@@ -210,7 +284,25 @@ export function usePortalIntegracoes() {
     try {
       const created = await createPortalIntegracao(body);
       setItems((current) => [created, ...current]);
+      notifySuccess({
+        title: "Integracao criada com sucesso",
+        message: `${created.nome} foi adicionada em Configuracoes.`,
+        action: {
+          label: "Abrir Configuracoes",
+          to: "/configuracoes",
+        },
+      });
       return created;
+    } catch (error) {
+      notifyError({
+        title: "Falha ao criar integracao",
+        message: error instanceof Error ? error.message : "Nao foi possivel criar a integracao agora.",
+        action: {
+          label: "Abrir Configuracoes",
+          to: "/configuracoes",
+        },
+      });
+      throw error;
     } finally {
       setIsCreating(false);
     }
@@ -221,7 +313,26 @@ export function usePortalIntegracoes() {
     try {
       const updated = await updatePortalIntegracaoStatus(portalId, nextStatus);
       setItems((current) => current.map((item) => (item.id === portalId ? updated : item)));
+      notifySuccess({
+        title: "Status da integracao atualizado",
+        message: `${updated.nome} foi marcada como ${nextStatus}.`,
+        action: {
+          label: "Abrir Configuracoes",
+          to: "/configuracoes",
+        },
+      });
       return updated;
+    } catch (error) {
+      notifyError({
+        title: "Falha ao atualizar integracao",
+        message:
+          error instanceof Error ? error.message : "Nao foi possivel atualizar esta integracao agora.",
+        action: {
+          label: "Abrir Configuracoes",
+          to: "/configuracoes",
+        },
+      });
+      throw error;
     } finally {
       setTogglingPortalId(null);
     }

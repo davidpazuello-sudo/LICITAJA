@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
+import { useAppNotifications } from "../contexts/AppNotificationsContext";
 import { excluirLicitacao, listarLicitacoes } from "../services/licitacoes.service";
 import type {
   LicitacoesListCountsType,
@@ -23,6 +24,7 @@ const EMPTY_RESPONSE: LicitacoesListResponseType = {
 type ListStatus = "loading" | "success" | "error";
 
 export function useLicitacoes() {
+  const { notifyError, notifySuccess } = useAppNotifications();
   const [statusFilter, setStatusFilter] = useState<MinhasLicitacoesStatusFilter>("todas");
   const [searchTerm, setSearchTerm] = useState("");
   const [response, setResponse] = useState<LicitacoesListResponseType>(EMPTY_RESPONSE);
@@ -71,6 +73,7 @@ export function useLicitacoes() {
 
   const removeLicitacao = async (licitacaoId: number) => {
     setRemovingIds((current) => [...current, licitacaoId]);
+    const licitacaoRemovida = response.items.find((item) => item.id === licitacaoId) ?? null;
 
     try {
       await excluirLicitacao(licitacaoId);
@@ -79,6 +82,27 @@ export function useLicitacoes() {
         q: searchTerm,
       });
       setResponse(refreshed);
+      notifySuccess({
+        title: "Licitacao removida com sucesso",
+        message: licitacaoRemovida
+          ? `${licitacaoRemovida.orgao} saiu de Minhas Licitacoes.`
+          : "A licitacao foi removida da sua lista.",
+        action: {
+          label: "Abrir Minhas Licitacoes",
+          to: "/minhas-licitacoes",
+        },
+      });
+    } catch (error) {
+      notifyError({
+        title: "Falha ao remover licitacao",
+        message:
+          error instanceof Error ? error.message : "Nao foi possivel remover esta licitacao agora.",
+        action: {
+          label: "Abrir Minhas Licitacoes",
+          to: "/minhas-licitacoes",
+        },
+      });
+      throw error;
     } finally {
       setRemovingIds((current) => current.filter((id) => id !== licitacaoId));
     }
@@ -113,4 +137,3 @@ export function useLicitacoes() {
     totalSaved: response.counts.todas,
   };
 }
-

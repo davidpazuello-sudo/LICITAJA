@@ -55,6 +55,7 @@ export interface BuscaInteligentePlanoType {
 }
 
 export interface BuscaLicitacaoItemType {
+  licitacao_salva_id?: number | null;
   numero_controle: string;
   numero_compra: string | null;
   sub_status: string | null;

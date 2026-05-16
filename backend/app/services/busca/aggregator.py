@@ -190,14 +190,19 @@ class BuscaAggregator:
         if not numero_controles:
             return
 
-        saved_ids = set(
-            self.db.scalars(
-                select(LicitacaoModel.numero_controle).where(LicitacaoModel.numero_controle.in_(numero_controles)),
-            ).all(),
-        )
+        saved_records = self.db.execute(
+            select(LicitacaoModel.id, LicitacaoModel.numero_controle).where(LicitacaoModel.numero_controle.in_(numero_controles)),
+        ).all()
+        saved_map = {
+            numero_controle: licitacao_id
+            for licitacao_id, numero_controle in saved_records
+            if numero_controle
+        }
 
         for item in items:
-            item.salva = item.numero_controle in saved_ids
+            licitacao_salva_id = saved_map.get(item.numero_controle)
+            item.salva = licitacao_salva_id is not None
+            item.licitacao_salva_id = licitacao_salva_id
 
     def _build_empty_response(
         self,

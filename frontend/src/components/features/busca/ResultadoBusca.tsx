@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 import type { BuscaLicitacaoItemType } from "../../../types/licitacao.types";
 import { MODALIDADE_BADGE_VARIANT } from "../../../utils/constants";
 import { formatCurrency, formatDate, formatDateTime } from "../../../utils/formatters";
@@ -52,6 +54,15 @@ function ResultadoBusca({ item, isSaving, onSave }: ResultadoBuscaProps) {
           >
             {item.salva ? "Salvo OK" : "Salvar em Minhas Licitacoes"}
           </Button>
+
+          {item.salva && item.licitacao_salva_id ? (
+            <Link
+              to={`/licitacoes/${item.licitacao_salva_id}`}
+              className="inline-flex items-center justify-center rounded-2xl border border-line bg-white px-4 py-3 text-sm font-semibold text-accent transition hover:border-accent/30 hover:text-accentDark"
+            >
+              Abrir perfil da licitacao
+            </Link>
+          ) : null}
 
           {item.link_site ? (
             <a

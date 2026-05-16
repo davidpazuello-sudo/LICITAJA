@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
+import { useAppNotifications } from "../contexts/AppNotificationsContext";
 import {
   exportarTabelaItens,
   exportarPropostasPorItem,
@@ -23,6 +24,7 @@ export function useItens(params: {
   onRefreshPerfil: () => Promise<void>;
 }) {
   const { licitacaoId, perfil, onRefreshPerfil } = params;
+  const { notifyError, notifySuccess } = useAppNotifications();
   const [items, setItems] = useState<ItemType[]>([]);
   const [status, setStatus] = useState<ItensStatus>("idle");
   const [errorMessage, setErrorMessage] = useState("");
@@ -127,10 +129,25 @@ export function useItens(params: {
       await uploadEdital(licitacaoId, arquivo);
       await onRefreshPerfil();
       setErrorMessage("");
+      notifySuccess({
+        title: "Edital enviado com sucesso",
+        message: `${arquivo.name} foi anexado a esta licitacao.`,
+        action: {
+          label: "Abrir perfil da licitacao",
+          to: `/licitacoes/${licitacaoId}`,
+        },
+      });
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Nao foi possivel enviar o edital agora.",
-      );
+      const message = error instanceof Error ? error.message : "Nao foi possivel enviar o edital agora.";
+      setErrorMessage(message);
+      notifyError({
+        title: "Falha ao enviar edital",
+        message,
+        action: {
+          label: "Abrir perfil da licitacao",
+          to: `/licitacoes/${licitacaoId}`,
+        },
+      });
     } finally {
       setIsUploading(false);
     }
@@ -151,11 +168,27 @@ export function useItens(params: {
       setErrorMessage("");
       await onRefreshPerfil();
       void pollBrandEnrichment(licitacaoId);
+      notifySuccess({
+        title: "Itens extraidos com sucesso",
+        message: `${response.items.length} item(ns) foram identificados no edital.`,
+        action: {
+          label: "Abrir perfil da licitacao",
+          to: `/licitacoes/${licitacaoId}`,
+        },
+      });
     } catch (error) {
       setStatus("error");
-      setErrorMessage(
-        error instanceof Error ? error.message : "Nao foi possivel extrair os itens do edital.",
-      );
+      const message =
+        error instanceof Error ? error.message : "Nao foi possivel extrair os itens do edital.";
+      setErrorMessage(message);
+      notifyError({
+        title: "Falha ao extrair itens",
+        message,
+        action: {
+          label: "Abrir perfil da licitacao",
+          to: `/licitacoes/${licitacaoId}`,
+        },
+      });
     } finally {
       setIsExtracting(false);
     }
@@ -219,10 +252,26 @@ export function useItens(params: {
       setItems(response.items);
       setErrorMessage("");
       await onRefreshPerfil();
+      notifySuccess({
+        title: "Pesquisa de itens concluida",
+        message: `${response.items.length} item(ns) foram processados nesta licitacao.`,
+        action: {
+          label: "Abrir perfil da licitacao",
+          to: `/licitacoes/${licitacaoId}`,
+        },
+      });
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Nao foi possivel pesquisar fornecedores para todos os itens.",
-      );
+      const message =
+        error instanceof Error ? error.message : "Nao foi possivel pesquisar fornecedores para todos os itens.";
+      setErrorMessage(message);
+      notifyError({
+        title: "Falha ao pesquisar todos os itens",
+        message,
+        action: {
+          label: "Abrir perfil da licitacao",
+          to: `/licitacoes/${licitacaoId}`,
+        },
+      });
     } finally {
       setIsSearchingAll(false);
     }
@@ -245,10 +294,26 @@ export function useItens(params: {
       anchor.remove();
       window.URL.revokeObjectURL(url);
       setErrorMessage("");
+      notifySuccess({
+        title: "Exportacao concluida",
+        message: "O download da tabela de itens foi iniciado com sucesso.",
+        action: {
+          label: "Abrir perfil da licitacao",
+          to: `/licitacoes/${licitacaoId}`,
+        },
+      });
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Nao foi possivel exportar a tabela de itens.",
-      );
+      const message =
+        error instanceof Error ? error.message : "Nao foi possivel exportar a tabela de itens.";
+      setErrorMessage(message);
+      notifyError({
+        title: "Falha ao exportar tabela de itens",
+        message,
+        action: {
+          label: "Abrir perfil da licitacao",
+          to: `/licitacoes/${licitacaoId}`,
+        },
+      });
     } finally {
       setIsExporting(false);
     }
@@ -271,10 +336,26 @@ export function useItens(params: {
       anchor.remove();
       window.URL.revokeObjectURL(url);
       setErrorMessage("");
+      notifySuccess({
+        title: "Propostas extraidas com sucesso",
+        message: "O download da planilha de propostas por item foi iniciado.",
+        action: {
+          label: "Abrir perfil da licitacao",
+          to: `/licitacoes/${licitacaoId}`,
+        },
+      });
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Nao foi possivel extrair as propostas por item.",
-      );
+      const message =
+        error instanceof Error ? error.message : "Nao foi possivel extrair as propostas por item.";
+      setErrorMessage(message);
+      notifyError({
+        title: "Falha ao extrair propostas",
+        message,
+        action: {
+          label: "Abrir perfil da licitacao",
+          to: `/licitacoes/${licitacaoId}`,
+        },
+      });
     } finally {
       setIsExtractingProposals(false);
     }
@@ -290,10 +371,26 @@ export function useItens(params: {
       const payload = await obterPropostasPorItem(licitacaoId);
       setPropostasPayload(payload);
       setErrorMessage("");
+      notifySuccess({
+        title: "Propostas carregadas com sucesso",
+        message: `${payload.itens.length} item(ns) tiveram propostas organizadas para analise.`,
+        action: {
+          label: "Abrir perfil da licitacao",
+          to: `/licitacoes/${licitacaoId}`,
+        },
+      });
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Nao foi possivel carregar as propostas agora.",
-      );
+      const message =
+        error instanceof Error ? error.message : "Nao foi possivel carregar as propostas agora.";
+      setErrorMessage(message);
+      notifyError({
+        title: "Falha ao carregar propostas",
+        message,
+        action: {
+          label: "Abrir perfil da licitacao",
+          to: `/licitacoes/${licitacaoId}`,
+        },
+      });
     } finally {
       setIsExtractingProposals(false);
     }

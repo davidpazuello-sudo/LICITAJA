@@ -201,8 +201,12 @@ function PerfilLicitacao() {
                     className="rounded-2xl bg-rose-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:opacity-60"
                     disabled={isRemoving}
                     onClick={async () => {
-                      await removePerfil();
-                      navigate("/minhas-licitacoes");
+                      try {
+                        await removePerfil();
+                        navigate("/minhas-licitacoes");
+                      } catch {
+                        return;
+                      }
                     }}
                   >
                     {isRemoving ? "Removendo..." : "Confirmar remocao"}

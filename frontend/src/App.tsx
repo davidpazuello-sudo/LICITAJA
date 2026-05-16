@@ -3,6 +3,7 @@ import { Navigate, Outlet, Route, BrowserRouter as Router, Routes, useLocation }
 
 import { Sidebar } from "./components/layout/Sidebar";
 import { TopNavigation } from "./components/layout/TopNavigation";
+import { AppNotificationsProvider } from "./contexts/AppNotificationsContext";
 import { AreaEmpresasDetalhe } from "./pages/AreaEmpresasDetalhe";
 import { AreasEmpresas } from "./pages/AreasEmpresas";
 import { BuscarLicitacoes } from "./pages/BuscarLicitacoes";
@@ -35,22 +36,24 @@ function AppShell() {
   const pageTitle = useMemo(() => resolvePageTitle(location.pathname), [location.pathname]);
 
   return (
-    <div className="h-screen overflow-hidden bg-app">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(47,111,237,0.15),_transparent_34%),radial-gradient(circle_at_bottom_left,_rgba(15,23,42,0.09),_transparent_28%)]" />
-      <div className="relative flex h-screen">
-        <Sidebar collapsed={sidebarCollapsed} />
-        <main className="flex-1 overflow-y-auto">
-          <div className="min-h-full bg-white/88 backdrop-blur">
-            <TopNavigation
-              pageTitle={pageTitle}
-              sidebarCollapsed={sidebarCollapsed}
-              onToggleSidebar={() => setSidebarCollapsed((current) => !current)}
-            />
-            <Outlet />
-          </div>
-        </main>
+    <AppNotificationsProvider>
+      <div className="h-screen overflow-hidden bg-app">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(47,111,237,0.15),_transparent_34%),radial-gradient(circle_at_bottom_left,_rgba(15,23,42,0.09),_transparent_28%)]" />
+        <div className="relative flex h-screen">
+          <Sidebar collapsed={sidebarCollapsed} />
+          <main className="flex-1 overflow-y-auto">
+            <div className="min-h-full bg-white/88 backdrop-blur">
+              <TopNavigation
+                pageTitle={pageTitle}
+                sidebarCollapsed={sidebarCollapsed}
+                onToggleSidebar={() => setSidebarCollapsed((current) => !current)}
+              />
+              <Outlet />
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
+    </AppNotificationsProvider>
   );
 }
 

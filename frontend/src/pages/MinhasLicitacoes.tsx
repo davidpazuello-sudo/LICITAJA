@@ -141,8 +141,12 @@ function MinhasLicitacoes() {
                 type="button"
                 className="rounded-2xl bg-rose-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-rose-700"
                 onClick={async () => {
-                  await removeLicitacao(pendingRemoval.id);
-                  setPendingRemoval(null);
+                  try {
+                    await removeLicitacao(pendingRemoval.id);
+                    setPendingRemoval(null);
+                  } catch {
+                    return;
+                  }
                 }}
               >
                 Confirmar remocao

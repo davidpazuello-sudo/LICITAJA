@@ -2,6 +2,7 @@ from pydantic import BaseModel
 
 
 class BuscaLicitacaoItem(BaseModel):
+    licitacao_salva_id: int | None = None
     numero_controle: str
     numero_compra: str | None = None
     sub_status: str | None = None

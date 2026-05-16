@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
+import { useAppNotifications } from "../contexts/AppNotificationsContext";
 import { buscarLicitacoes, buscarLicitacoesInteligente } from "../services/busca.service";
 import { salvarLicitacao } from "../services/licitacoes.service";
 import type {
@@ -44,6 +45,7 @@ const INITIAL_FILTERS: BuscaLicitacaoFilters = {
 type BuscaStatus = "idle" | "loading" | "success" | "error";
 
 export function useBusca() {
+  const { notifyError, notifySuccess } = useAppNotifications();
   const [filters, setFilters] = useState<BuscaLicitacaoFilters>(INITIAL_FILTERS);
   const [response, setResponse] = useState<BuscaLicitacoesResponseType>(EMPTY_RESPONSE);
   const [status, setStatus] = useState<BuscaStatus>("idle");
@@ -216,7 +218,7 @@ export function useBusca() {
     setSavingIds((current) => [...current, item.numero_controle]);
 
     try {
-      await salvarLicitacao({
+      const savedLicitacao = await salvarLicitacao({
         numero_controle: item.numero_controle,
         numero_processo: item.numero_processo,
         orgao: item.orgao,
@@ -238,16 +240,32 @@ export function useBusca() {
         ...current,
         items: current.items.map((currentItem) =>
           currentItem.numero_controle === item.numero_controle
-            ? { ...currentItem, salva: true }
+            ? { ...currentItem, salva: true, licitacao_salva_id: savedLicitacao.id }
             : currentItem,
         ),
       }));
+      notifySuccess({
+        title: "Licitacao salva com sucesso",
+        message: `${item.orgao} foi adicionada em Minhas Licitacoes.`,
+        action: {
+          label: "Abrir perfil da licitacao",
+          to: `/licitacoes/${savedLicitacao.id}`,
+        },
+      });
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
           : "Nao foi possivel salvar esta licitacao agora. Tente novamente.";
       setErrorMessage(message);
+      notifyError({
+        title: "Falha ao salvar licitacao",
+        message,
+        action: {
+          label: "Voltar para a busca",
+          to: "/buscar",
+        },
+      });
     } finally {
       setSavingIds((current) => current.filter((id) => id !== item.numero_controle));
     }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { useAppNotifications } from "../contexts/AppNotificationsContext";
 import {
   atualizarLicitacao,
   excluirLicitacao,
@@ -12,6 +13,7 @@ type PerfilStatus = "loading" | "success" | "error";
 type SaveIndicator = "idle" | "saving" | "saved";
 
 export function usePerfilLicitacao(licitacaoId: number | null) {
+  const { notifyError, notifySuccess } = useAppNotifications();
   const [perfil, setPerfil] = useState<LicitacaoDetailType | null>(null);
   const [status, setStatus] = useState<PerfilStatus>("loading");
   const [errorMessage, setErrorMessage] = useState("");
@@ -105,6 +107,25 @@ export function usePerfilLicitacao(licitacaoId: number | null) {
     setIsRemoving(true);
     try {
       await excluirLicitacao(perfil.id);
+      notifySuccess({
+        title: "Licitacao removida com sucesso",
+        message: `${perfil.orgao} saiu de Minhas Licitacoes.`,
+        action: {
+          label: "Abrir Minhas Licitacoes",
+          to: "/minhas-licitacoes",
+        },
+      });
+    } catch (error) {
+      notifyError({
+        title: "Falha ao remover licitacao",
+        message:
+          error instanceof Error ? error.message : "Nao foi possivel remover esta licitacao agora.",
+        action: {
+          label: "Voltar ao perfil",
+          to: perfil ? `/licitacoes/${perfil.id}` : "/minhas-licitacoes",
+        },
+      });
+      throw error;
     } finally {
       setIsRemoving(false);
     }
@@ -120,12 +141,28 @@ export function usePerfilLicitacao(licitacaoId: number | null) {
       const updated = await gerarResumoIALicitacao(perfil.id);
       setPerfil((current) => (current ? { ...current, ...updated } : current));
       setErrorMessage("");
+      notifySuccess({
+        title: "Resumo com IA concluido",
+        message: "A analise executiva da licitacao foi gerada com sucesso.",
+        action: {
+          label: "Abrir perfil da licitacao",
+          to: `/licitacoes/${perfil.id}`,
+        },
+      });
     } catch (error) {
-      setErrorMessage(
+      const message =
         error instanceof Error
           ? error.message
-          : "Nao foi possivel gerar o resumo com IA agora.",
-      );
+          : "Nao foi possivel gerar o resumo com IA agora.";
+      setErrorMessage(message);
+      notifyError({
+        title: "Falha ao gerar resumo com IA",
+        message,
+        action: {
+          label: "Abrir perfil da licitacao",
+          to: `/licitacoes/${perfil.id}`,
+        },
+      });
     } finally {
       setIsGeneratingSummary(false);
     }

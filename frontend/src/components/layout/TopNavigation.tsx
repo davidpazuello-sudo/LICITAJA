@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
+import { useAppNotifications } from "../../contexts/AppNotificationsContext";
 import { cn } from "../../utils/cn";
 
 interface TopNavigationProps {
@@ -11,6 +12,7 @@ interface TopNavigationProps {
 function TopNavigation({ pageTitle, sidebarCollapsed, onToggleSidebar }: TopNavigationProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const { clearNotifications, notificationCount } = useAppNotifications();
 
   useEffect(() => {
     if (searchOpen) {
@@ -91,9 +93,14 @@ function TopNavigation({ pageTitle, sidebarCollapsed, onToggleSidebar }: TopNavi
           <button
             type="button"
             aria-label="Notificacoes"
+            onClick={clearNotifications}
             className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-line bg-white text-slate transition hover:border-accent/30 hover:text-accent focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent/15"
           >
-            <span className="absolute right-3 top-3 h-2.5 w-2.5 rounded-full bg-accent" />
+            {notificationCount > 0 ? (
+              <span className='absolute -right-1 -top-1 inline-flex min-w-[20px] items-center justify-center rounded-full bg-accent px-1.5 py-0.5 font-["DM_Mono"] text-[10px] text-white'>
+                {notificationCount}
+              </span>
+            ) : null}
             <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
               <path
                 d="M15 17H5.5a1.5 1.5 0 0 1-1.2-2.4L6 12.4V10a6 6 0 1 1 12 0v2.4l1.7 2.2A1.5 1.5 0 0 1 18.5 17H15Zm0 0a3 3 0 1 1-6 0"
