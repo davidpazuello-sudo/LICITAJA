@@ -53,11 +53,20 @@ const navigationItems = [
   },
 ];
 
-function Sidebar() {
+interface SidebarProps {
+  collapsed?: boolean;
+}
+
+function Sidebar({ collapsed = false }: SidebarProps) {
   return (
-    <aside className="hidden h-screen w-[240px] shrink-0 border-r border-white/10 bg-[#1F2D57] px-4 py-5 text-white lg:flex lg:flex-col">
+    <aside
+      className={cn(
+        "hidden h-screen shrink-0 border-r border-white/10 bg-[#1F2D57] py-5 text-white transition-[width,padding] duration-300 lg:flex lg:flex-col",
+        collapsed ? "w-[86px] px-3" : "w-[240px] px-4",
+      )}
+    >
       <div>
-        <div className="flex items-center gap-2.5 px-2 py-2">
+        <div className={cn("flex items-center px-2 py-2", collapsed ? "justify-center" : "gap-2.5")}>
           <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-accent shadow-card">
             <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
               <path
@@ -69,7 +78,7 @@ function Sidebar() {
               />
             </svg>
           </div>
-          <div>
+          <div className={cn("min-w-0 transition-all duration-300", collapsed && "hidden")}>
             <p className="font-heading text-[1.65rem] font-extrabold leading-none tracking-tight">
               LicitaAI
             </p>
@@ -82,15 +91,17 @@ function Sidebar() {
             <NavLink
               key={item.to}
               to={item.to}
+              title={item.label}
               className={({ isActive }) =>
                 cn(
-                  "flex items-center gap-3 rounded-2xl px-3 py-2.5 text-[13px] font-medium text-white/70 transition duration-200 hover:bg-white/8 hover:text-white",
+                  "flex items-center rounded-2xl px-3 py-2.5 text-[13px] font-medium text-white/70 transition duration-200 hover:bg-white/8 hover:text-white",
+                  collapsed ? "justify-center" : "gap-3",
                   isActive && "bg-[#30457D] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]",
                 )
               }
             >
               <span className="shrink-0 scale-90">{item.icon}</span>
-              <span className="leading-5">{item.label}</span>
+              <span className={cn("leading-5 transition-all duration-300", collapsed && "hidden")}>{item.label}</span>
             </NavLink>
           ))}
         </nav>
@@ -99,9 +110,11 @@ function Sidebar() {
       <div className="mt-auto space-y-2">
         <NavLink
           to="/configuracoes"
+          title="Configuracoes"
           className={({ isActive }) =>
             cn(
-              "flex items-center gap-3 rounded-2xl px-3 py-2.5 text-[13px] font-medium text-white/70 transition duration-200 hover:bg-white/8 hover:text-white",
+              "flex items-center rounded-2xl px-3 py-2.5 text-[13px] font-medium text-white/70 transition duration-200 hover:bg-white/8 hover:text-white",
+              collapsed ? "justify-center" : "gap-3",
               isActive && "bg-[#30457D] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]",
             )
           }
@@ -116,15 +129,20 @@ function Sidebar() {
               stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
             />
           </svg>
-          <span>Configuracoes</span>
+          <span className={cn("transition-all duration-300", collapsed && "hidden")}>Configuracoes</span>
         </NavLink>
 
-        <div className="rounded-[22px] border border-white/8 bg-white/5 px-3 py-3.5">
-          <div className="flex items-center gap-3">
+        <div
+          className={cn(
+            "rounded-[22px] border border-white/8 bg-white/5 px-3 py-3.5 transition-all duration-300",
+            collapsed && "px-2.5 py-3",
+          )}
+        >
+          <div className={cn("flex items-center", collapsed ? "justify-center" : "gap-3")}>
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-xs font-semibold">
               CM
             </div>
-            <div>
+            <div className={cn("transition-all duration-300", collapsed && "hidden")}>
               <p className="text-[13px] font-semibold text-white">Carlos M.</p>
               <p className="text-xs text-sidebarMuted">Plano Pro</p>
             </div>
