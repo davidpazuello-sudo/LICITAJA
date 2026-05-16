@@ -29,9 +29,6 @@ function TabInteligenciaLicitacao({
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
             <h2 className='text-[12.5px] font-semibold text-[#0F1724] font-["DM_Sans"]'>Resumo com IA</h2>
-            <p className="mt-1 text-[12px] leading-[1.6] text-[#5A6478]">
-              Gere ou revise a leitura executiva desta oportunidade com o agente configurado.
-            </p>
           </div>
           {!resumoIA ? (
             <button
@@ -46,7 +43,7 @@ function TabInteligenciaLicitacao({
         </div>
 
         <div className="rounded-[7px] border border-[#E2E6EF] bg-[#F5F7FB] px-[12px] py-[11px] text-[12px] leading-[1.7] text-[#5A6478]">
-          {resumoIA ?? "Ainda nao existe resumo salvo desta oportunidade."}
+          {resumoIA ?? ""}
         </div>
       </section>
 
@@ -54,12 +51,6 @@ function TabInteligenciaLicitacao({
         <div className="mb-4 flex items-center justify-between gap-4">
           <div>
             <h2 className='text-[12.5px] font-semibold text-[#0F1724] font-["DM_Sans"]'>Chat da oportunidade</h2>
-            <p className="mt-1 text-[12px] leading-[1.6] text-[#5A6478]">
-              Converse com a IA sobre edital, riscos, estrategia e priorizacao dos itens.
-            </p>
-          </div>
-          <div className="rounded-[20px] border border-[#E2E6EF] bg-[#F5F7FB] px-[11px] py-[5px] text-[12px] text-[#5A6478]">
-            {chatMessages.length} mensagens
           </div>
         </div>
 
@@ -73,7 +64,7 @@ function TabInteligenciaLicitacao({
           {chatStatus === "loading" ? <div className="text-[12px] text-[#5A6478]">Carregando historico do chat...</div> : null}
 
           {chatMessages.length === 0 && chatStatus !== "loading" ? (
-            <div className="text-[12px] text-[#5A6478]">Nenhuma mensagem ainda. Comece pedindo um resumo, risco ou leitura comercial desta licitacao.</div>
+            <div className="text-[12px] text-[#5A6478]"></div>
           ) : null}
 
           {chatMessages.map((message) => {

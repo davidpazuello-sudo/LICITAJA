@@ -127,7 +127,7 @@ function PainelLateralLicitacao({
   const pesquisaCompleta = totalItens > 0 && pesquisados >= totalItens;
   const resumoCurto = perfil.resumo_ia
     ? perfil.resumo_ia.split("\n").join(" ").slice(0, 190)
-    : "Ainda nao existe resumo salvo desta oportunidade.";
+    : "";
 
   return (
     <aside className='h-full min-w-[268px] border-l border-[#E2E6EF] bg-white font-["DM_Sans"]'>
