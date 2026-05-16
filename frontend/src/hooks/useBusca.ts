@@ -47,6 +47,7 @@ type BuscaStatus = "idle" | "loading" | "success" | "error";
 export function useBusca() {
   const { notifyError, notifySuccess } = useAppNotifications();
   const [filters, setFilters] = useState<BuscaLicitacaoFilters>(INITIAL_FILTERS);
+  const [effectiveFilters, setEffectiveFilters] = useState<BuscaLicitacaoFilters>(INITIAL_FILTERS);
   const [response, setResponse] = useState<BuscaLicitacoesResponseType>(EMPTY_RESPONSE);
   const [status, setStatus] = useState<BuscaStatus>("idle");
   const [errorMessage, setErrorMessage] = useState<string>("");
@@ -76,6 +77,7 @@ export function useBusca() {
       }
 
       setResponse(result);
+      setEffectiveFilters(nextFilters);
       setStatus("success");
     } catch (error) {
       if (requestId !== requestIdRef.current) {
@@ -124,17 +126,15 @@ export function useBusca() {
       }
 
       setResponse(result);
+      const mergedFilters: BuscaLicitacaoFilters = {
+        ...nextFilters,
+        ...(result.plano_ia?.filtros_aplicados ?? {}),
+        buscar_por: objetivo,
+        portais: nextFilters.portais,
+        pagina: nextFilters.pagina ?? 1,
+      };
+      setEffectiveFilters(mergedFilters);
       setStatus("success");
-      if (result.plano_ia?.filtros_aplicados) {
-        skipNextEffectRef.current = true;
-        setFilters((current) => ({
-          ...current,
-          ...result.plano_ia!.filtros_aplicados,
-          buscar_por: objetivo,
-          portais: nextFilters.portais,
-          pagina: nextFilters.pagina ?? 1,
-        }));
-      }
     } catch (error) {
       if (requestId !== requestIdRef.current) {
         return;
@@ -274,6 +274,7 @@ export function useBusca() {
   return {
     errorMessage,
     filters,
+    effectiveFilters,
     hasSearched,
     response,
     savingIds,

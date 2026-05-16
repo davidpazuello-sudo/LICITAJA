@@ -2,7 +2,6 @@ import { useState } from "react";
 
 import { CardLicitacao } from "../components/features/licitacoes/CardLicitacao";
 import { FiltroStatus } from "../components/features/licitacoes/FiltroStatus";
-import { PageHeader } from "../components/layout/PageHeader";
 import { Card } from "../components/ui/Card";
 import { Input } from "../components/ui/Input";
 import { Spinner } from "../components/ui/Spinner";
@@ -42,10 +41,6 @@ function MinhasLicitacoes() {
 
   return (
     <div className="h-full">
-      <PageHeader
-        title="Minhas Licitacoes"
-      />
-
       <div className="space-y-6 px-6 py-8 sm:px-8">
         <FiltroStatus
           activeTab={statusFilter}

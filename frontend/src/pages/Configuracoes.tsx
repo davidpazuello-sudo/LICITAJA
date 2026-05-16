@@ -1027,11 +1027,6 @@ function Configuracoes() {
 
   return (
     <div className="h-full">
-      <div className="border-b border-line px-6 pb-5 pt-7 sm:px-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent/80">Sistema</p>
-        <h1 className="mt-1 font-heading text-2xl font-extrabold text-ink">Configuracoes</h1>
-      </div>
-
       <div className="space-y-6 px-6 py-8 sm:px-8">
         <Tabs items={configTabs} activeTab={activeTab} onChange={setActiveTab} />
         {activeTab === "portais" ? <TabPortais /> : <TabIA />}

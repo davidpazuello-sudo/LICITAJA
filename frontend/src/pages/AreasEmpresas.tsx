@@ -2,7 +2,6 @@ import { Link } from "react-router-dom";
 
 import { areasCatalog, slugifyArea } from "../data/areasEmpresas";
 import { useCompanyProfiles } from "../hooks/useCompanyProfiles";
-import { PageHeader } from "../components/layout/PageHeader";
 import { Badge } from "../components/ui/Badge";
 import { Card } from "../components/ui/Card";
 
@@ -18,18 +17,12 @@ function AreasEmpresas() {
 
   return (
     <div className="h-full">
-      <PageHeader
-        title="Areas e Empresas"
-        description=""
-        actions={
-          <div className="flex flex-wrap items-center gap-3">
-            <Badge variant="blue">{areasCatalog.length} areas mapeadas</Badge>
-            <Badge variant="slate">{companyProfiles.length} empresas na base</Badge>
-          </div>
-        }
-      />
-
       <div className="space-y-6 px-6 py-8 sm:px-8">
+        <div className="flex flex-wrap items-center gap-3">
+          <Badge variant="blue">{areasCatalog.length} areas mapeadas</Badge>
+          <Badge variant="slate">{companyProfiles.length} empresas na base</Badge>
+        </div>
+
         <section className="grid gap-4 xl:grid-cols-3">
           <Card className="bg-[linear-gradient(135deg,rgba(47,111,237,0.1),rgba(255,255,255,0.95))]">
             <div className="p-6">

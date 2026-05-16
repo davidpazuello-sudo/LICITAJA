@@ -88,7 +88,7 @@ function ResultadoBusca({ item, isSaving, onSave }: ResultadoBuscaProps) {
               to={`/licitacoes/${item.licitacao_salva_id}`}
               className="inline-flex h-9 items-center justify-center rounded-[12px] border-[1.5px] border-[#C7D9FA] px-4 text-[12.5px] font-semibold text-[#2F6FED] transition hover:border-[#2F6FED]/40 hover:text-[#2460D4]"
             >
-              Abrir perfil salvo
+              Ir para licitacao
             </Link>
           ) : null}
 
