@@ -18,49 +18,77 @@ function ResultadoBusca({ item, isSaving, onSave }: ResultadoBuscaProps) {
   const subStatusVariant = getSubStatusVariant(item.sub_status);
 
   return (
-    <Card className="overflow-hidden">
-      <div className="flex flex-col gap-6 p-6 lg:flex-row lg:items-start lg:justify-between">
-        <div className="space-y-5">
-          <div className="flex flex-wrap items-center gap-3">
-            <Badge variant={badgeVariant}>{item.modalidade ?? "Modalidade nao informada"}</Badge>
+    <Card className="overflow-hidden rounded-[20px] border border-[rgba(231,235,244,0.9)] shadow-[0_1px_4px_rgba(0,0,0,0.06),0_4px_16px_rgba(0,0,0,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_2px_8px_rgba(0,0,0,0.07),0_8px_28px_rgba(0,0,0,0.08)]">
+      <div className="flex flex-col overflow-hidden lg:flex-row">
+        <div className="flex-1 px-5 py-[18px]">
+          <div className="mb-[10px] flex flex-wrap items-center gap-2">
+            {item.modalidade ? <span className="rounded-[6px] bg-[#EEF4FF] px-[6px] py-[2px] font-['Manrope'] text-[10.5px] font-bold text-[#2F6FED]">{item.modalidade}</span> : null}
             {item.sub_status ? <Badge variant={subStatusVariant}>{item.sub_status}</Badge> : null}
-            <Badge variant="slate">Portal: {item.fonte}</Badge>
+            <span className="rounded-full border border-[#E7EBF4] px-2 py-[2px] text-[11px] font-medium text-[#6B7280]">
+              Portal: {item.fonte}
+            </span>
             {typeof item.score_inteligencia === "number" ? (
-              <Badge variant="blue">Fit IA: {item.score_inteligencia.toFixed(1)}</Badge>
+              <span className="rounded-full border border-[#FDE68A] bg-[#FFFBEB] px-2 py-[2px] text-[11px] font-semibold text-[#92400E]">
+                Fit IA: {item.score_inteligencia.toFixed(1)}
+              </span>
             ) : null}
-            <span className="text-sm font-medium text-slate">{item.orgao}</span>
+            <span className="text-[12px] font-medium text-[#6B7280]">{item.orgao}</span>
           </div>
 
-          <div className="space-y-2">
-            <h2 className="font-heading text-lg font-bold leading-snug text-ink">{item.objeto}</h2>
-            <p className="text-sm leading-7 text-slate">
-              {formatCurrency(item.valor_estimado)} - Abertura {formatDate(item.data_abertura)} - Encerramento{" "}
-              {formatDateTime(item.data_encerramento)}
+          <h2 className="mb-1 line-clamp-2 font-['Manrope'] text-[16px] font-bold leading-[1.35] text-[#111827]">
+            {item.objeto}
+          </h2>
+          <p className="text-[13px] font-medium text-[#6B7280]">{item.orgao}</p>
+
+          <hr className="my-3 border-0 border-t border-[rgba(231,235,244,0.8)]" />
+
+          <div className="flex flex-wrap gap-x-5 gap-y-2">
+            <p className="text-[12.5px] text-[#6B7280]">
+              <strong className="font-semibold text-[#111827]">{formatCurrency(item.valor_estimado)}</strong>
             </p>
-            <p className="text-sm text-slate">
+            <p className="text-[12.5px] text-[#6B7280]">
+              Abertura <strong className="font-semibold text-[#111827]">{formatDate(item.data_abertura)}</strong>
+            </p>
+            <p className="text-[12.5px] text-[#6B7280]">
+              Encerramento <strong className="font-semibold text-[#111827]">{formatDateTime(item.data_encerramento)}</strong>
+            </p>
+            <p className="text-[12.5px] text-[#6B7280]">
               {item.cidade ?? "Cidade nao informada"}
               {item.estado ? ` - ${item.estado}` : ""}
-              {item.numero_processo ? ` - Processo ${item.numero_processo}` : ""}
             </p>
+            {item.numero_processo ? (
+              <p className="text-[12.5px] text-[#6B7280]">
+                Processo <strong className="font-semibold text-[#111827]">{item.numero_processo}</strong>
+              </p>
+            ) : null}
+            {item.motivo_match ? (
+              <p className="basis-full text-[12px] text-[#9CA3AF]">
+                {item.motivo_match}
+              </p>
+            ) : null}
           </div>
         </div>
 
-        <div className="flex shrink-0 flex-col items-stretch gap-3 lg:min-w-[240px]">
-          <Button
-            variant={item.salva ? "secondary" : "primary"}
-            isLoading={isSaving}
-            disabled={item.salva}
+        <div className="flex min-w-[148px] flex-col justify-center gap-2 border-t border-[rgba(231,235,244,0.8)] px-4 py-[18px] lg:border-l lg:border-t-0">
+          <button
+            type="button"
+            disabled={item.salva || isSaving}
             onClick={() => onSave(item)}
+            className={`inline-flex h-9 items-center justify-center gap-[5px] rounded-[12px] font-['Plus_Jakarta_Sans'] text-[12.5px] font-semibold transition ${
+              item.salva
+                ? "border border-[#A7F3D0] bg-[#DCFCE7] text-[#16A34A]"
+                : "bg-[#2F6FED] text-white hover:bg-[#2460D4] disabled:cursor-not-allowed disabled:opacity-60"
+            }`}
           >
-            {item.salva ? "Salvo OK" : "Salvar em Minhas Licitacoes"}
-          </Button>
+            {isSaving ? "Salvando..." : item.salva ? "Salvo OK" : "Salvar em Minhas Licitacoes"}
+          </button>
 
           {item.salva && item.licitacao_salva_id ? (
             <Link
               to={`/licitacoes/${item.licitacao_salva_id}`}
-              className="inline-flex items-center justify-center rounded-2xl border border-line bg-white px-4 py-3 text-sm font-semibold text-accent transition hover:border-accent/30 hover:text-accentDark"
+              className="inline-flex h-9 items-center justify-center rounded-[12px] border-[1.5px] border-[#C7D9FA] px-4 text-[12.5px] font-semibold text-[#2F6FED] transition hover:border-[#2F6FED]/40 hover:text-[#2460D4]"
             >
-              Abrir perfil da licitacao
+              Abrir perfil salvo
             </Link>
           ) : null}
 
@@ -69,9 +97,9 @@ function ResultadoBusca({ item, isSaving, onSave }: ResultadoBuscaProps) {
               href={item.link_site}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center justify-center rounded-2xl border border-line px-4 py-3 text-sm font-semibold text-accent transition hover:border-accent/30 hover:text-accentDark"
+              className="inline-flex h-9 items-center justify-center rounded-[12px] border-[1.5px] border-[#C7D9FA] px-4 text-[12.5px] font-semibold text-[#2F6FED] transition hover:border-[#2F6FED]/40 hover:text-[#2460D4]"
             >
-              Abrir no portal de origem
+              Abrir no portal
             </a>
           ) : null}
         </div>

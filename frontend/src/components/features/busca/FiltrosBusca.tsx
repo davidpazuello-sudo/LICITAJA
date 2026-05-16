@@ -71,7 +71,7 @@ function InfoIcon() {
 }
 
 function FieldLabel(props: { children: string }) {
-  return <span className="text-xs font-semibold text-ink">{props.children}</span>;
+  return <span className="text-[12px] font-medium text-[#111827]">{props.children}</span>;
 }
 
 function TextField(props: {
@@ -97,7 +97,7 @@ function TextField(props: {
             if (event.key === "Enter") void onEnter();
           }}
           placeholder={placeholder}
-          className="h-11 w-full rounded-[14px] border-none bg-transparent px-4 text-[13px] text-ink outline-none placeholder:text-slate/90"
+          className="h-[50px] w-full rounded-[14px] border-none bg-transparent px-4 text-[13px] text-ink outline-none placeholder:text-[#9CA3AF]"
         />
       </div>
       {listId && options.length > 0 ? (
@@ -127,7 +127,7 @@ function SelectField(props: {
         <select
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className="h-11 w-full appearance-none rounded-[14px] border-none bg-transparent px-4 pr-12 text-[13px] text-ink outline-none"
+          className="h-[50px] w-full appearance-none rounded-[14px] border-none bg-transparent px-4 pr-12 text-[13px] text-ink outline-none"
         >
           <option value="">{placeholder}</option>
           {options.map((option) => (
@@ -165,7 +165,7 @@ function StatusOption(props: {
       type="button"
       onClick={onClick}
       className={cn(
-        "flex min-h-[50px] items-start gap-3 rounded-[16px] border px-4 py-3 text-left transition",
+        "flex min-h-[48px] items-start gap-3 rounded-[16px] border px-4 py-3 text-left transition",
         checked
           ? "border-accent bg-blue-50 text-ink shadow-sm"
           : "border-line bg-white text-ink hover:border-accent/35",
@@ -179,7 +179,7 @@ function StatusOption(props: {
       >
         <span className="h-3 w-3 rounded-full bg-current" />
       </span>
-      <span className="text-sm leading-6">{label}</span>
+      <span className="text-[13px] leading-6">{label}</span>
     </button>
   );
 }
@@ -291,52 +291,71 @@ function FiltrosBusca({
   };
 
   return (
-    <div className="space-y-5 p-6">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-end">
-        <div className="flex-1">
-          <TextField
-            label="Pesquisa inteligente"
-            value={filters.buscar_por}
-            placeholder="Descreva o que voce quer encontrar. Ex.: alimentos hospitalares no Amazonas"
-            onChange={(value) => onChange("buscar_por", value)}
-            onEnter={onSearch}
-          />
+    <div className="overflow-hidden rounded-[22px]">
+      <div className="border-b border-[#E7EBF4] bg-[linear-gradient(135deg,#E8F0FE_0%,#F4F6FB_60%,#EFF3FA_100%)] px-6 py-7">
+        <div className="mb-3 font-['Manrope'] text-[11.5px] font-semibold uppercase tracking-[0.1em] text-[#6B7280]">
+          Busca inteligente
         </div>
 
-        <div className="flex flex-wrap gap-3 xl:shrink-0">
-          <Button
-            type="button"
-            variant="outline"
-            className="min-w-[148px]"
-            onClick={() => setShowAdvancedFilters((value) => !value)}
-          >
-            <FilterIcon />
-            {showAdvancedFilters ? "Ocultar filtros" : "Filtros"}
-            {activeFiltersCount > 0 ? ` (${activeFiltersCount})` : ""}
-          </Button>
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+          <div className="flex h-[56px] flex-1 items-center gap-[10px] rounded-[14px] border-[1.5px] border-[#E7EBF4] bg-white px-[18px] shadow-[0_1px_6px_rgba(47,111,237,0.08)]">
+            <span className="shrink-0 text-[#6B7280]">
+              <SearchIcon />
+            </span>
+            <input
+              value={filters.buscar_por}
+              onChange={(event) => onChange("buscar_por", event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") void onSearch();
+              }}
+              placeholder="Descreva o que voce quer encontrar. Ex.: alimentos hospitalares no Amazonas"
+              className="w-full border-0 bg-transparent font-['Plus_Jakarta_Sans'] text-[14px] text-[#111827] outline-none placeholder:text-[#9CA3AF]"
+            />
+          </div>
 
-          <Button className="min-w-[140px]" size="lg" isLoading={isLoading} onClick={onSearch}>
-            <SearchIcon />
-            Pesquisar
-          </Button>
+          <div className="flex gap-[10px] xl:shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowAdvancedFilters((value) => !value)}
+              className="relative inline-flex h-[44px] items-center gap-[7px] rounded-[12px] border-[1.5px] border-[#E7EBF4] bg-white px-[18px] font-['Plus_Jakarta_Sans'] text-[13px] font-medium text-[#6B7280] transition hover:border-accent/35 hover:text-[#111827]"
+            >
+              <FilterIcon />
+              {showAdvancedFilters ? "Ocultar filtros" : "Filtros"}
+              {activeFiltersCount > 0 ? (
+                <span className="absolute -right-[5px] -top-[5px] inline-flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-[#2F6FED] px-1 font-['Manrope'] text-[10px] font-bold text-white">
+                  {activeFiltersCount}
+                </span>
+              ) : null}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void onSearch()}
+              disabled={isLoading}
+              className="inline-flex h-[44px] items-center gap-[7px] rounded-[12px] bg-[#2F6FED] px-[22px] font-['Manrope'] text-[14px] font-semibold text-white transition hover:bg-[#2460D4] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <SearchIcon />
+              {isLoading ? "Buscando..." : "Pesquisar"}
+            </button>
+          </div>
         </div>
       </div>
 
       <div
         className={cn(
-          "overflow-hidden rounded-[30px] border border-line/80 bg-panel/55 transition-all duration-300",
-          showAdvancedFilters ? "max-h-[2200px] opacity-100" : "max-h-0 border-transparent opacity-0",
+          "overflow-hidden border-t border-[#E7EBF4] bg-white transition-all duration-300",
+          showAdvancedFilters ? "max-h-[2200px] opacity-100" : "max-h-0 opacity-0",
         )}
       >
-        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-line/70 px-6 py-5">
+        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#E7EBF4] px-6 py-5">
           <div className="space-y-3">
             <div className="flex items-center gap-3">
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-ink shadow-sm">
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-[#F4F6FB] text-ink shadow-sm">
                 <FilterIcon />
               </span>
               <div>
-                <h3 className="font-heading text-lg font-extrabold text-ink">Filtros</h3>
-                <p className="text-xs text-slate">
+                <h3 className="font-['Manrope'] text-[18px] font-extrabold text-[#111827]">Filtros</h3>
+                <p className="text-[12px] text-[#6B7280]">
                   A IA interpreta a pesquisa principal e cruza isso com os filtros selecionados.
                 </p>
               </div>
@@ -358,7 +377,7 @@ function FiltrosBusca({
               </div>
             ) : null}
 
-            <div className="flex items-start gap-3 rounded-2xl border border-blue-100 bg-white/80 px-4 py-3 text-xs text-slate shadow-sm">
+            <div className="flex items-start gap-3 rounded-2xl border border-blue-100 bg-[#F8FBFF] px-4 py-3 text-[12px] text-[#6B7280] shadow-sm">
               <span className="mt-0.5 text-accent">
                 <InfoIcon />
               </span>
@@ -366,7 +385,7 @@ function FiltrosBusca({
             </div>
           </div>
 
-          <div className="rounded-full border border-blue-100 bg-white px-4 py-2 text-xs font-semibold text-accent shadow-sm">
+          <div className="rounded-full border border-blue-100 bg-white px-4 py-2 text-[12px] font-semibold text-accent shadow-sm">
             {activeFiltersCount} filtro{activeFiltersCount === 1 ? "" : "s"} ativo{activeFiltersCount === 1 ? "" : "s"}
           </div>
         </div>
@@ -490,11 +509,11 @@ function FiltrosBusca({
             ) : null}
           </div>
 
-          <div className="space-y-3 rounded-[22px] border border-line/70 bg-white/80 p-4 shadow-sm">
+          <div className="space-y-3 rounded-[18px] border border-[#E7EBF4] bg-[#F9FBFF] p-4 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold text-ink">Portais consultados</p>
-                <p className="text-xs text-slate">Selecione em quais fontes a busca integrada deve rodar.</p>
+                <p className="text-[12px] font-semibold text-ink">Portais consultados</p>
+                <p className="text-[12px] text-slate">Selecione em quais fontes a busca integrada deve rodar.</p>
               </div>
             </div>
 
@@ -510,16 +529,16 @@ function FiltrosBusca({
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-end gap-4 border-t border-line/70 pt-5">
+          <div className="flex flex-wrap items-center justify-end gap-4 border-t border-[#E7EBF4] pt-5">
             <button
               type="button"
               onClick={clearAdvancedFilters}
-              className="text-sm font-semibold text-accent transition hover:text-accentDark"
+              className="font-['Plus_Jakarta_Sans'] text-[13px] font-semibold text-accent transition hover:text-accentDark"
             >
               Limpar
             </button>
 
-            <Button className="min-w-[148px]" isLoading={isLoading} onClick={onSearch}>
+            <Button className="min-w-[148px] rounded-[12px] font-['Manrope']" isLoading={isLoading} onClick={onSearch}>
               <SearchIcon />
               Pesquisar
             </Button>
