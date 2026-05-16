@@ -26,6 +26,19 @@ export async function extrairItens(licitacaoId: number): Promise<ItemListRespons
   });
 }
 
+export async function exportarPropostasPorItem(licitacaoId: number): Promise<Blob> {
+  const response = await fetch(`${API_BASE_URL}/licitacoes/${licitacaoId}/propostas-item/exportar`, {
+    method: "POST",
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(detail || "Nao foi possivel exportar as propostas por item.");
+  }
+
+  return response.blob();
+}
+
 export async function obterItem(itemId: number): Promise<ItemType> {
   return apiRequest<ItemType>(`/itens/${itemId}`);
 }

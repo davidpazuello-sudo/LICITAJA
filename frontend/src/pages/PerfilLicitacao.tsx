@@ -45,9 +45,11 @@ function PerfilLicitacao() {
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const {
     errorMessage: itensErrorMessage,
+    exportarPropostas,
     exportarTabela,
     backgroundJob,
     isExtracting,
+    isExtractingProposals,
     isExporting,
     isSearchingAll,
     isUploading,
@@ -91,6 +93,8 @@ function PerfilLicitacao() {
 
     return Boolean(latestEdital || perfil.link_edital || perfil.link_site);
   }, [latestEdital, perfil]);
+
+  const canExtractProposalsByPortal = useMemo(() => Boolean(perfil?.link_site), [perfil]);
 
   const overviewItems = perfil
     ? [
@@ -302,8 +306,16 @@ function PerfilLicitacao() {
                         </Button>
                         <Button
                           variant="outline"
+                          isLoading={isExtractingProposals}
+                          disabled={!canExtractProposalsByPortal || isExtracting || isUploading}
+                          onClick={exportarPropostas}
+                        >
+                          Extrair propostas por item com IA
+                        </Button>
+                        <Button
+                          variant="outline"
                           isLoading={isExporting}
-                          disabled={items.length === 0 || isExtracting || isUploading}
+                          disabled={items.length === 0 || isExtracting || isUploading || isExtractingProposals}
                           onClick={exportarTabela}
                         >
                           Exportar tabela de itens
@@ -346,6 +358,12 @@ function PerfilLicitacao() {
                         Esta licitacao ainda nao tem um edital principal acessivel. Envie um PDF manualmente para habilitar a extracao com IA.
                       </div>
                     )}
+
+                    {!canExtractProposalsByPortal ? (
+                      <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                        A extracao de propostas por item depende do link publico da licitacao no portal. Nesta oportunidade esse link ainda nao esta disponivel.
+                      </div>
+                    ) : null}
 
                     {itensErrorMessage ? (
                       <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">

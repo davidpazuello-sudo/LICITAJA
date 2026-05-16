@@ -16,6 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.models.edital import EditalModel
 from app.models.item import ItemModel
 from app.models.licitacao import LicitacaoModel
 from app.services.ia_config_service import resolve_ai_agent_runtime_config
@@ -101,6 +102,32 @@ class ItensExtraidosWrapper(BaseModel):
     itens: list[ItemExtraidoSchema]
 
 
+class PropostaEmpresaSchema(BaseModel):
+    cnpj: str = "[NAO INFORMADO]"
+    nome_empresa: str = "[NAO INFORMADO]"
+    valor_unitario_ofertado: str | float | int = "[NAO INFORMADO]"
+
+
+class PropostaItemSchema(BaseModel):
+    numero_item: int
+    descricao: str
+    descricao_detalhada: str = "[NAO INFORMADO]"
+    quantidade_solicitada: str | float | int = "[NAO INFORMADO]"
+    valor_estimado_unitario: str | float | int = "[NAO INFORMADO]"
+    propostas: list[PropostaEmpresaSchema] = Field(default_factory=list)
+    observacoes: str | None = None
+
+
+class PropostasExtraidasPayload(BaseModel):
+    portal: str = "[NAO INFORMADO]"
+    numero_processo: str = "[NAO INFORMADO]"
+    itens: list[PropostaItemSchema]
+
+
+class PropostasExtraidasWrapper(BaseModel):
+    resultado: PropostasExtraidasPayload
+
+
 # Limite de caracteres para o texto do edital enviado a IA.
 # ~120k chars = aprox. 30k tokens — margem segura para todos os provedores suportados.
 _TEXTO_MAX_CHARS = 120_000
@@ -121,6 +148,14 @@ _PROVIDER_CHUNK_CONFIG = {
     "groq": {"max_chars": 6_000, "max_chunks": 4, "delay_seconds": 1.0},
     "anthropic": {"max_chars": 16_000, "max_chunks": 6, "delay_seconds": 0.5},
     "gemini": {"max_chars": _GEMINI_FREE_MAX_CHARS, "max_chunks": _GEMINI_FREE_MAX_CHUNKS, "delay_seconds": _GEMINI_CHUNK_DELAY_SECONDS},
+}
+
+_PROPOSTAS_CONTEXT_CONFIG = {
+    "openai": {"max_chars": 8_000, "max_chunks": 3},
+    "deepseek": {"max_chars": 6_000, "max_chunks": 3},
+    "groq": {"max_chars": 3_500, "max_chunks": 2},
+    "anthropic": {"max_chars": 8_000, "max_chunks": 3},
+    "gemini": {"max_chars": 5_000, "max_chunks": 3},
 }
 
 _CHAT_DOCUMENT_CHUNK_SIZE = 4_500
@@ -542,6 +577,27 @@ class IaService:
             return await self._generate_text_gemini(provider, prompt, _CHAT_SYSTEM_INSTRUCTION)
 
         raise ExtracaoItensError(f"IA ativa nao suportada: {provider['nome']}.")
+
+    async def extrair_propostas_por_item(self, licitacao: LicitacaoModel) -> PropostasExtraidasPayload:
+        if self.db is None:
+            raise ExtracaoItensError("Servico de IA sem acesso ao banco para extrair propostas por item.")
+
+        provider_id, provider = resolve_ai_agent_runtime_config(self.db, "propostas_item", self.settings)
+        if not provider["api_key"]:
+            raise ExtracaoItensError(
+                f"A chave da IA configurada para este agente ({provider['nome']}) nao esta disponivel."
+            )
+
+        contexto = await self._build_propostas_item_context(licitacao, provider_id)
+        prompt = self._build_propostas_item_prompt(provider["prompt_extracao"], contexto)
+        resultado = await self._extract_propostas_payload(provider_id, provider, prompt)
+        if not resultado.portal or resultado.portal == "[NAO INFORMADO]":
+            resultado.portal = str(licitacao.fonte or "[NAO INFORMADO]")
+        if not resultado.numero_processo or resultado.numero_processo == "[NAO INFORMADO]":
+            resultado.numero_processo = str(licitacao.numero_processo or licitacao.numero_controle or "[NAO INFORMADO]")
+        if not resultado.itens:
+            raise ExtracaoItensError("A IA nao conseguiu identificar itens com propostas nesta licitacao.")
+        return resultado
 
     async def gerar_texto_estruturado(self, prompt: str, system_instruction: str) -> str:
         if self.db is None:
@@ -977,6 +1033,267 @@ class IaService:
             raise ExtracaoItensError(f"A IA ativa ({provider_name}) nao retornou itens validos para este edital.")
 
         return parsed.root
+
+    async def _extract_propostas_payload(
+        self,
+        provider_id: str,
+        provider: dict[str, str],
+        prompt: str,
+    ) -> PropostasExtraidasPayload:
+        if provider_id == "openai":
+            return self._extract_propostas_with_openai(provider, prompt)
+        if provider_id == "deepseek":
+            return self._extract_propostas_with_openai_compatible(
+                provider,
+                prompt,
+                base_url="https://api.deepseek.com/v1",
+            )
+        if provider_id == "groq":
+            return self._extract_propostas_with_openai_compatible(
+                provider,
+                prompt,
+                base_url="https://api.groq.com/openai/v1",
+            )
+        if provider_id == "anthropic":
+            raw = await self._generate_text_anthropic(provider, prompt, _SYSTEM_INSTRUCTION)
+            return self._parse_propostas_payload_from_text(raw, provider["nome"])
+        if provider_id == "gemini":
+            raw = await self._generate_text_gemini(provider, prompt, _SYSTEM_INSTRUCTION)
+            return self._parse_propostas_payload_from_text(raw, provider["nome"])
+
+        raise ExtracaoItensError(f"IA ativa nao suportada: {provider['nome']}.")
+
+    def _extract_propostas_with_openai(self, provider: dict[str, str], prompt: str) -> PropostasExtraidasPayload:
+        client = OpenAI(api_key=provider["api_key"])
+        prompt_com_instrucao = (
+            prompt
+            + "\n\nIMPORTANTE: retorne um objeto JSON com a chave 'resultado', contendo portal, numero_processo e itens."
+        )
+
+        try:
+            response = client.responses.parse(
+                model=provider["modelo"],
+                input=[
+                    {"role": "system", "content": _SYSTEM_INSTRUCTION},
+                    {"role": "user", "content": prompt_com_instrucao},
+                ],
+                text_format=PropostasExtraidasWrapper,
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise ExtracaoItensError(f"Nao foi possivel extrair as propostas com {provider['nome']}: {exc}") from exc
+
+        parsed = response.output_parsed
+        if parsed is None or not parsed.resultado.itens:
+            raise ExtracaoItensError(f"A IA ativa ({provider['nome']}) nao retornou propostas validas.")
+        return parsed.resultado
+
+    def _extract_propostas_with_openai_compatible(
+        self,
+        provider: dict[str, str],
+        prompt: str,
+        *,
+        base_url: str,
+    ) -> PropostasExtraidasPayload:
+        client = OpenAI(api_key=provider["api_key"], base_url=base_url)
+        prompt_com_instrucao = (
+            prompt
+            + "\n\nIMPORTANTE: voce deve retornar EXCLUSIVAMENTE um objeto JSON valido com a chave 'resultado'."
+        )
+
+        try:
+            response = client.chat.completions.create(
+                model=provider["modelo"],
+                messages=[
+                    {"role": "system", "content": _SYSTEM_INSTRUCTION},
+                    {"role": "user", "content": prompt_com_instrucao},
+                ],
+                response_format={"type": "json_object"},
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise ExtracaoItensError(f"Nao foi possivel extrair as propostas com {provider['nome']}: {exc}") from exc
+
+        content = response.choices[0].message.content if response.choices else ""
+        if not content:
+            raise ExtracaoItensError(f"A IA ativa ({provider['nome']}) retornou uma resposta vazia.")
+        return self._parse_propostas_payload_from_text(content, provider["nome"])
+
+    def _parse_propostas_payload_from_text(self, raw_text: str, provider_name: str) -> PropostasExtraidasPayload:
+        cleaned = raw_text.strip()
+        if cleaned.startswith("```"):
+            cleaned = cleaned.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+
+        try:
+            payload = json.loads(cleaned)
+        except json.JSONDecodeError:
+            start = cleaned.find("{")
+            end = cleaned.rfind("}")
+            if start == -1 or end == -1:
+                start = cleaned.find("[")
+                end = cleaned.rfind("]")
+                if start == -1 or end == -1:
+                    raise ExtracaoItensError(
+                        f"A IA ativa ({provider_name}) nao retornou um JSON valido para propostas por item."
+                    ) from None
+                payload = json.loads(cleaned[start : end + 1])
+            else:
+                payload = json.loads(cleaned[start : end + 1])
+
+        if isinstance(payload, list):
+            payload = {"resultado": {"itens": payload}}
+        elif isinstance(payload, dict) and isinstance(payload.get("resultado"), list):
+            payload = {"resultado": {"itens": payload.get("resultado")}}
+
+        try:
+            parsed = PropostasExtraidasWrapper.model_validate(payload)
+        except Exception as exc:  # noqa: BLE001
+            raise ExtracaoItensError(
+                f"A IA ativa ({provider_name}) retornou propostas em formato inesperado: {exc}"
+            ) from exc
+
+        if not parsed.resultado.itens:
+            raise ExtracaoItensError(f"A IA ativa ({provider_name}) nao retornou itens validos com propostas.")
+        return parsed.resultado
+
+    async def _build_propostas_item_context(self, licitacao: LicitacaoModel, provider_id: str) -> str:
+        partes = [
+            "DADOS GERAIS DA LICITACAO",
+            f"Portal/Fonte: {licitacao.fonte}",
+            f"Orgao: {licitacao.orgao}",
+            f"Numero de controle: {licitacao.numero_controle}",
+            f"Numero do processo: {licitacao.numero_processo or '[NAO INFORMADO]'}",
+            f"Modalidade: {licitacao.modalidade or '[NAO INFORMADO]'}",
+            f"Objeto: {licitacao.objeto}",
+            f"Data de abertura: {licitacao.data_abertura or '[NAO INFORMADO]'}",
+            f"Link do portal: {licitacao.link_site or '[NAO INFORMADO]'}",
+            f"Link do edital: {licitacao.link_edital or '[NAO INFORMADO]'}",
+        ]
+
+        itens_existentes = self.db.scalars(
+            select(ItemModel)
+            .where(ItemModel.licitacao_id == licitacao.id)
+            .order_by(ItemModel.numero_item.asc(), ItemModel.id.asc())
+        ).all()
+        if itens_existentes:
+            partes.append("\nITENS JA EXTRAIDOS NO SISTEMA")
+            for item in itens_existentes[:40]:
+                quantidade = item.quantidade if item.quantidade is not None else "[NAO INFORMADO]"
+                unidade = item.unidade or ""
+                partes.append(
+                    f"- Item {item.numero_item}: {item.descricao} | Quantidade: {quantidade} {unidade}".strip()
+                )
+
+        texto_portal = await self._collect_portal_text_for_propostas(licitacao, itens_existentes)
+        if texto_portal:
+            partes.append("\nCONTEUDO COLETADO NO PORTAL")
+            partes.append(texto_portal)
+
+        texto_edital = await self._load_latest_edital_text_for_licitacao(licitacao)
+        if texto_edital:
+            partes.append("\nTEXTO DO EDITAL E ANEXOS")
+            partes.append(texto_edital)
+
+        contexto = "\n".join(parte for parte in partes if parte)
+        return self._compress_propostas_context(contexto, provider_id)
+
+    def _build_propostas_item_prompt(self, template: str, contexto: str) -> str:
+        return (
+            f"{template}\n\n"
+            "CONTEXTO DA LICITACAO E DAS FONTES COLETADAS:\n"
+            f"{contexto}"
+        )
+
+    async def _load_latest_edital_text_for_licitacao(self, licitacao: LicitacaoModel) -> str:
+        edital = self.db.scalar(
+            select(EditalModel)
+            .where(EditalModel.licitacao_id == licitacao.id)
+            .order_by(EditalModel.created_at.desc(), EditalModel.id.desc())
+        )
+
+        arquivo_path = edital.arquivo_path if edital and edital.arquivo_path else None
+        if not arquivo_path and licitacao.link_edital:
+            try:
+                arquivo_path, _ = await self.baixar_edital_principal(licitacao)
+            except ExtracaoItensError:
+                arquivo_path = None
+
+        if not arquivo_path:
+            return ""
+
+        try:
+            arquivo_bytes = self.storage.read_bytes(arquivo_path)
+        except StorageError:
+            return ""
+
+        texto = self._extrair_texto_pdf_bytes(arquivo_bytes)
+        if not texto.strip():
+            return ""
+        return await self._enriquecer_texto_com_anexos(arquivo_path, texto)
+
+    async def _collect_portal_text_for_propostas(
+        self,
+        licitacao: LicitacaoModel,
+        itens_existentes: list[ItemModel],
+    ) -> str:
+        if not licitacao.link_site:
+            return ""
+
+        urls: list[str] = [licitacao.link_site]
+        if "cnetmobile.estaleiro.serpro.gov.br" in licitacao.link_site or "compras.gov.br" in licitacao.link_site:
+            item_urls = self._build_compras_gov_item_urls(licitacao.link_site, itens_existentes)
+            urls.extend(item_urls[:20])
+
+        blocos: list[str] = []
+        for url in urls[:21]:
+            texto = await self._fetch_visible_text_from_url(url)
+            if texto:
+                blocos.append(f"[URL: {url}]\n{texto}")
+
+        return "\n\n".join(blocos)
+
+    def _build_compras_gov_item_urls(self, detail_url: str, itens_existentes: list[ItemModel]) -> list[str]:
+        parsed = urlparse(detail_url)
+        query = parse_qs(parsed.query)
+        compra = query.get("compra", [None])[0]
+        if not compra:
+            return []
+
+        base = detail_url.split("/acompanhamento-compra", 1)[0]
+        urls: list[str] = []
+        for item in itens_existentes:
+            urls.append(f"{base}/acompanhamento-compra/item/{item.numero_item}?compra={compra}")
+        return urls
+
+    async def _fetch_visible_text_from_url(self, url: str) -> str:
+        try:
+            async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+                response = await client.get(url, headers={"User-Agent": _WEB_BRAND_USER_AGENT})
+                response.raise_for_status()
+        except httpx.HTTPError:
+            return ""
+
+        return self._html_to_visible_text(response.text)
+
+    def _html_to_visible_text(self, html: str) -> str:
+        cleaned = re.sub(r"(?is)<script[^>]*>.*?</script>", " ", html)
+        cleaned = re.sub(r"(?is)<style[^>]*>.*?</style>", " ", cleaned)
+        cleaned = re.sub(r"(?is)<noscript[^>]*>.*?</noscript>", " ", cleaned)
+        cleaned = re.sub(r"(?i)<br\\s*/?>", "\n", cleaned)
+        cleaned = re.sub(r"(?i)</(p|div|tr|li|h1|h2|h3|h4|h5|h6|td|th)>", "\n", cleaned)
+        cleaned = re.sub(r"(?is)<[^>]+>", " ", cleaned)
+        cleaned = unescape(cleaned)
+        cleaned = cleaned.replace("\xa0", " ")
+        cleaned = re.sub(r"[ \t]+", " ", cleaned)
+        cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+        return cleaned.strip()
+
+    def _compress_propostas_context(self, contexto: str, provider_id: str) -> str:
+        config = _PROPOSTAS_CONTEXT_CONFIG.get(provider_id, {"max_chars": 5_000, "max_chunks": 3})
+        blocos = self._prepare_text_chunks(
+            contexto,
+            max_chars=int(config["max_chars"]),
+            max_chunks=int(config["max_chunks"]),
+        )
+        return "\n\n".join(blocos)
 
     def _build_prompt(self, template: str, texto_edital: str) -> str:
         if "{texto_edital}" in template:

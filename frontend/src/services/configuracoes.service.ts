@@ -31,6 +31,11 @@ const DEFAULT_IA_AGENTS = [
     nome: "Busca de fornecedores por item",
     descricao: "Busca fornecedores e fabricantes mais aderentes para cada item.",
   },
+  {
+    id: "propostas_item",
+    nome: "Extracao de propostas por item",
+    descricao: "Organiza os itens da licitacao e todas as propostas cadastradas por empresa em cada item.",
+  },
 ] as const;
 
 export async function getPncpConfig(): Promise<PncpConfig> {

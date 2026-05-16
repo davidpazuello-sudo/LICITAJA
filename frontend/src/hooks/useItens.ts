@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import {
   exportarTabelaItens,
+  exportarPropostasPorItem,
   extrairItens,
   listarItens,
   obterJobEnriquecimentoMarcas,
@@ -28,6 +29,7 @@ export function useItens(params: {
   const [isExtracting, setIsExtracting] = useState(false);
   const [isSearchingAll, setIsSearchingAll] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isExtractingProposals, setIsExtractingProposals] = useState(false);
   const [searchingItemIds, setSearchingItemIds] = useState<number[]>([]);
   const [backgroundJob, setBackgroundJob] = useState<BackgroundJobType | null>(null);
 
@@ -250,10 +252,38 @@ export function useItens(params: {
     }
   };
 
+  const exportarPropostas = async () => {
+    if (!licitacaoId) {
+      return;
+    }
+
+    setIsExtractingProposals(true);
+    try {
+      const blob = await exportarPropostasPorItem(licitacaoId);
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `licitacao_${licitacaoId}_propostas_item.xlsx`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(url);
+      setErrorMessage("");
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Nao foi possivel extrair as propostas por item.",
+      );
+    } finally {
+      setIsExtractingProposals(false);
+    }
+  };
+
   return {
     errorMessage,
     exportarTabela,
+    exportarPropostas,
     isExtracting,
+    isExtractingProposals,
     isExporting,
     isSearchingAll,
     isUploading,

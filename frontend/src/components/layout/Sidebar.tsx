@@ -55,11 +55,11 @@ const navigationItems = [
 
 function Sidebar() {
   return (
-    <aside className="hidden h-screen w-[290px] shrink-0 border-r border-white/10 bg-[#1F2D57] px-5 py-6 text-white lg:flex lg:flex-col">
+    <aside className="hidden h-screen w-[240px] shrink-0 border-r border-white/10 bg-[#1F2D57] px-4 py-5 text-white lg:flex lg:flex-col">
       <div>
-        <div className="flex items-center gap-3 px-3 py-2">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent shadow-card">
-            <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" aria-hidden="true">
+        <div className="flex items-center gap-2.5 px-2 py-2">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-accent shadow-card">
+            <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
               <path
                 d="m8 7 7 7m0 0H9m6 0V8"
                 stroke="white"
@@ -70,27 +70,27 @@ function Sidebar() {
             </svg>
           </div>
           <div>
-            <p className="font-heading text-[2rem] font-extrabold leading-none tracking-tight">
+            <p className="font-heading text-[1.65rem] font-extrabold leading-none tracking-tight">
               LicitaAI
             </p>
-            <p className="mt-1 text-sm text-sidebarMuted">Assistente de oportunidade</p>
+            <p className="mt-1 text-xs text-sidebarMuted">Assistente de oportunidade</p>
           </div>
         </div>
 
-        <nav className="mt-12 space-y-3">
+        <nav className="mt-10 space-y-2">
           {navigationItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               className={({ isActive }) =>
                 cn(
-                  "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-white/70 transition duration-200 hover:bg-white/8 hover:text-white",
+                  "flex items-center gap-3 rounded-2xl px-3 py-2.5 text-[13px] font-medium text-white/70 transition duration-200 hover:bg-white/8 hover:text-white",
                   isActive && "bg-[#30457D] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]",
                 )
               }
             >
-              <span className="shrink-0">{item.icon}</span>
-              <span>{item.label}</span>
+              <span className="shrink-0 scale-90">{item.icon}</span>
+              <span className="leading-5">{item.label}</span>
             </NavLink>
           ))}
         </nav>
@@ -101,7 +101,7 @@ function Sidebar() {
           to="/configuracoes"
           className={({ isActive }) =>
             cn(
-              "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-white/70 transition duration-200 hover:bg-white/8 hover:text-white",
+              "flex items-center gap-3 rounded-2xl px-3 py-2.5 text-[13px] font-medium text-white/70 transition duration-200 hover:bg-white/8 hover:text-white",
               isActive && "bg-[#30457D] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]",
             )
           }
@@ -119,14 +119,14 @@ function Sidebar() {
           <span>Configuracoes</span>
         </NavLink>
 
-        <div className="rounded-[24px] border border-white/8 bg-white/5 px-4 py-4">
+        <div className="rounded-[22px] border border-white/8 bg-white/5 px-3 py-3.5">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-sm font-semibold">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-xs font-semibold">
               CM
             </div>
             <div>
-              <p className="text-sm font-semibold text-white">Carlos M.</p>
-              <p className="text-sm text-sidebarMuted">Plano Pro</p>
+              <p className="text-[13px] font-semibold text-white">Carlos M.</p>
+              <p className="text-xs text-sidebarMuted">Plano Pro</p>
             </div>
           </div>
         </div>

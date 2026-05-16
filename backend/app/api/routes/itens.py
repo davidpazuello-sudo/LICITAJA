@@ -19,6 +19,10 @@ from app.schemas.item import ItemListResponse, ItemRead
 from app.services.ia_service import ExtracaoItensError, IaService
 from app.services.job_service import criar_job_processamento, enriquecer_marcas_em_segundo_plano
 from app.services.pesquisa_service import PesquisaService
+from app.services.propostas_item_export_service import (
+    build_propostas_item_filename,
+    build_propostas_item_workbook,
+)
 
 router = APIRouter(tags=["itens"])
 
@@ -132,6 +136,38 @@ async def exportar_tabela_itens(
     nome_arquivo = f"licitacao_{licitacao_id}_itens.csv"
     headers = {"Content-Disposition": f'attachment; filename="{nome_arquivo}"'}
     return StreamingResponse(iter([csv_buffer.getvalue()]), media_type="text/csv; charset=utf-8", headers=headers)
+
+
+@router.post("/licitacoes/{licitacao_id}/propostas-item/exportar")
+async def exportar_propostas_por_item(
+    licitacao_id: int,
+    db: Session = Depends(get_db_session),
+) -> StreamingResponse:
+    licitacao = db.get(LicitacaoModel, licitacao_id)
+    if licitacao is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Licitacao nao encontrada.")
+
+    service = IaService(db)
+    try:
+        resultado = await service.extrair_propostas_por_item(licitacao)
+    except ExtracaoItensError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    workbook_bytes = build_propostas_item_workbook(
+        portal_sigla=str(resultado.portal or licitacao.fonte or "portal"),
+        numero_processo=str(resultado.numero_processo or licitacao.numero_processo or licitacao.numero_controle),
+        items=[item.model_dump() for item in resultado.itens],
+    )
+    nome_arquivo = build_propostas_item_filename(
+        str(resultado.portal or licitacao.fonte or "portal"),
+        str(resultado.numero_processo or licitacao.numero_processo or licitacao.numero_controle),
+    )
+    headers = {"Content-Disposition": f'attachment; filename="{nome_arquivo}"'}
+    return StreamingResponse(
+        iter([workbook_bytes]),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers=headers,
+    )
 
 
 @router.get("/itens/{item_id}", response_model=ItemRead)
