@@ -19,7 +19,7 @@ function TopNavigation({ pageTitle, sidebarCollapsed, onToggleSidebar }: TopNavi
   }, [searchOpen]);
 
   return (
-    <header className="sticky top-0 z-30 border-b border-line bg-white/92 backdrop-blur">
+    <header className="sticky top-0 z-30 border-b border-line bg-[#F4F6FB]">
       <div className="flex h-16 items-center justify-between gap-4 px-5 sm:px-6 lg:px-8">
         <div className="flex min-w-0 items-center gap-3">
           <button
