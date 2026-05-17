@@ -82,12 +82,17 @@ export async function exportarTabelaItens(licitacaoId: number): Promise<Blob> {
   return response.blob();
 }
 
-export function obterUrlExportacaoItens(licitacaoId: number): string {
-  return buildAbsoluteApiUrl(`/licitacoes/${licitacaoId}/itens/exportar`);
-}
+export async function obterTabelaItensCsv(licitacaoId: number): Promise<string> {
+  const response = await fetch(buildAbsoluteApiUrl(`/licitacoes/${licitacaoId}/itens/exportar`), {
+    method: "GET",
+  });
 
-export function obterUrlVisualizacaoGoogleSheets(licitacaoId: number): string {
-  return `https://docs.google.com/gview?embedded=1&url=${encodeURIComponent(obterUrlExportacaoItens(licitacaoId))}`;
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(detail || "Nao foi possivel carregar a planilha de itens.");
+  }
+
+  return response.text();
 }
 export async function obterPropostasPorItem(licitacaoId: number): Promise<any> {
   return apiRequest<any>(`/licitacoes/${licitacaoId}/propostas-item`);

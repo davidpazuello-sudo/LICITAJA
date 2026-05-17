@@ -32,13 +32,16 @@ function PerfilLicitacao() {
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const {
     errorMessage: itensErrorMessage,
-    abrirVisualizacaoGoogleSheets,
+    abrirVisualizacaoPlanilha,
+    fecharVisualizacaoPlanilha,
     exportarPropostas,
     exportarTabela,
     backgroundJob,
     isExtracting,
     isExtractingProposals,
     isExporting,
+    isPreviewingSheet,
+    isSheetPreviewOpen,
     isSearchingAll,
     isUploading,
     items,
@@ -49,6 +52,9 @@ function PerfilLicitacao() {
     pesquisarTodos,
     carregarPropostas,
     propostasPayload,
+    sheetPreviewError,
+    sheetPreviewHeaders,
+    sheetPreviewRows,
     status: itensStatus,
   } = useItens({
     licitacaoId,
@@ -150,7 +156,13 @@ function PerfilLicitacao() {
                   itensStatus={itensStatus}
                   itensErrorMessage={itensErrorMessage || errorMessage}
                   backgroundJob={backgroundJob}
-                  onAbrirGoogleSheets={abrirVisualizacaoGoogleSheets}
+                  onAbrirVisualizacaoPlanilha={abrirVisualizacaoPlanilha}
+                  onFecharVisualizacaoPlanilha={fecharVisualizacaoPlanilha}
+                  isPreviewingSheet={isPreviewingSheet}
+                  isSheetPreviewOpen={isSheetPreviewOpen}
+                  sheetPreviewHeaders={sheetPreviewHeaders}
+                  sheetPreviewRows={sheetPreviewRows}
+                  sheetPreviewError={sheetPreviewError}
                   canExtractProposalsByPortal={canExtractProposalsByPortal}
                   isExtractingProposals={isExtractingProposals}
                   exportarPropostas={exportarPropostas}

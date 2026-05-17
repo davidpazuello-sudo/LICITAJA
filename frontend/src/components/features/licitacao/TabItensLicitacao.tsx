@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
+import { PlanilhaItensPreviewModal } from "./PlanilhaItensPreviewModal";
 import type { BackgroundJobType, ItemType } from "../../../types/item.types";
 import { cn } from "../../../utils/cn";
 import { formatCurrency } from "../../../utils/formatters";
@@ -383,7 +384,13 @@ function TabItensLicitacao({
   backgroundJob,
   editalStatus,
   perfilStatus,
-  onAbrirGoogleSheets,
+  onAbrirVisualizacaoPlanilha,
+  onFecharVisualizacaoPlanilha,
+  isPreviewingSheet,
+  isSheetPreviewOpen,
+  sheetPreviewHeaders,
+  sheetPreviewRows,
+  sheetPreviewError,
 }: {
   items: ItemType[];
   resumo: { total: number; aguardando: number; pesquisados: number };
@@ -392,7 +399,13 @@ function TabItensLicitacao({
   backgroundJob: BackgroundJobType | null;
   editalStatus: string | null;
   perfilStatus: string;
-  onAbrirGoogleSheets: () => void;
+  onAbrirVisualizacaoPlanilha: () => void;
+  onFecharVisualizacaoPlanilha: () => void;
+  isPreviewingSheet: boolean;
+  isSheetPreviewOpen: boolean;
+  sheetPreviewHeaders: string[];
+  sheetPreviewRows: string[][];
+  sheetPreviewError: string;
 }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
@@ -428,7 +441,7 @@ function TabItensLicitacao({
         <div className="mt-3">
           <button
             type="button"
-            onClick={onAbrirGoogleSheets}
+            onClick={onAbrirVisualizacaoPlanilha}
             className="inline-flex items-center gap-2 rounded-xl border border-[#D7E3FF] bg-[#EEF4FF] px-3 py-2 font-['Plus_Jakarta_Sans'] text-[12px] font-semibold text-[#2563EB] transition hover:border-[#BFD2FF] hover:bg-[#E6F0FF]"
           >
             <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
@@ -440,7 +453,7 @@ function TabItensLicitacao({
                 strokeLinejoin="round"
               />
             </svg>
-            Abrir visualizacao em Google Sheets
+            Abrir visualizacao da planilha
           </button>
         </div>
       </section>
@@ -516,6 +529,14 @@ function TabItensLicitacao({
         items={items}
         onClose={() => setModalOpen(false)}
         initialItemId={selectedItemId}
+      />
+      <PlanilhaItensPreviewModal
+        isOpen={isSheetPreviewOpen}
+        onClose={onFecharVisualizacaoPlanilha}
+        isLoading={isPreviewingSheet}
+        headers={sheetPreviewHeaders}
+        rows={sheetPreviewRows}
+        errorMessage={sheetPreviewError}
       />
     </>
   );

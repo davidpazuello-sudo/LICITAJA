@@ -28,7 +28,13 @@ function WorkspaceLicitacao({
   itensStatus,
   itensErrorMessage,
   backgroundJob,
-  onAbrirGoogleSheets,
+  onAbrirVisualizacaoPlanilha,
+  onFecharVisualizacaoPlanilha,
+  isPreviewingSheet,
+  isSheetPreviewOpen,
+  sheetPreviewHeaders,
+  sheetPreviewRows,
+  sheetPreviewError,
   canExtractProposalsByPortal,
   isExtractingProposals,
   exportarPropostas,
@@ -66,7 +72,13 @@ function WorkspaceLicitacao({
   itensStatus: "idle" | "loading" | "ready" | "error";
   itensErrorMessage: string;
   backgroundJob: BackgroundJobType | null;
-  onAbrirGoogleSheets: () => void;
+  onAbrirVisualizacaoPlanilha: () => void;
+  onFecharVisualizacaoPlanilha: () => void;
+  isPreviewingSheet: boolean;
+  isSheetPreviewOpen: boolean;
+  sheetPreviewHeaders: string[];
+  sheetPreviewRows: string[][];
+  sheetPreviewError: string;
   canExtractProposalsByPortal: boolean;
   isExtractingProposals: boolean;
   exportarPropostas: () => Promise<void>;
@@ -132,7 +144,13 @@ function WorkspaceLicitacao({
             backgroundJob={backgroundJob}
             editalStatus={latestEdital?.status_extracao ?? null}
             perfilStatus={perfil.status}
-            onAbrirGoogleSheets={onAbrirGoogleSheets}
+            onAbrirVisualizacaoPlanilha={onAbrirVisualizacaoPlanilha}
+            onFecharVisualizacaoPlanilha={onFecharVisualizacaoPlanilha}
+            isPreviewingSheet={isPreviewingSheet}
+            isSheetPreviewOpen={isSheetPreviewOpen}
+            sheetPreviewHeaders={sheetPreviewHeaders}
+            sheetPreviewRows={sheetPreviewRows}
+            sheetPreviewError={sheetPreviewError}
           />
         ) : null}
 

@@ -6,9 +6,9 @@ import {
   exportarPropostasPorItem,
   extrairItens,
   listarItens,
-  obterUrlVisualizacaoGoogleSheets,
   obterJobAutoPipeline,
   obterJobEnriquecimentoMarcas,
+  obterTabelaItensCsv,
   pesquisarItem,
   pesquisarMercado,
   pesquisarTodosItens,
@@ -19,6 +19,58 @@ import type { BackgroundJobType, ItemType, PropostasExtraidasPayloadType } from 
 import type { EditalType, LicitacaoDetailType } from "../types/licitacao.types";
 
 type ItensStatus = "idle" | "loading" | "ready" | "error";
+
+function parseCsvRows(csvText: string): string[][] {
+  const rows: string[][] = [];
+  let currentRow: string[] = [];
+  let currentCell = "";
+  let insideQuotes = false;
+
+  for (let index = 0; index < csvText.length; index += 1) {
+    const char = csvText[index];
+    const nextChar = csvText[index + 1];
+
+    if (char === '"') {
+      if (insideQuotes && nextChar === '"') {
+        currentCell += '"';
+        index += 1;
+      } else {
+        insideQuotes = !insideQuotes;
+      }
+      continue;
+    }
+
+    if (char === ";" && !insideQuotes) {
+      currentRow.push(currentCell);
+      currentCell = "";
+      continue;
+    }
+
+    if ((char === "\n" || char === "\r") && !insideQuotes) {
+      if (char === "\r" && nextChar === "\n") {
+        index += 1;
+      }
+      currentRow.push(currentCell);
+      currentCell = "";
+      if (currentRow.some((value) => value !== "")) {
+        rows.push(currentRow);
+      }
+      currentRow = [];
+      continue;
+    }
+
+    currentCell += char;
+  }
+
+  if (currentCell.length > 0 || currentRow.length > 0) {
+    currentRow.push(currentCell);
+    if (currentRow.some((value) => value !== "")) {
+      rows.push(currentRow);
+    }
+  }
+
+  return rows;
+}
 
 export function useItens(params: {
   licitacaoId: number | null;
@@ -35,6 +87,11 @@ export function useItens(params: {
   const [isSearchingAll, setIsSearchingAll] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isExtractingProposals, setIsExtractingProposals] = useState(false);
+  const [isPreviewingSheet, setIsPreviewingSheet] = useState(false);
+  const [isSheetPreviewOpen, setIsSheetPreviewOpen] = useState(false);
+  const [sheetPreviewHeaders, setSheetPreviewHeaders] = useState<string[]>([]);
+  const [sheetPreviewRows, setSheetPreviewRows] = useState<string[][]>([]);
+  const [sheetPreviewError, setSheetPreviewError] = useState("");
   const [searchingItemIds, setSearchingItemIds] = useState<number[]>([]);
   const [backgroundJob, setBackgroundJob] = useState<BackgroundJobType | null>(null);
   const [propostasPayload, setPropostasPayload] = useState<PropostasExtraidasPayloadType | null>(null);
@@ -377,34 +434,51 @@ export function useItens(params: {
     }
   };
 
-  const abrirVisualizacaoGoogleSheets = () => {
+  const abrirVisualizacaoPlanilha = async () => {
     if (!licitacaoId) {
       return;
     }
 
-    const targetUrl = obterUrlVisualizacaoGoogleSheets(licitacaoId);
-    const openedWindow = window.open(targetUrl, "_blank", "noopener,noreferrer");
+    setIsPreviewingSheet(true);
+    setIsSheetPreviewOpen(true);
+    setSheetPreviewError("");
 
-    if (!openedWindow) {
-      notifyError({
-        title: "Nao foi possivel abrir a visualizacao",
-        message: "O navegador bloqueou a nova aba da planilha. Tente liberar popups para este site.",
+    try {
+      const csvText = await obterTabelaItensCsv(licitacaoId);
+      const rows = parseCsvRows(csvText);
+      const [headers = [], ...dataRows] = rows;
+
+      setSheetPreviewHeaders(headers);
+      setSheetPreviewRows(dataRows);
+      notifySuccess({
+        title: "Planilha carregada",
+        message: "A visualizacao da planilha de itens foi aberta no popup.",
         action: {
           label: "Abrir perfil da licitacao",
           to: `/licitacoes/${licitacaoId}`,
         },
       });
-      return;
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Nao foi possivel carregar a visualizacao da planilha.";
+      setSheetPreviewError(message);
+      setSheetPreviewHeaders([]);
+      setSheetPreviewRows([]);
+      notifyError({
+        title: "Falha ao abrir a planilha",
+        message,
+        action: {
+          label: "Abrir perfil da licitacao",
+          to: `/licitacoes/${licitacaoId}`,
+        },
+      });
+    } finally {
+      setIsPreviewingSheet(false);
     }
+  };
 
-    notifySuccess({
-      title: "Visualizacao aberta",
-      message: "A planilha foi aberta em uma visualizacao externa no estilo Google Sheets.",
-      action: {
-        label: "Abrir perfil da licitacao",
-        to: `/licitacoes/${licitacaoId}`,
-      },
-    });
+  const fecharVisualizacaoPlanilha = () => {
+    setIsSheetPreviewOpen(false);
   };
 
   const exportarPropostas = async () => {
@@ -487,10 +561,16 @@ export function useItens(params: {
   return {
     errorMessage,
     exportarTabela,
-    abrirVisualizacaoGoogleSheets,
+    abrirVisualizacaoPlanilha,
+    fecharVisualizacaoPlanilha,
     exportarPropostas,
     carregarPropostas,
     propostasPayload,
+    isPreviewingSheet,
+    isSheetPreviewOpen,
+    sheetPreviewHeaders,
+    sheetPreviewRows,
+    sheetPreviewError,
     isExtracting,
     isExtractingProposals,
     isExporting,
