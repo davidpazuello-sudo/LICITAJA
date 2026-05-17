@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { ItemType } from "../../../types/item.types";
 import { cn } from "../../../utils/cn";
@@ -231,7 +231,15 @@ function ItensModal({
 }) {
   const [activeId, setActiveId] = useState<number | null>(initialItemId);
 
-  // sync when modal opens with a new item
+  // trava scroll do body enquanto modal está aberto
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [isOpen]);
+
+  // sync quando modal abre com novo item
   useMemo(() => {
     if (isOpen && initialItemId !== null) setActiveId(initialItemId);
   }, [isOpen, initialItemId]);
