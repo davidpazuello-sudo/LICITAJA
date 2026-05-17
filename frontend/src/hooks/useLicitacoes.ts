@@ -108,6 +108,52 @@ export function useLicitacoes() {
     }
   };
 
+  const removeLicitacoes = async (licitacaoIds: number[]) => {
+    const uniqueIds = Array.from(new Set(licitacaoIds));
+    if (uniqueIds.length === 0) {
+      return;
+    }
+
+    setRemovingIds((current) => Array.from(new Set([...current, ...uniqueIds])));
+    const licitacoesRemovidas = response.items.filter((item) => uniqueIds.includes(item.id));
+
+    try {
+      for (const licitacaoId of uniqueIds) {
+        await excluirLicitacao(licitacaoId);
+      }
+
+      const refreshed = await listarLicitacoes({
+        status: statusFilter,
+        q: searchTerm,
+      });
+      setResponse(refreshed);
+      notifySuccess({
+        title: "Licitacoes removidas com sucesso",
+        message:
+          uniqueIds.length === 1
+            ? `${licitacoesRemovidas[0]?.orgao ?? "A licitacao"} saiu de Minhas Licitacoes.`
+            : `${uniqueIds.length} licitacoes foram removidas de Minhas Licitacoes.`,
+        action: {
+          label: "Abrir Minhas Licitacoes",
+          to: "/minhas-licitacoes",
+        },
+      });
+    } catch (error) {
+      notifyError({
+        title: "Falha ao remover licitacoes",
+        message:
+          error instanceof Error ? error.message : "Nao foi possivel remover as licitacoes selecionadas agora.",
+        action: {
+          label: "Abrir Minhas Licitacoes",
+          to: "/minhas-licitacoes",
+        },
+      });
+      throw error;
+    } finally {
+      setRemovingIds((current) => current.filter((id) => !uniqueIds.includes(id)));
+    }
+  };
+
   const tabs = useMemo(
     () => [
       { id: "todas", label: "Todas", count: response.counts.todas },
@@ -126,6 +172,7 @@ export function useLicitacoes() {
     errorMessage,
     items: response.items,
     removeLicitacao,
+    removeLicitacoes,
     removingIds,
     searchTerm,
     setSearchTerm,

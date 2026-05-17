@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { CardLicitacao } from "../components/features/licitacoes/CardLicitacao";
@@ -26,6 +26,7 @@ function MinhasLicitacoes() {
     errorMessage,
     items,
     removeLicitacao,
+    removeLicitacoes,
     removingIds,
     searchTerm,
     setSearchTerm,
@@ -36,6 +37,30 @@ function MinhasLicitacoes() {
     total,
   } = useLicitacoes();
   const [pendingRemoval, setPendingRemoval] = useState<LicitacaoType | null>(null);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [showBulkRemoveModal, setShowBulkRemoveModal] = useState(false);
+
+  useEffect(() => {
+    setSelectedIds((current) => current.filter((id) => items.some((item) => item.id === id)));
+  }, [items]);
+
+  const allVisibleSelected = items.length > 0 && items.every((item) => selectedIds.includes(item.id));
+  const selectedCount = selectedIds.length;
+
+  const toggleSelected = (licitacaoId: number, checked: boolean) => {
+    setSelectedIds((current) =>
+      checked ? Array.from(new Set([...current, licitacaoId])) : current.filter((id) => id !== licitacaoId),
+    );
+  };
+
+  const toggleSelectAllVisible = (checked: boolean) => {
+    setSelectedIds((current) => {
+      if (checked) {
+        return Array.from(new Set([...current, ...items.map((item) => item.id)]));
+      }
+      return current.filter((id) => !items.some((item) => item.id === id));
+    });
+  };
 
   return (
     <div className="h-full">
@@ -66,6 +91,46 @@ function MinhasLicitacoes() {
               </p>
             ) : null}
           </div>
+
+          {items.length > 0 ? (
+            <div className="flex flex-col gap-3 rounded-2xl border border-line bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <label className="inline-flex items-center gap-2 font-['Plus_Jakarta_Sans'] text-sm text-slate">
+                  <input
+                    type="checkbox"
+                    checked={allVisibleSelected}
+                    onChange={(e) => toggleSelectAllVisible(e.target.checked)}
+                    className="h-4 w-4 rounded border-line text-accent focus:ring-accent/30"
+                  />
+                  Selecionar visiveis
+                </label>
+                {selectedCount > 0 ? (
+                  <span className="font-['Plus_Jakarta_Sans'] text-sm font-semibold text-ink">
+                    {selectedCount} selecionada{selectedCount === 1 ? "" : "s"}
+                  </span>
+                ) : null}
+              </div>
+
+              {selectedCount > 0 ? (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="rounded-xl border border-line px-4 py-2 font-['Plus_Jakarta_Sans'] text-sm font-semibold text-slate transition hover:border-accent/20 hover:text-ink"
+                    onClick={() => setSelectedIds([])}
+                  >
+                    Limpar selecao
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-xl bg-rose-600 px-4 py-2 font-['Plus_Jakarta_Sans'] text-sm font-semibold text-white transition hover:bg-rose-700"
+                    onClick={() => setShowBulkRemoveModal(true)}
+                  >
+                    Remover selecionadas
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         {/* Loading */}
@@ -124,7 +189,9 @@ function MinhasLicitacoes() {
                 key={licitacao.id}
                 licitacao={licitacao}
                 isRemoving={removingIds.includes(licitacao.id)}
+                isSelected={selectedIds.includes(licitacao.id)}
                 onRemove={() => setPendingRemoval(licitacao)}
+                onToggleSelect={toggleSelected}
               />
             ))}
           </div>
@@ -156,6 +223,43 @@ function MinhasLicitacoes() {
                   try {
                     await removeLicitacao(pendingRemoval.id);
                     setPendingRemoval(null);
+                  } catch {
+                    return;
+                  }
+                }}
+              >
+                Confirmar remocao
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showBulkRemoveModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/35 px-4">
+          <div className="w-full max-w-lg rounded-[28px] bg-white p-8 shadow-soft">
+            <p className="font-['Manrope'] text-2xl font-extrabold text-ink">
+              Remover licitacoes selecionadas?
+            </p>
+            <p className="mt-3 font-['Plus_Jakarta_Sans'] text-base text-slate">
+              Esta acao remove <strong className="text-ink">{selectedCount}</strong> licitacao{selectedCount === 1 ? "" : "oes"} de Minhas Licitacoes.
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                className="rounded-2xl border border-line px-5 py-2.5 font-['Plus_Jakarta_Sans'] text-sm font-semibold text-slate transition hover:border-accent/20 hover:text-ink"
+                onClick={() => setShowBulkRemoveModal(false)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="rounded-2xl bg-rose-600 px-5 py-2.5 font-['Plus_Jakarta_Sans'] text-sm font-semibold text-white transition hover:bg-rose-700"
+                onClick={async () => {
+                  try {
+                    await removeLicitacoes(selectedIds);
+                    setSelectedIds([]);
+                    setShowBulkRemoveModal(false);
                   } catch {
                     return;
                   }

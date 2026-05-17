@@ -9,6 +9,8 @@ interface CardLicitacaoProps {
   licitacao: LicitacaoType;
   isRemoving?: boolean;
   onRemove?: (licitacaoId: number) => void | Promise<void>;
+  isSelected?: boolean;
+  onToggleSelect?: (licitacaoId: number, checked: boolean) => void;
 }
 
 const STATUS_META: Record<string, { label: string; variant: "blue" | "green" | "amber" | "slate"; step: number }> = {
@@ -75,7 +77,13 @@ function PipelineStatus({ step }: { step: number }) {
   );
 }
 
-function CardLicitacao({ licitacao, isRemoving = false, onRemove }: CardLicitacaoProps) {
+function CardLicitacao({
+  licitacao,
+  isRemoving = false,
+  onRemove,
+  isSelected = false,
+  onToggleSelect,
+}: CardLicitacaoProps) {
   const navigate = useNavigate();
   const modalidadeSigla = getModalidadeSigla(licitacao.modalidade);
   const statusMeta = STATUS_META[licitacao.status] ?? STATUS_META.nova;
@@ -93,6 +101,20 @@ function CardLicitacao({ licitacao, isRemoving = false, onRemove }: CardLicitaca
 
           {/* Linha 1 — Meta */}
           <div className="flex flex-wrap items-center gap-2">
+            {onToggleSelect ? (
+              <label
+                className="mr-1 inline-flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={(e) => onToggleSelect(licitacao.id, e.target.checked)}
+                  className="h-4 w-4 rounded border-line text-accent focus:ring-accent/30"
+                  aria-label={`Selecionar ${licitacao.objeto}`}
+                />
+              </label>
+            ) : null}
             <span className={cn("h-2 w-2 shrink-0 rounded-full", deadlineMeta.dotClass)} />
             <span className="inline-flex items-center rounded-md bg-[#EEF4FF] px-2 py-0.5 font-['Manrope'] text-[11px] font-bold text-accent">
               {modalidadeSigla}
