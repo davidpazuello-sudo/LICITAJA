@@ -245,8 +245,8 @@ export function useBusca() {
         ),
       }));
       notifySuccess({
-        title: "Licitacao salva com sucesso",
-        message: `${item.orgao} foi adicionada em Minhas Licitacoes.`,
+        title: "Licitacao salva e processando",
+        message: `${item.orgao} foi adicionada e a extracao dos itens com busca automatica de fornecedores ja foi iniciada.`,
         action: {
           label: "Abrir perfil da licitacao",
           to: `/licitacoes/${savedLicitacao.id}`,

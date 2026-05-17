@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 import unicodedata
@@ -16,6 +16,9 @@ from app.schemas.licitacao import (
     LicitacaoUpdate,
 )
 from app.services.ia_service import ExtracaoItensError, IaService
+from app.services.job_service import criar_job_processamento, processar_licitacao_salva_em_segundo_plano
+from app.models.item import ItemModel
+from app.models.processamento_job import ProcessamentoJobModel
 
 router = APIRouter(tags=["licitacoes"])
 
@@ -61,6 +64,7 @@ async def listar_licitacoes(
 @router.post("/licitacoes", response_model=LicitacaoRead, status_code=status.HTTP_201_CREATED)
 async def salvar_licitacao(
     payload: LicitacaoCreate,
+    background_tasks: BackgroundTasks,
     response: Response,
     db: Session = Depends(get_db_session),
 ) -> LicitacaoRead:
@@ -69,10 +73,13 @@ async def salvar_licitacao(
     )
 
     if existing is not None:
+        _agendar_processamento_automatico(db, background_tasks, existing)
         response.status_code = status.HTTP_200_OK
         return LicitacaoRead.model_validate(existing)
 
-    licitacao = LicitacaoModel(**payload.model_dump())
+    payload_data = payload.model_dump()
+    payload_data["status"] = "em_analise"
+    licitacao = LicitacaoModel(**payload_data)
     db.add(licitacao)
     db.commit()
     db.refresh(licitacao)
@@ -83,6 +90,7 @@ async def salvar_licitacao(
             detail="Nao foi possivel salvar a licitacao.",
         )
 
+    _agendar_processamento_automatico(db, background_tasks, licitacao)
     return LicitacaoRead.model_validate(licitacao)
 
 
@@ -279,3 +287,40 @@ def _matches_status_filter(current_status: str, status_filter: str | None) -> bo
 def _normalize_text(value: str) -> str:
     normalized = unicodedata.normalize("NFKD", value)
     return "".join(char for char in normalized if not unicodedata.combining(char)).casefold()
+
+
+def _agendar_processamento_automatico(
+    db: Session,
+    background_tasks: BackgroundTasks,
+    licitacao: LicitacaoModel,
+) -> None:
+    has_items = db.scalar(
+        select(ItemModel.id)
+        .where(ItemModel.licitacao_id == licitacao.id)
+        .limit(1),
+    )
+    if has_items is not None and licitacao.status in {"itens_extraidos", "fornecedores_encontrados", "concluida"}:
+        return
+
+    active_job = db.scalar(
+        select(ProcessamentoJobModel)
+        .where(
+            ProcessamentoJobModel.licitacao_id == licitacao.id,
+            ProcessamentoJobModel.tipo == "licitacao_auto_pipeline",
+            ProcessamentoJobModel.status.in_(["queued", "processing"]),
+        )
+        .order_by(ProcessamentoJobModel.id.desc()),
+    )
+    if active_job is not None:
+        return
+
+    licitacao.status = "em_analise"
+    db.add(licitacao)
+    db.commit()
+
+    job = criar_job_processamento(
+        licitacao.id,
+        "licitacao_auto_pipeline",
+        mensagem="Licitacao salva. Iniciando extracao automatica de itens e pesquisa de fornecedores.",
+    )
+    background_tasks.add_task(processar_licitacao_salva_em_segundo_plano, job.id, licitacao.id)
