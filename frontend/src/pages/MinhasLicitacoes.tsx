@@ -21,6 +21,14 @@ function SearchIcon() {
   );
 }
 
+function CheckIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+      <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function MinhasLicitacoes() {
   const {
     errorMessage,
@@ -36,30 +44,34 @@ function MinhasLicitacoes() {
     tabs,
     total,
   } = useLicitacoes();
+
   const [pendingRemoval, setPendingRemoval] = useState<LicitacaoType | null>(null);
+  const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [showBulkRemoveModal, setShowBulkRemoveModal] = useState(false);
 
+  // limpa seleção ao sair do modo
   useEffect(() => {
-    setSelectedIds((current) => current.filter((id) => items.some((item) => item.id === id)));
+    if (!selectionMode) setSelectedIds([]);
+  }, [selectionMode]);
+
+  // remove IDs que saíram da lista
+  useEffect(() => {
+    setSelectedIds((cur) => cur.filter((id) => items.some((item) => item.id === id)));
   }, [items]);
 
-  const allVisibleSelected = items.length > 0 && items.every((item) => selectedIds.includes(item.id));
   const selectedCount = selectedIds.length;
+  const allSelected = items.length > 0 && items.every((item) => selectedIds.includes(item.id));
 
-  const toggleSelected = (licitacaoId: number, checked: boolean) => {
-    setSelectedIds((current) =>
-      checked ? Array.from(new Set([...current, licitacaoId])) : current.filter((id) => id !== licitacaoId),
-    );
-  };
+  const toggleItem = (id: number, checked: boolean) =>
+    setSelectedIds((cur) => (checked ? [...new Set([...cur, id])] : cur.filter((x) => x !== id)));
 
-  const toggleSelectAllVisible = (checked: boolean) => {
-    setSelectedIds((current) => {
-      if (checked) {
-        return Array.from(new Set([...current, ...items.map((item) => item.id)]));
-      }
-      return current.filter((id) => !items.some((item) => item.id === id));
-    });
+  const toggleAll = () =>
+    setSelectedIds(allSelected ? [] : items.map((item) => item.id));
+
+  const exitSelection = () => {
+    setSelectionMode(false);
+    setSelectedIds([]);
   };
 
   return (
@@ -71,10 +83,9 @@ function MinhasLicitacoes() {
           <FiltroStatus activeTab={statusFilter} items={tabs} onChange={setStatusFilter} />
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            {/* Busca */}
             <div className="relative flex h-11 flex-1 items-center gap-3 rounded-2xl border border-line bg-white px-4 shadow-sm transition focus-within:border-accent/40 focus-within:ring-4 focus-within:ring-accent/10 sm:max-w-md">
-              <span className="shrink-0 text-slate">
-                <SearchIcon />
-              </span>
+              <span className="shrink-0 text-slate"><SearchIcon /></span>
               <input
                 type="text"
                 value={searchTerm}
@@ -84,53 +95,44 @@ function MinhasLicitacoes() {
               />
             </div>
 
-            {status === "success" && total > 0 ? (
-              <p className="shrink-0 font-['Plus_Jakarta_Sans'] text-sm text-slate">
-                <span className="font-semibold text-ink">{total}</span>{" "}
-                resultado{total === 1 ? "" : "s"} nesta aba
-              </p>
-            ) : null}
-          </div>
+            <div className="flex shrink-0 items-center gap-3">
+              {status === "success" && total > 0 ? (
+                <p className="font-['Plus_Jakarta_Sans'] text-sm text-slate">
+                  <span className="font-semibold text-ink">{total}</span> resultado{total === 1 ? "" : "s"}
+                </p>
+              ) : null}
 
-          {items.length > 0 ? (
-            <div className="flex flex-col gap-3 rounded-2xl border border-line bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-3">
-                <label className="inline-flex items-center gap-2 font-['Plus_Jakarta_Sans'] text-sm text-slate">
-                  <input
-                    type="checkbox"
-                    checked={allVisibleSelected}
-                    onChange={(e) => toggleSelectAllVisible(e.target.checked)}
-                    className="h-4 w-4 rounded border-line text-accent focus:ring-accent/30"
-                  />
-                  Selecionar visiveis
-                </label>
-                {selectedCount > 0 ? (
-                  <span className="font-['Plus_Jakarta_Sans'] text-sm font-semibold text-ink">
-                    {selectedCount} selecionada{selectedCount === 1 ? "" : "s"}
-                  </span>
-                ) : null}
-              </div>
-
-              {selectedCount > 0 ? (
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    className="rounded-xl border border-line px-4 py-2 font-['Plus_Jakarta_Sans'] text-sm font-semibold text-slate transition hover:border-accent/20 hover:text-ink"
-                    onClick={() => setSelectedIds([])}
-                  >
-                    Limpar selecao
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-xl bg-rose-600 px-4 py-2 font-['Plus_Jakarta_Sans'] text-sm font-semibold text-white transition hover:bg-rose-700"
-                    onClick={() => setShowBulkRemoveModal(true)}
-                  >
-                    Remover selecionadas
-                  </button>
-                </div>
+              {/* Botão modo seleção */}
+              {items.length > 0 && status === "success" ? (
+                <button
+                  type="button"
+                  onClick={() => setSelectionMode((v) => !v)}
+                  className={
+                    selectionMode
+                      ? "inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 font-['Plus_Jakarta_Sans'] text-sm font-semibold text-white transition hover:bg-accentDark"
+                      : "inline-flex items-center gap-2 rounded-xl border border-line bg-white px-4 py-2 font-['Plus_Jakarta_Sans'] text-sm font-medium text-slate transition hover:border-accent/30 hover:text-ink"
+                  }
+                >
+                  {selectionMode ? (
+                    <>
+                      <CheckIcon />
+                      Selecionando
+                    </>
+                  ) : (
+                    <>
+                      <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+                        <rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
+                        <rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
+                        <rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
+                        <rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
+                      </svg>
+                      Selecionar
+                    </>
+                  )}
+                </button>
               ) : null}
             </div>
-          ) : null}
+          </div>
         </div>
 
         {/* Loading */}
@@ -138,12 +140,8 @@ function MinhasLicitacoes() {
           <div className="flex items-center gap-4 rounded-[26px] border border-line bg-white px-8 py-10 shadow-card">
             <Spinner size="lg" className="text-accent" />
             <div>
-              <p className="font-['Manrope'] text-base font-bold text-ink">
-                Carregando suas licitacoes
-              </p>
-              <p className="mt-0.5 font-['Plus_Jakarta_Sans'] text-sm text-slate">
-                Organizando por status, prazo e urgencia.
-              </p>
+              <p className="font-['Manrope'] text-base font-bold text-ink">Carregando suas licitacoes</p>
+              <p className="mt-0.5 font-['Plus_Jakarta_Sans'] text-sm text-slate">Organizando por status, prazo e urgencia.</p>
             </div>
           </div>
         ) : null}
@@ -151,9 +149,7 @@ function MinhasLicitacoes() {
         {/* Erro */}
         {status === "error" ? (
           <div className="rounded-[26px] border border-rose-100 bg-rose-50/70 px-8 py-10">
-            <p className="font-['Manrope'] text-base font-bold text-rose-800">
-              Nao foi possivel carregar as licitacoes
-            </p>
+            <p className="font-['Manrope'] text-base font-bold text-rose-800">Nao foi possivel carregar as licitacoes</p>
             <p className="mt-1 font-['Plus_Jakarta_Sans'] text-sm text-rose-700">{errorMessage}</p>
           </div>
         ) : null}
@@ -162,9 +158,7 @@ function MinhasLicitacoes() {
         {status === "success" && items.length === 0 ? (
           <div className="rounded-[26px] border border-dashed border-line bg-panel/70 px-8 py-14 text-center">
             <div className="mb-3 text-4xl">📋</div>
-            <p className="font-['Manrope'] text-lg font-bold text-ink">
-              Nenhuma licitacao nesta aba
-            </p>
+            <p className="font-['Manrope'] text-lg font-bold text-ink">Nenhuma licitacao nesta aba</p>
             <p className="mt-2 font-['Plus_Jakarta_Sans'] text-sm text-slate">
               {searchTerm
                 ? "Ajuste o termo buscado ou troque a aba de status."
@@ -189,22 +183,69 @@ function MinhasLicitacoes() {
                 key={licitacao.id}
                 licitacao={licitacao}
                 isRemoving={removingIds.includes(licitacao.id)}
+                onRemove={selectionMode ? undefined : () => setPendingRemoval(licitacao)}
                 isSelected={selectedIds.includes(licitacao.id)}
-                onRemove={() => setPendingRemoval(licitacao)}
-                onToggleSelect={toggleSelected}
+                selectionMode={selectionMode}
+                onToggleSelect={selectionMode ? toggleItem : undefined}
               />
             ))}
           </div>
         ) : null}
       </div>
 
-      {/* Modal de confirmação de remoção */}
+      {/* ── Barra flutuante de seleção ── */}
+      {selectionMode ? (
+        <div
+          className={
+            "fixed bottom-6 left-1/2 z-40 -translate-x-1/2 transition-all duration-300 " +
+            (selectedCount > 0 ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0 pointer-events-none")
+          }
+        >
+          <div className="flex items-center gap-3 rounded-2xl border border-line/80 bg-white px-5 py-3 shadow-soft">
+            {/* Selecionar todas */}
+            <button
+              type="button"
+              onClick={toggleAll}
+              className="font-['Plus_Jakarta_Sans'] text-sm text-slate transition hover:text-ink"
+            >
+              {allSelected ? "Desmarcar todas" : "Selecionar todas"}
+            </button>
+
+            <div className="h-4 w-px bg-line" />
+
+            {/* Contagem */}
+            <span className="font-['Manrope'] text-sm font-bold text-ink">
+              {selectedCount} selecionada{selectedCount === 1 ? "" : "s"}
+            </span>
+
+            <div className="h-4 w-px bg-line" />
+
+            {/* Cancelar */}
+            <button
+              type="button"
+              onClick={exitSelection}
+              className="font-['Plus_Jakarta_Sans'] text-sm text-slate transition hover:text-ink"
+            >
+              Cancelar
+            </button>
+
+            {/* Remover */}
+            <button
+              type="button"
+              onClick={() => setShowBulkRemoveModal(true)}
+              className="rounded-xl bg-rose-600 px-4 py-2 font-['Plus_Jakarta_Sans'] text-sm font-semibold text-white transition hover:bg-rose-700"
+            >
+              Remover {selectedCount}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Modal remoção individual */}
       {pendingRemoval ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/35 px-4">
           <div className="w-full max-w-lg rounded-[28px] bg-white p-8 shadow-soft">
-            <p className="font-['Manrope'] text-2xl font-extrabold text-ink">
-              Remover licitacao?
-            </p>
+            <p className="font-['Manrope'] text-2xl font-extrabold text-ink">Remover licitacao?</p>
             <p className="mt-3 font-['Plus_Jakarta_Sans'] text-base text-slate">
               Esta acao remove <strong className="text-ink">{pendingRemoval.orgao}</strong> de Minhas Licitacoes.
             </p>
@@ -235,14 +276,15 @@ function MinhasLicitacoes() {
         </div>
       ) : null}
 
+      {/* Modal remoção em massa */}
       {showBulkRemoveModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/35 px-4">
           <div className="w-full max-w-lg rounded-[28px] bg-white p-8 shadow-soft">
             <p className="font-['Manrope'] text-2xl font-extrabold text-ink">
-              Remover licitacoes selecionadas?
+              Remover {selectedCount} licitacao{selectedCount === 1 ? "" : "es"}?
             </p>
             <p className="mt-3 font-['Plus_Jakarta_Sans'] text-base text-slate">
-              Esta acao remove <strong className="text-ink">{selectedCount}</strong> licitacao{selectedCount === 1 ? "" : "oes"} de Minhas Licitacoes.
+              Esta acao nao pode ser desfeita.
             </p>
             <div className="mt-6 flex justify-end gap-3">
               <button
@@ -258,8 +300,8 @@ function MinhasLicitacoes() {
                 onClick={async () => {
                   try {
                     await removeLicitacoes(selectedIds);
-                    setSelectedIds([]);
                     setShowBulkRemoveModal(false);
+                    exitSelection();
                   } catch {
                     return;
                   }
