@@ -1044,10 +1044,14 @@ class IaService:
 
     @staticmethod
     def _normalize_item_field_name(value: str) -> str:
-        normalized = unicodedata.normalize("NFKD", value or "")
+        raw = (value or "").strip()
+        raw = raw.replace("Nº", "numero ").replace("nº", "numero ")
+        raw = raw.replace("N°", "numero ").replace("n°", "numero ")
+        raw = raw.replace("No.", "numero ").replace("no.", "numero ")
+        raw = raw.replace("Nro.", "numero ").replace("nro.", "numero ")
+        normalized = unicodedata.normalize("NFKD", raw)
         without_accents = "".join(char for char in normalized if not unicodedata.combining(char))
         lowered = without_accents.lower().strip()
-        lowered = lowered.replace("nº", "numero").replace("n°", "numero")
         lowered = re.sub(r"[^a-z0-9]+", "_", lowered)
         lowered = re.sub(r"_+", "_", lowered).strip("_")
         return lowered
@@ -1060,7 +1064,7 @@ class IaService:
             return value
         if isinstance(value, float):
             return int(value)
-        match = re.search(r"\d+", str(value))
+        match = re.search(r'\d+', str(value))
         if not match:
             return None
         try:
@@ -1108,6 +1112,7 @@ class IaService:
 
         numero_aliases = {
             "numero_item", "numero_do_item", "numero", "item_numero", "num_item", "num", "id", "item",
+            "n_do_item", "no_do_item", "nro_do_item", "numero_item_item",
         }
         descricao_aliases = {
             "descricao", "descricao_resumida", "descricao_item", "nome", "title", "objeto", "item_descricao",
@@ -1129,36 +1134,48 @@ class IaService:
 
         for key, value in raw.items():
             normalized_key = IaService._normalize_item_field_name(str(key))
-            if normalized_key in numero_aliases:
-                normalized_result.setdefault("numero_item", value)
-            elif normalized_key in descricao_aliases:
-                normalized_result.setdefault("descricao", value)
-            elif normalized_key in descricao_completa_aliases:
+            if (
+                normalized_key in numero_aliases
+                or normalized_key.startswith("numero_do_item")
+                or normalized_key.startswith("numero_item")
+            ):
+                normalized_result.setdefault('numero_item', value)
+            elif (
+                normalized_key in descricao_aliases
+                or ("descr" in normalized_key and "resum" in normalized_key)
+                or normalized_key.startswith("descricao_")
+            ):
+                normalized_result.setdefault('descricao', value)
+            elif (
+                normalized_key in descricao_completa_aliases
+                or ("descr" in normalized_key and ("completa" in normalized_key or "detalh" in normalized_key))
+                or ("especific" in normalized_key and "descricao" in normalized_key)
+            ):
                 descricao_completa = value
             elif normalized_key in quantidade_aliases:
-                normalized_result.setdefault("quantidade", value)
+                normalized_result.setdefault('quantidade', value)
             elif normalized_key in unidade_aliases:
-                normalized_result.setdefault("unidade", value)
+                normalized_result.setdefault('unidade', value)
             elif normalized_key in especificacoes_aliases:
-                normalized_result.setdefault("especificacoes", value)
+                normalized_result.setdefault('especificacoes', value)
             elif normalized_key in marcas_aliases:
-                normalized_result.setdefault("marcas_fabricantes", value)
+                normalized_result.setdefault('marcas_fabricantes', value)
             elif normalized_key == "grupo":
                 grupo_value = value
             else:
                 normalized_result[key] = value
 
-        numero_item = IaService._coerce_item_number(normalized_result.get("numero_item"))
+        numero_item = IaService._coerce_item_number(normalized_result.get('numero_item'))
         if numero_item is not None:
-            normalized_result["numero_item"] = numero_item
+            normalized_result['numero_item'] = numero_item
 
-        normalized_result["quantidade"] = IaService._coerce_optional_number(normalized_result.get("quantidade"))
+        normalized_result['quantidade'] = IaService._coerce_optional_number(normalized_result.get('quantidade'))
 
         if "unidade" in normalized_result and normalized_result["unidade"] is not None:
             unidade = str(normalized_result["unidade"]).strip()
             normalized_result["unidade"] = unidade or None
 
-        especificacoes = IaService._coerce_string_list(normalized_result.get("especificacoes"))
+        especificacoes = IaService._coerce_string_list(normalized_result.get('especificacoes'))
         if descricao_completa is not None:
             detalhes = IaService._coerce_string_list(descricao_completa)
             especificacoes.extend(detalhe for detalhe in detalhes if detalhe and detalhe not in especificacoes)
@@ -1183,47 +1200,6 @@ class IaService:
             normalized_result["descricao"] = str(normalized_result["descricao"]).strip()
 
         return normalized_result
-        """Mapeia campos com nomes alternativos retornados pela IA para os campos canônicos do ItemExtraidoSchema.
-
-        Aliases mapeados:
-          numero_item  ← Nº, N, No, Num, Item, Numero, numero, item_numero, num_item, id
-          descricao    ← Grupo, Descricao, Descricão, Objeto, descr, descricao_item, nome, title
-          quantidade   ← Qtd, Quant, qtd, quant, qty, Quantidade
-          unidade      ← Unidade, Un, und, unit, Und
-          especificacoes ← Especificacoes, specs, especificacoes_tecnicas, detalhes
-          marcas_fabricantes ← Marcas, Fabricantes, marcas, fabricantes, brands
-        """
-        _NUMERO_ITEM_ALIASES = {
-            "nº", "n", "no", "num", "item", "numero", "item_numero",
-            "num_item", "id", "n°", "n.º", "numero_item",
-        }
-        _DESCRICAO_ALIASES = {
-            "grupo", "descricao", "descrição", "objeto", "descr",
-            "descricao_item", "nome", "title", "descricao_completa",
-        }
-        _QUANTIDADE_ALIASES = {"qtd", "quant", "qty", "quantidade"}
-        _UNIDADE_ALIASES = {"un", "und", "unit", "unidade"}
-        _ESPEC_ALIASES = {"especificacoes", "specs", "especificacoes_tecnicas", "detalhes", "especificações"}
-        _MARCAS_ALIASES = {"marcas", "fabricantes", "brands", "marcas_fabricantes"}
-
-        result: dict = {}
-        for key, value in raw.items():
-            normalized_key = key.strip().lower().replace(" ", "_")
-            if normalized_key in _NUMERO_ITEM_ALIASES:
-                result.setdefault("numero_item", value)
-            elif normalized_key in _DESCRICAO_ALIASES:
-                result.setdefault("descricao", value)
-            elif normalized_key in _QUANTIDADE_ALIASES:
-                result.setdefault("quantidade", value)
-            elif normalized_key in _UNIDADE_ALIASES:
-                result.setdefault("unidade", value)
-            elif normalized_key in _ESPEC_ALIASES:
-                result.setdefault("especificacoes", value)
-            elif normalized_key in _MARCAS_ALIASES:
-                result.setdefault("marcas_fabricantes", value)
-            else:
-                result[key] = value
-        return result
 
     async def _extract_propostas_payload(
         self,
