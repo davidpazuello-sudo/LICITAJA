@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { CardLicitacao } from "../components/features/licitacoes/CardLicitacao";
@@ -49,11 +49,19 @@ function MinhasLicitacoes() {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [showBulkRemoveModal, setShowBulkRemoveModal] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   // limpa seleção ao sair do modo
   useEffect(() => {
     if (!selectionMode) setSelectedIds([]);
   }, [selectionMode]);
+
+  useEffect(() => {
+    if (searchOpen) {
+      searchInputRef.current?.focus();
+    }
+  }, [searchOpen]);
 
   // remove IDs que saíram da lista
   useEffect(() => {
@@ -84,15 +92,39 @@ function MinhasLicitacoes() {
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             {/* Busca */}
-            <div className="relative flex h-11 flex-1 items-center gap-3 rounded-2xl border border-line bg-white px-4 shadow-sm transition focus-within:border-accent/40 focus-within:ring-4 focus-within:ring-accent/10 sm:max-w-md">
-              <span className="shrink-0 text-slate"><SearchIcon /></span>
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Filtrar por palavra-chave, orgao ou status..."
-                className="w-full border-0 bg-transparent font-['Plus_Jakarta_Sans'] text-sm text-ink outline-none placeholder:text-slate/60"
-              />
+            <div className="flex flex-1 items-center gap-3 sm:max-w-md">
+              <div
+                className={
+                  "overflow-hidden transition-all duration-300 " +
+                  (searchOpen ? "w-full opacity-100" : "w-0 opacity-0")
+                }
+              >
+                <div className="relative flex h-11 items-center gap-3 rounded-2xl border border-line bg-white px-4 shadow-sm transition focus-within:border-accent/40 focus-within:ring-4 focus-within:ring-accent/10">
+                  <span className="shrink-0 text-slate"><SearchIcon /></span>
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Filtrar por palavra-chave, orgao ou status..."
+                    className="w-full border-0 bg-transparent font-['Plus_Jakarta_Sans'] text-sm text-ink outline-none placeholder:text-slate/60"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="button"
+                aria-label={searchOpen ? "Fechar pesquisa" : "Abrir pesquisa"}
+                onClick={() => {
+                  if (searchOpen && searchTerm) {
+                    setSearchTerm("");
+                  }
+                  setSearchOpen((current) => !current);
+                }}
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-line bg-white text-slate transition hover:border-accent/30 hover:text-accent focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent/15"
+              >
+                <SearchIcon />
+              </button>
             </div>
 
             <div className="flex shrink-0 items-center gap-3">
