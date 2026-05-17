@@ -173,7 +173,7 @@ function PerfilLicitacao() {
                   totalItens={resumo.total}
                   pesquisados={resumo.pesquisados}
                   onOpenRemove={() => setShowRemoveModal(true)}
-                  onExtrairItens={iniciarExtracao}
+                  onExportarItens={exportarTabela}
                   onPesquisarTodos={pesquisarTodos}
                   onOpenIA={() => setActiveTab("ia")}
                 />

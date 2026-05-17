@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
-import type { ItemType } from "../../../types/item.types";
+import type { BackgroundJobType, ItemType } from "../../../types/item.types";
 import { cn } from "../../../utils/cn";
 import { formatCurrency } from "../../../utils/formatters";
 
@@ -75,6 +75,65 @@ function SummaryBadge({ count, label, tone = "default" }: { count: number; label
       <span className="font-['Manrope'] text-[14px] font-bold">{count}</span>
       {label}
     </span>
+  );
+}
+
+function EmptyItemsState({
+  itensStatus,
+  itensErrorMessage,
+  backgroundJob,
+  editalStatus,
+  perfilStatus,
+}: {
+  itensStatus: "idle" | "loading" | "ready" | "error";
+  itensErrorMessage: string;
+  backgroundJob: BackgroundJobType | null;
+  editalStatus: string | null;
+  perfilStatus: string;
+}) {
+  const isExtractingNow =
+    itensStatus === "loading" ||
+    editalStatus === "processando" ||
+    backgroundJob?.status === "queued" ||
+    backgroundJob?.status === "processing" ||
+    perfilStatus === "em_analise";
+
+  const hasExtractionError =
+    itensStatus === "error" ||
+    editalStatus === "erro" ||
+    (backgroundJob?.status === "failed" && backgroundJob?.tipo === "licitacao_auto_pipeline");
+
+  if (hasExtractionError) {
+    return (
+      <div className="rounded-xl border border-rose-200 bg-rose-50/70 px-4 py-6 text-center">
+        <p className="font-['Manrope'] text-[15px] font-bold text-rose-800">
+          A extracao dos itens nao foi concluida
+        </p>
+        <p className="mt-1 font-['Plus_Jakarta_Sans'] text-[13px] text-rose-700">
+          {itensErrorMessage || backgroundJob?.mensagem || "Nao foi possivel interpretar o edital desta licitacao."}
+        </p>
+      </div>
+    );
+  }
+
+  if (isExtractingNow) {
+    return (
+      <div className="rounded-xl border border-accent/15 bg-[#EEF4FF] px-4 py-6 text-center">
+        <div className="mx-auto mb-3 flex h-8 w-8 items-center justify-center rounded-full border-2 border-accent/20 border-t-accent animate-spin" />
+        <p className="font-['Manrope'] text-[15px] font-bold text-ink">
+          A IA esta lendo o edital e extraindo os itens
+        </p>
+        <p className="mt-1 font-['Plus_Jakarta_Sans'] text-[13px] text-slate">
+          Os itens vao aparecer aqui automaticamente assim que o processamento terminar.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-dashed border-line bg-panel/50 px-4 py-6 text-center font-['Plus_Jakarta_Sans'] text-[13px] text-slate/70">
+      Nenhum item extraido ainda.
+    </div>
   );
 }
 
@@ -319,9 +378,19 @@ function ItensModal({
 function TabItensLicitacao({
   items,
   resumo,
+  itensStatus,
+  itensErrorMessage,
+  backgroundJob,
+  editalStatus,
+  perfilStatus,
 }: {
   items: ItemType[];
   resumo: { total: number; aguardando: number; pesquisados: number };
+  itensStatus: "idle" | "loading" | "ready" | "error";
+  itensErrorMessage: string;
+  backgroundJob: BackgroundJobType | null;
+  editalStatus: string | null;
+  perfilStatus: string;
 }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
@@ -366,9 +435,13 @@ function TabItensLicitacao({
         </div>
 
         {visibleItems.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-line bg-panel/50 px-4 py-6 text-center font-['Plus_Jakarta_Sans'] text-[13px] text-slate/70">
-            Nenhum item extraido ainda.
-          </div>
+          <EmptyItemsState
+            itensStatus={itensStatus}
+            itensErrorMessage={itensErrorMessage}
+            backgroundJob={backgroundJob}
+            editalStatus={editalStatus}
+            perfilStatus={perfilStatus}
+          />
         ) : (
           <div className="space-y-1.5">
             {visibleItems.map((item) => (

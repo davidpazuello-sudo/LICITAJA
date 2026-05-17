@@ -125,6 +125,11 @@ function WorkspaceLicitacao({
           <TabItensLicitacao
             items={items}
             resumo={resumo}
+            itensStatus={itensStatus}
+            itensErrorMessage={itensErrorMessage}
+            backgroundJob={backgroundJob}
+            editalStatus={latestEdital?.status_extracao ?? null}
+            perfilStatus={perfil.status}
           />
         ) : null}
 
