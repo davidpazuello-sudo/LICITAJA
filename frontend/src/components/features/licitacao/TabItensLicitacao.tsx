@@ -296,7 +296,7 @@ function TabItensLicitacao({
         eyebrow="Itens da licitacao"
         widthClassName="max-w-5xl"
       >
-        <div className="max-h-[72vh] space-y-4 overflow-y-auto pr-1">
+        <div className="space-y-4 pr-1">
           {modalItems.map((item) => (
             <ItemDetailCard key={item.id} item={item} />
           ))}

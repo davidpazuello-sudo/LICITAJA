@@ -35,16 +35,16 @@ function Modal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/45 px-4 py-8 backdrop-blur-[2px]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-ink/45 px-4 py-4 backdrop-blur-[2px]">
       <button type="button" className="absolute inset-0 cursor-default" aria-label="Fechar modal" onClick={onClose} />
 
       <div
         className={cn(
-          "relative z-10 w-full rounded-[28px] border border-line/80 bg-white shadow-card",
+          "relative z-10 flex max-h-[calc(100vh-32px)] w-full flex-col overflow-hidden rounded-[28px] border border-line/80 bg-white shadow-card",
           widthClassName,
         )}
       >
-        <div className="flex items-center justify-between gap-4 border-b border-line px-6 py-5">
+        <div className="shrink-0 flex items-center justify-between gap-4 border-b border-line px-6 py-5">
           <div>
             {eyebrow ? (
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent/80">{eyebrow}</p>
@@ -70,7 +70,7 @@ function Modal({
           </button>
         </div>
 
-        <div className="px-6 py-6">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">{children}</div>
       </div>
     </div>
   );
