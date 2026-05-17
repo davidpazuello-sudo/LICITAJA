@@ -189,12 +189,19 @@ class EComprasAMProvider(SearchProvider):
         data_abertura = (detail or {}).get("data_abertura_iso") or summary.get("data_abertura_iso")
         objeto = (detail or {}).get("titulo") or summary.get("titulo") or "Objeto nao informado"
         link_edital = (detail or {}).get("edital_url")
+        numero_processo = (
+            (detail or {}).get("processo")
+            or (detail or {}).get("edital_numero")
+            or summary.get("numero_compra")
+        )
+        orgao = (detail or {}).get("orgao") or "Governo do Estado do Amazonas"
         return BuscaLicitacaoItem(
             numero_controle=f"ecomprasam-{ident}",
             numero_compra=summary.get("numero_compra"),
             sub_status=sub_status,
-            numero_processo=None,
-            orgao="Governo do Estado do Amazonas",
+            numero_processo=numero_processo,
+            orgao=orgao,
+            uasg=ident or None,
             objeto=objeto,
             modalidade=modalidade,
             valor_estimado=None,
@@ -275,8 +282,12 @@ class EComprasAMProvider(SearchProvider):
             "objeto": self._extract_object_table(html),
             "edital_url": self._extract_pdf_url(html),
             "modalidade": self._extract_modalidade_from_title(self._extract_table_value(html, "T&iacute;tulo")),
-            "orgao": None,
-            "processo": None,
+            "orgao": self._extract_table_value(html, "Orgao")
+            or self._extract_table_value(html, "&Oacute;rg&atilde;o")
+            or self._extract_table_value(html, "&Oacute;rg&atilde;o Demandante"),
+            "processo": self._extract_table_value(html, "Processo")
+            or self._extract_table_value(html, "N&ordm; Processo")
+            or self._extract_table_value(html, "N&uacute;mero do Processo"),
         }
 
     def _extract_label_value(self, html: str, label: str) -> str | None:

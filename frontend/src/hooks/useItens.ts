@@ -6,6 +6,7 @@ import {
   exportarPropostasPorItem,
   extrairItens,
   listarItens,
+  obterUrlVisualizacaoGoogleSheets,
   obterJobAutoPipeline,
   obterJobEnriquecimentoMarcas,
   pesquisarItem,
@@ -376,6 +377,36 @@ export function useItens(params: {
     }
   };
 
+  const abrirVisualizacaoGoogleSheets = () => {
+    if (!licitacaoId) {
+      return;
+    }
+
+    const targetUrl = obterUrlVisualizacaoGoogleSheets(licitacaoId);
+    const openedWindow = window.open(targetUrl, "_blank", "noopener,noreferrer");
+
+    if (!openedWindow) {
+      notifyError({
+        title: "Nao foi possivel abrir a visualizacao",
+        message: "O navegador bloqueou a nova aba da planilha. Tente liberar popups para este site.",
+        action: {
+          label: "Abrir perfil da licitacao",
+          to: `/licitacoes/${licitacaoId}`,
+        },
+      });
+      return;
+    }
+
+    notifySuccess({
+      title: "Visualizacao aberta",
+      message: "A planilha foi aberta em uma visualizacao externa no estilo Google Sheets.",
+      action: {
+        label: "Abrir perfil da licitacao",
+        to: `/licitacoes/${licitacaoId}`,
+      },
+    });
+  };
+
   const exportarPropostas = async () => {
     if (!licitacaoId) {
       return;
@@ -456,6 +487,7 @@ export function useItens(params: {
   return {
     errorMessage,
     exportarTabela,
+    abrirVisualizacaoGoogleSheets,
     exportarPropostas,
     carregarPropostas,
     propostasPayload,

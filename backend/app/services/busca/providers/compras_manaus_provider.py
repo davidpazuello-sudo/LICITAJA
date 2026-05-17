@@ -282,12 +282,15 @@ class ComprasManausProvider(SearchProvider):
         data_abertura = (detail or {}).get("data_abertura_iso")
         link_edital = (detail or {}).get("edital_url")
         modalidade = (detail or {}).get("modalidade") or summary.get("modalidade")
+        numero_processo = (detail or {}).get("processo") or numero_compra
+        ug = (detail or {}).get("ug") or summary.get("ug")
         return BuscaLicitacaoItem(
             numero_controle=f"comprasmanaus-{ident}",
             numero_compra=numero_compra,
             sub_status=sub_status,
-            numero_processo=None,
+            numero_processo=numero_processo,
             orgao=orgao,
+            uasg=ug,
             objeto=objeto,
             modalidade=modalidade,
             valor_estimado=None,
@@ -512,6 +515,9 @@ class ComprasManausProvider(SearchProvider):
             "data_abertura_iso": self._to_iso_datetime(self._extract_detail_value(html, "Data de Abertura")),
             "edital_url": self._extract_pdf_url(html),
             "edital_numero": self._extract_edital_numero(html),
+            "processo": self._extract_detail_value(html, "Processo")
+            or self._extract_detail_value(html, "NÂº Processo")
+            or self._extract_detail_value(html, "NÃºmero do Processo"),
             "sub_status": self._infer_detail_status(html),
             "modalidade": self._infer_modalidade_from_edital(self._extract_edital_numero(html), ""),
         }

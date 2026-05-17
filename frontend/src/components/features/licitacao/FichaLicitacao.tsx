@@ -3,6 +3,11 @@ import { useState, type ReactNode } from "react";
 import type { LicitacaoDetailType } from "../../../types/licitacao.types";
 import { formatCurrency } from "../../../utils/formatters";
 
+type RawPortalPayload = {
+  summary?: Record<string, string | null | undefined>;
+  detail?: Record<string, string | null | undefined>;
+};
+
 function formatMockDateTime(value: string | null | undefined) {
   if (!value) {
     return "Prazo nao informado";
@@ -26,6 +31,23 @@ function formatMockDateTime(value: string | null | undefined) {
     .replace(":", "h");
 
   return `${dayMonthYear} · ${time}`;
+}
+
+function parseRawPortalPayload(value: string | null | undefined): RawPortalPayload {
+  if (!value) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(value) as RawPortalPayload;
+  } catch {
+    return {};
+  }
+}
+
+function pickFirst(...values: Array<string | null | undefined>) {
+  const selected = values.find((value) => typeof value === "string" && value.trim());
+  return selected?.trim() ?? null;
 }
 
 function FichaField({
@@ -114,11 +136,52 @@ function FichaLink({ href, children }: { href: string; children: ReactNode }) {
   );
 }
 
+function buildAdaptiveRegistry(perfil: LicitacaoDetailType) {
+  const raw = parseRawPortalPayload(perfil.dados_brutos);
+  const summary = raw.summary ?? {};
+  const detail = raw.detail ?? {};
+  const source = (perfil.fonte || "").toLowerCase();
+
+  if (source.includes("compras manaus")) {
+    return {
+      registryLabel: "UG",
+      registryValue: pickFirst(perfil.uasg, detail.ug, summary.ug) ?? "Nao informado",
+      processLabel: "Edital",
+      processValue: pickFirst(perfil.numero_processo, detail.processo, detail.edital_numero, summary.numero_compra) ?? "Nao informado",
+    };
+  }
+
+  if (source.includes("e-compras am")) {
+    return {
+      registryLabel: "Identificador",
+      registryValue: pickFirst(perfil.uasg, detail.ident, summary.ident) ?? "Nao informado",
+      processLabel: "Edital",
+      processValue: pickFirst(perfil.numero_processo, detail.processo, detail.edital_numero, summary.numero_compra) ?? "Nao informado",
+    };
+  }
+
+  if (source.includes("pncp")) {
+    return {
+      registryLabel: "Unidade",
+      registryValue: pickFirst(perfil.uasg) ?? "Nao informado",
+      processLabel: "Numero do Processo",
+      processValue: pickFirst(perfil.numero_processo, summary.numero_compra) ?? "Nao informado",
+    };
+  }
+
+  return {
+    registryLabel: "UASG",
+    registryValue: pickFirst(perfil.uasg) ?? "Nao informado",
+    processLabel: "Numero do Processo",
+    processValue: pickFirst(perfil.numero_processo, summary.numero_compra) ?? "Nao informado",
+  };
+}
+
 function FichaLicitacao({ perfil }: { perfil: LicitacaoDetailType }) {
   const localCurto = [perfil.cidade, perfil.estado].filter(Boolean).join(" - ") || "Nao informado";
-  const localEntrega = [perfil.cidade, perfil.estado === perfil.cidade ? null : perfil.estado]
-    .filter(Boolean)
-    .join(", ") || "Nao informado";
+  const localEntrega =
+    [perfil.cidade, perfil.estado === perfil.cidade ? null : perfil.estado].filter(Boolean).join(", ") || "Nao informado";
+  const adaptiveRegistry = buildAdaptiveRegistry(perfil);
 
   return (
     <aside className="h-full min-w-[264px] border-r border-[#E2E6EF] bg-white">
@@ -135,8 +198,8 @@ function FichaLicitacao({ perfil }: { perfil: LicitacaoDetailType }) {
         <FichaField label="Objeto" value={perfil.objeto} />
         <FichaField label="Modalidade" value={perfil.modalidade ?? "Nao informada"} />
         <FichaField label="Portal / Fonte" value={perfil.fonte} />
-        <FichaField label="UASG" value={perfil.uasg ?? "Nao informado"} mono />
-        <FichaField label="Nº do Processo" value={perfil.numero_processo ?? "Nao informado"} mono />
+        <FichaField label={adaptiveRegistry.registryLabel} value={adaptiveRegistry.registryValue} mono />
+        <FichaField label={adaptiveRegistry.processLabel} value={adaptiveRegistry.processValue} mono />
       </FichaSection>
 
       <FichaSection title="Datas e Valores">

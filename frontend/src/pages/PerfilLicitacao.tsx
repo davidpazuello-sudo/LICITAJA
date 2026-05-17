@@ -32,6 +32,7 @@ function PerfilLicitacao() {
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const {
     errorMessage: itensErrorMessage,
+    abrirVisualizacaoGoogleSheets,
     exportarPropostas,
     exportarTabela,
     backgroundJob,
@@ -149,6 +150,7 @@ function PerfilLicitacao() {
                   itensStatus={itensStatus}
                   itensErrorMessage={itensErrorMessage || errorMessage}
                   backgroundJob={backgroundJob}
+                  onAbrirGoogleSheets={abrirVisualizacaoGoogleSheets}
                   canExtractProposalsByPortal={canExtractProposalsByPortal}
                   isExtractingProposals={isExtractingProposals}
                   exportarPropostas={exportarPropostas}

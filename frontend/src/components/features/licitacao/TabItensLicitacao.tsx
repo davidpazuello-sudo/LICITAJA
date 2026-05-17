@@ -383,6 +383,7 @@ function TabItensLicitacao({
   backgroundJob,
   editalStatus,
   perfilStatus,
+  onAbrirGoogleSheets,
 }: {
   items: ItemType[];
   resumo: { total: number; aguardando: number; pesquisados: number };
@@ -391,6 +392,7 @@ function TabItensLicitacao({
   backgroundJob: BackgroundJobType | null;
   editalStatus: string | null;
   perfilStatus: string;
+  onAbrirGoogleSheets: () => void;
 }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
@@ -422,6 +424,24 @@ function TabItensLicitacao({
           <SummaryBadge count={resumo.total} label="Total" />
           <SummaryBadge count={resumo.pesquisados} label="Pesquisados" tone="green" />
           <SummaryBadge count={resumo.aguardando} label="Aguardando" tone="amber" />
+        </div>
+        <div className="mt-3">
+          <button
+            type="button"
+            onClick={onAbrirGoogleSheets}
+            className="inline-flex items-center gap-2 rounded-xl border border-[#D7E3FF] bg-[#EEF4FF] px-3 py-2 font-['Plus_Jakarta_Sans'] text-[12px] font-semibold text-[#2563EB] transition hover:border-[#BFD2FF] hover:bg-[#E6F0FF]"
+          >
+            <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+              <path
+                d="M8 7h8M8 12h8M8 17h5M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            Abrir visualizacao em Google Sheets
+          </button>
         </div>
       </section>
 

@@ -28,6 +28,7 @@ function WorkspaceLicitacao({
   itensStatus,
   itensErrorMessage,
   backgroundJob,
+  onAbrirGoogleSheets,
   canExtractProposalsByPortal,
   isExtractingProposals,
   exportarPropostas,
@@ -65,6 +66,7 @@ function WorkspaceLicitacao({
   itensStatus: "idle" | "loading" | "ready" | "error";
   itensErrorMessage: string;
   backgroundJob: BackgroundJobType | null;
+  onAbrirGoogleSheets: () => void;
   canExtractProposalsByPortal: boolean;
   isExtractingProposals: boolean;
   exportarPropostas: () => Promise<void>;
@@ -130,6 +132,7 @@ function WorkspaceLicitacao({
             backgroundJob={backgroundJob}
             editalStatus={latestEdital?.status_extracao ?? null}
             perfilStatus={perfil.status}
+            onAbrirGoogleSheets={onAbrirGoogleSheets}
           />
         ) : null}
 
