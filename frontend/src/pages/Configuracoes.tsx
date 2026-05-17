@@ -530,7 +530,12 @@ function TabPortais() {
         </div>
       ) : null}
 
-      <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title="Cadastrar novo portal">
+      <Modal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        title="Cadastrar novo portal"
+        eyebrow="Nova integracao"
+      >
         <div className="space-y-5">
           <p className="text-sm leading-6 text-slate">
             Cadastre um novo portal de licitacao para centralizar a configuracao dentro do LicitaAI.

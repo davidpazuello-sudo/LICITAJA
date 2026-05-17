@@ -8,9 +8,17 @@ interface ModalProps {
   title: string;
   onClose: () => void;
   widthClassName?: string;
+  eyebrow?: string | null;
 }
 
-function Modal({ children, isOpen, title, onClose, widthClassName = "max-w-2xl" }: ModalProps) {
+function Modal({
+  children,
+  isOpen,
+  title,
+  onClose,
+  widthClassName = "max-w-2xl",
+  eyebrow = null,
+}: ModalProps) {
   if (!isOpen) return null;
 
   return (
@@ -25,7 +33,9 @@ function Modal({ children, isOpen, title, onClose, widthClassName = "max-w-2xl" 
       >
         <div className="flex items-center justify-between gap-4 border-b border-line px-6 py-5">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent/80">Nova integracao</p>
+            {eyebrow ? (
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent/80">{eyebrow}</p>
+            ) : null}
             <h2 className="mt-1 font-heading text-xl font-extrabold text-ink">{title}</h2>
           </div>
 
