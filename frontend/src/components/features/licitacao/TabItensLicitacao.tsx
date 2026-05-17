@@ -1,20 +1,19 @@
 import { useMemo, useState } from "react";
 
 import type { ItemType } from "../../../types/item.types";
+import { cn } from "../../../utils/cn";
 import { formatCurrency } from "../../../utils/formatters";
-import { Modal } from "../../ui/Modal";
+
+/* ─── helpers ──────────────────────────────────────────────── */
 
 function formatQuantity(value: number | null, unidade: string | null) {
-  const quantidade = value === null ? "-" : new Intl.NumberFormat("pt-BR").format(value);
+  const qty = value === null ? "–" : new Intl.NumberFormat("pt-BR").format(value);
   const unit = unidade ? ` ${unidade.toUpperCase()}` : "";
-  return `${quantidade}${unit}`;
+  return `${qty}${unit}`;
 }
 
-function parseSpecifications(item: ItemType) {
-  if (!item.especificacoes) {
-    return [] as string[];
-  }
-
+function parseSpecifications(item: ItemType): string[] {
+  if (!item.especificacoes) return [];
   try {
     const parsed = JSON.parse(item.especificacoes) as string[];
     return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
@@ -23,198 +22,291 @@ function parseSpecifications(item: ItemType) {
   }
 }
 
-function parseFirstSpecification(item: ItemType) {
-  const parsed = parseSpecifications(item);
-  return parsed[0] || "-";
-}
-
-function parseReferenceBrands(item: ItemType) {
-  if (!item.marcas_fabricantes) {
-    return [] as string[];
-  }
-
+function parseReferenceBrands(item: ItemType): string[] {
+  if (!item.marcas_fabricantes) return [];
   try {
     const parsed = JSON.parse(item.marcas_fabricantes) as Array<string | { nome?: string }>;
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      return [];
-    }
-
+    if (!Array.isArray(parsed)) return [];
     return parsed
-      .map((entry) => (typeof entry === "string" ? entry : entry?.nome || ""))
-      .map((entry) => entry.trim())
+      .map((e) => (typeof e === "string" ? e : e?.nome ?? ""))
+      .map((e) => e.trim())
       .filter(Boolean);
   } catch {
     return [];
   }
 }
 
-function SummaryBadge({
-  count,
-  label,
-  tone = "default",
-}: {
-  count: number;
-  label: string;
-  tone?: "default" | "green" | "yellow";
-}) {
-  const toneClass =
-    tone === "green" ? "text-[#16A34A]" : tone === "yellow" ? "text-[#D97706]" : "text-[#0F1724]";
+/* ─── status badge ──────────────────────────────────────────── */
 
-  return (
-    <div className="flex items-center gap-[6px] rounded-[20px] border border-[#E2E6EF] bg-[#F5F7FB] px-[11px] py-[5px] text-[12px] text-[#0F1724]">
-      <span className={`text-[13.5px] font-bold ${toneClass}`}>{count}</span>
-      {label}
-    </div>
-  );
-}
-
-function ItemStatusBadge({ status }: { status: string }) {
+function StatusBadge({ status }: { status: string }) {
   if (status === "encontrado") {
     return (
-      <span className="rounded-[20px] bg-[#DCFCE7] px-[7px] py-[2px] text-[10px] font-semibold text-[#16A34A]">
+      <span className="inline-flex items-center rounded-md bg-emerald-50 px-2 py-0.5 font-['Plus_Jakarta_Sans'] text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-100">
         Pesquisado
       </span>
     );
   }
-
   if (status === "aguardando" || status === "pesquisando") {
     return (
-      <span className="rounded-[20px] bg-[#FEF3C7] px-[7px] py-[2px] text-[10px] font-semibold text-[#D97706]">
+      <span className="inline-flex items-center rounded-md bg-amber-50 px-2 py-0.5 font-['Plus_Jakarta_Sans'] text-[11px] font-semibold text-amber-700 ring-1 ring-amber-100">
         Aguardando
       </span>
     );
   }
-
   return (
-    <span className="rounded-[20px] bg-[#F5F7FB] px-[7px] py-[2px] text-[10px] font-semibold text-[#9AA3B5]">
+    <span className="inline-flex items-center rounded-md bg-[#EFF2F8] px-2 py-0.5 font-['Plus_Jakarta_Sans'] text-[11px] font-semibold text-[#596376] ring-1 ring-[#DEE5F0]">
       Nao pesquisado
     </span>
   );
 }
 
-function ItemRow({
-  item,
-  expanded,
-  onOpen,
-}: {
-  item: ItemType;
-  expanded: boolean;
-  onOpen: () => void;
-}) {
-  const melhorCotacao =
-    item.preco_medio !== null
-      ? `${formatCurrency(item.preco_medio)} / ${(item.unidade ?? "un").toLowerCase()}`
-      : "-";
+/* ─── summary badges ────────────────────────────────────────── */
 
+function SummaryBadge({ count, label, tone = "default" }: { count: number; label: string; tone?: "default" | "green" | "amber" }) {
+  const colors =
+    tone === "green"
+      ? "bg-emerald-50 text-emerald-700 ring-emerald-100"
+      : tone === "amber"
+        ? "bg-amber-50 text-amber-700 ring-amber-100"
+        : "bg-[#EFF2F8] text-[#596376] ring-[#DEE5F0]";
+
+  return (
+    <span className={cn("inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 font-['Plus_Jakarta_Sans'] text-[12px] ring-1", colors)}>
+      <span className="font-['Manrope'] text-[14px] font-bold">{count}</span>
+      {label}
+    </span>
+  );
+}
+
+/* ─── item list row (left panel) ────────────────────────────── */
+
+function ItemListRow({ item, isActive, onClick }: { item: ItemType; isActive: boolean; onClick: () => void }) {
   return (
     <button
       type="button"
-      onClick={onOpen}
-      className="mb-[6px] w-full overflow-hidden rounded-[7px] border border-[#E2E6EF] text-left transition hover:border-[#C8D6F8] hover:shadow-[0_8px_24px_rgba(37,99,235,0.08)]"
+      onClick={onClick}
+      className={cn(
+        "w-full rounded-xl border px-3 py-2.5 text-left transition-all duration-150",
+        isActive
+          ? "border-accent/30 bg-[#EEF4FF] shadow-sm"
+          : "border-transparent hover:border-line hover:bg-panel/70",
+      )}
     >
-      <div className="flex items-center gap-[9px] bg-white px-[13px] py-[9px]">
-        <span className='min-w-[20px] font-["DM_Mono"] text-[10.5px] text-[#9AA3B5]'>
+      <div className="flex items-start gap-2.5">
+        <span
+          className={cn(
+            "mt-0.5 shrink-0 font-['Manrope'] text-[11px] font-bold",
+            isActive ? "text-accent" : "text-slate/60",
+          )}
+        >
           {String(item.numero_item).padStart(2, "0")}
         </span>
-        <span className="flex-1 text-[12.5px] font-medium text-[#0F1724]">{item.descricao}</span>
-        <span className="whitespace-nowrap text-[11px] text-[#9AA3B5]">{formatQuantity(item.quantidade, item.unidade)}</span>
-        <ItemStatusBadge status={item.status_pesquisa} />
-      </div>
-
-      {expanded ? (
-        <div className="grid grid-cols-3 gap-[10px] border-t border-[#ECEEF5] bg-[#F5F7FB] px-[13px] py-[11px]">
-          <div>
-            <div className="mb-[2px] text-[10px] font-medium uppercase tracking-[0.05em] text-[#9AA3B5]">Especificacao</div>
-            <div className="text-[12px] font-medium text-[#0F1724]">{parseFirstSpecification(item)}</div>
-          </div>
-          <div>
-            <div className="mb-[2px] text-[10px] font-medium uppercase tracking-[0.05em] text-[#9AA3B5]">Marca ref.</div>
-            <div className="text-[12px] font-medium text-[#0F1724]">
-              {parseReferenceBrands(item).slice(0, 2).join(" / ") || "-"}
-            </div>
-          </div>
-          <div>
-            <div className="mb-[2px] text-[10px] font-medium uppercase tracking-[0.05em] text-[#9AA3B5]">Melhor cotacao</div>
-            <div className="text-[12px] font-medium text-[#16A34A]">{melhorCotacao}</div>
+        <div className="min-w-0 flex-1 space-y-1">
+          <p
+            className={cn(
+              "line-clamp-2 font-['Plus_Jakarta_Sans'] text-[12.5px] font-medium leading-snug",
+              isActive ? "text-ink" : "text-ink/80",
+            )}
+          >
+            {item.descricao}
+          </p>
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-['Plus_Jakarta_Sans'] text-[11px] text-slate/70">
+              {formatQuantity(item.quantidade, item.unidade)}
+            </span>
+            <StatusBadge status={item.status_pesquisa} />
           </div>
         </div>
-      ) : null}
+      </div>
     </button>
   );
 }
 
-function ItemDetailCard({ item }: { item: ItemType }) {
+/* ─── item detail panel (right panel) ──────────────────────── */
+
+function ItemDetail({ item }: { item: ItemType }) {
   const especificacoes = parseSpecifications(item);
   const marcas = parseReferenceBrands(item);
 
   return (
-    <div className="rounded-[18px] border border-[#E2E6EF] bg-[#F8FAFD] p-5">
-      <div className="mb-4 flex flex-wrap items-start gap-3">
-        <div className="rounded-[12px] bg-white px-3 py-2 font-['DM_Mono'] text-[12px] text-[#9AA3B5]">
-          Item {String(item.numero_item).padStart(2, "0")}
+    <div className="flex h-full flex-col gap-4 overflow-y-auto pr-1">
+      {/* Header */}
+      <div className="flex flex-wrap items-start gap-3">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#EEF4FF] font-['Manrope'] text-[13px] font-bold text-accent">
+            {String(item.numero_item).padStart(2, "0")}
+          </span>
+          <StatusBadge status={item.status_pesquisa} />
         </div>
-        <div className="flex-1">
-          <h3 className="text-[18px] font-semibold leading-7 text-[#0F1724]">{item.descricao}</h3>
-        </div>
-        <ItemStatusBadge status={item.status_pesquisa} />
+        <h3 className="flex-1 font-['Manrope'] text-[17px] font-bold leading-snug text-ink">
+          {item.descricao}
+        </h3>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-[14px] border border-[#E2E6EF] bg-white px-4 py-3">
-          <div className="mb-1 text-[11px] font-medium uppercase tracking-[0.08em] text-[#9AA3B5]">Quantidade</div>
-          <div className="text-[14px] font-semibold text-[#0F1724]">{formatQuantity(item.quantidade, item.unidade)}</div>
+      {/* Métricas */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="rounded-xl border border-line/80 bg-panel/50 px-4 py-3">
+          <p className="font-['Plus_Jakarta_Sans'] text-[10.5px] font-semibold uppercase tracking-[0.1em] text-slate/70">
+            Quantidade
+          </p>
+          <p className="mt-1 font-['Manrope'] text-[15px] font-bold text-ink">
+            {formatQuantity(item.quantidade, item.unidade)}
+          </p>
         </div>
-        <div className="rounded-[14px] border border-[#E2E6EF] bg-white px-4 py-3">
-          <div className="mb-1 text-[11px] font-medium uppercase tracking-[0.08em] text-[#9AA3B5]">Melhor cotacao</div>
-          <div className="text-[14px] font-semibold text-[#16A34A]">
-            {item.preco_medio !== null ? formatCurrency(item.preco_medio) : "-"}
-          </div>
+        <div className="rounded-xl border border-line/80 bg-panel/50 px-4 py-3">
+          <p className="font-['Plus_Jakarta_Sans'] text-[10.5px] font-semibold uppercase tracking-[0.1em] text-slate/70">
+            Melhor cotacao
+          </p>
+          <p className={cn("mt-1 font-['Manrope'] text-[15px] font-bold", item.preco_medio !== null ? "text-emerald-600" : "text-slate/50")}>
+            {item.preco_medio !== null ? formatCurrency(item.preco_medio) : "–"}
+          </p>
         </div>
-        <div className="rounded-[14px] border border-[#E2E6EF] bg-white px-4 py-3">
-          <div className="mb-1 text-[11px] font-medium uppercase tracking-[0.08em] text-[#9AA3B5]">Marca ref.</div>
-          <div className="text-[14px] font-semibold text-[#0F1724]">{marcas.slice(0, 3).join(" / ") || "-"}</div>
+        <div className="rounded-xl border border-line/80 bg-panel/50 px-4 py-3">
+          <p className="font-['Plus_Jakarta_Sans'] text-[10.5px] font-semibold uppercase tracking-[0.1em] text-slate/70">
+            Marca ref.
+          </p>
+          <p className="mt-1 font-['Manrope'] text-[15px] font-bold text-ink">
+            {marcas[0] ?? "–"}
+          </p>
         </div>
       </div>
 
-      <div className="mt-5 grid gap-5 lg:grid-cols-[1.35fr_0.9fr]">
-        <div className="rounded-[14px] border border-[#E2E6EF] bg-white px-4 py-4">
-          <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.08em] text-[#9AA3B5]">
-            Descricao completa e especificacoes
+      {/* Especificações */}
+      <div className="rounded-xl border border-line/80 bg-white px-4 py-4">
+        <p className="mb-2.5 font-['Plus_Jakarta_Sans'] text-[10.5px] font-semibold uppercase tracking-[0.1em] text-slate/70">
+          Especificacoes tecnicas
+        </p>
+        {especificacoes.length > 0 ? (
+          <ul className="space-y-1.5">
+            {especificacoes.map((spec) => (
+              <li key={spec} className="flex items-start gap-2 font-['Plus_Jakarta_Sans'] text-[13px] leading-relaxed text-ink/80">
+                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent/50" />
+                {spec}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="font-['Plus_Jakarta_Sans'] text-[13px] text-slate/60">{item.descricao}</p>
+        )}
+      </div>
+
+      {/* Marcas */}
+      <div className="rounded-xl border border-line/80 bg-white px-4 py-4">
+        <p className="mb-2.5 font-['Plus_Jakarta_Sans'] text-[10.5px] font-semibold uppercase tracking-[0.1em] text-slate/70">
+          Marcas e fabricantes
+        </p>
+        {marcas.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {marcas.map((marca) => (
+              <span
+                key={marca}
+                className="inline-flex items-center rounded-xl border border-accent/20 bg-[#EEF4FF] px-3 py-1 font-['Plus_Jakarta_Sans'] text-[12px] font-medium text-accent"
+              >
+                {marca}
+              </span>
+            ))}
           </div>
-          {especificacoes.length > 0 ? (
-            <ul className="space-y-2 text-[14px] leading-6 text-[#0F1724]">
-              {especificacoes.map((spec) => (
-                <li key={spec}>- {spec}</li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-[14px] leading-6 text-[#5A6478]">{item.descricao}</p>
-          )}
+        ) : (
+          <p className="font-['Plus_Jakarta_Sans'] text-[13px] text-slate/60">
+            Nenhuma marca sugerida foi encontrada.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─── modal de itens ────────────────────────────────────────── */
+
+function ItensModal({
+  isOpen,
+  items,
+  onClose,
+  initialItemId,
+}: {
+  isOpen: boolean;
+  items: ItemType[];
+  onClose: () => void;
+  initialItemId: number | null;
+}) {
+  const [activeId, setActiveId] = useState<number | null>(initialItemId);
+
+  // sync when modal opens with a new item
+  useMemo(() => {
+    if (isOpen && initialItemId !== null) setActiveId(initialItemId);
+  }, [isOpen, initialItemId]);
+
+  const activeItem = useMemo(() => items.find((i) => i.id === activeId) ?? items[0] ?? null, [items, activeId]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-ink/45 px-4 py-4 backdrop-blur-[2px]">
+      <button type="button" className="absolute inset-0 cursor-default" aria-label="Fechar" onClick={onClose} />
+
+      <div className="relative z-10 flex h-[calc(100vh-48px)] w-full max-w-5xl flex-col overflow-hidden rounded-[28px] border border-line/80 bg-white shadow-soft">
+
+        {/* Header */}
+        <div className="flex shrink-0 items-center justify-between gap-4 border-b border-line px-6 py-4">
+          <div>
+            <p className="font-['Plus_Jakarta_Sans'] text-[11px] font-semibold uppercase tracking-[0.18em] text-accent/80">
+              Itens da licitacao
+            </p>
+            <h2 className="font-['Manrope'] text-[18px] font-extrabold text-ink">
+              {items.length} {items.length === 1 ? "item extraido" : "itens extraidos"}
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate transition hover:bg-slate-100 hover:text-ink"
+            aria-label="Fechar"
+          >
+            <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
+              <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
         </div>
 
-        <div className="rounded-[14px] border border-[#E2E6EF] bg-white px-4 py-4">
-          <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.08em] text-[#9AA3B5]">
-            Marcas e fabricantes
-          </div>
-          {marcas.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {marcas.map((marca) => (
-                <span
-                  key={marca}
-                  className="rounded-[999px] border border-[#D7E3FF] bg-[#EEF4FF] px-3 py-1 text-[12px] font-medium text-[#2563EB]"
-                >
-                  {marca}
-                </span>
+        {/* Body: two columns */}
+        <div className="flex min-h-0 flex-1">
+
+          {/* Left — lista de itens */}
+          <div className="flex w-[280px] shrink-0 flex-col border-r border-line/80 bg-panel/40">
+            <div className="shrink-0 px-3 pt-3 pb-2">
+              <p className="font-['Plus_Jakarta_Sans'] text-[11px] font-semibold uppercase tracking-[0.1em] text-slate/60">
+                {items.length} {items.length === 1 ? "item" : "itens"}
+              </p>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3 space-y-0.5">
+              {items.map((item) => (
+                <ItemListRow
+                  key={item.id}
+                  item={item}
+                  isActive={item.id === activeItem?.id}
+                  onClick={() => setActiveId(item.id)}
+                />
               ))}
             </div>
-          ) : (
-            <p className="text-[14px] leading-6 text-[#5A6478]">Nenhuma marca sugerida foi encontrada.</p>
-          )}
+          </div>
+
+          {/* Right — detalhe do item */}
+          <div className="min-w-0 flex-1 overflow-hidden px-6 py-5">
+            {activeItem ? (
+              <ItemDetail item={activeItem} />
+            ) : (
+              <div className="flex h-full items-center justify-center text-slate">
+                <p className="font-['Plus_Jakarta_Sans'] text-sm">Selecione um item</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
   );
 }
+
+/* ─── tab principal ─────────────────────────────────────────── */
 
 function TabItensLicitacao({
   items,
@@ -223,21 +315,22 @@ function TabItensLicitacao({
   items: ItemType[];
   resumo: { total: number; aguardando: number; pesquisados: number };
 }) {
-  const visibleItems = items.slice(0, 5);
+  const [modalOpen, setModalOpen] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
 
-  const selectedItem = useMemo(
-    () => items.find((item) => item.id === selectedItemId) ?? null,
-    [items, selectedItemId],
-  );
+  function openModal(itemId?: number) {
+    setSelectedItemId(itemId ?? items[0]?.id ?? null);
+    setModalOpen(true);
+  }
 
-  const modalItems = selectedItem ? [selectedItem, ...items.filter((item) => item.id !== selectedItem.id)] : items;
+  const visibleItems = items.slice(0, 5);
 
   return (
     <>
-      <section className="rounded-[10px] border border-[#E2E6EF] bg-white px-4 py-4">
-        <div className="mb-[13px] flex items-center gap-[7px] text-[12.5px] font-semibold text-[#0F1724]">
-          <svg viewBox="0 0 24 24" fill="none" className="h-[14px] w-[14px] text-[#2563EB]" aria-hidden="true">
+      {/* Resumo */}
+      <section className="rounded-[14px] border border-line/80 bg-white px-4 py-4">
+        <div className="mb-3 flex items-center gap-2">
+          <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 text-accent" aria-hidden="true">
             <path
               d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2"
               stroke="currentColor"
@@ -246,62 +339,83 @@ function TabItensLicitacao({
               strokeLinejoin="round"
             />
           </svg>
-          Resumo dos Itens
+          <span className="font-['Manrope'] text-[13px] font-bold text-ink">Resumo dos Itens</span>
         </div>
-
-        <div className="mb-[13px] flex flex-wrap gap-[7px]">
+        <div className="flex flex-wrap gap-2">
           <SummaryBadge count={resumo.total} label="Total" />
           <SummaryBadge count={resumo.pesquisados} label="Pesquisados" tone="green" />
-          <SummaryBadge count={resumo.aguardando} label="Aguardando" tone="yellow" />
+          <SummaryBadge count={resumo.aguardando} label="Aguardando" tone="amber" />
         </div>
       </section>
 
-      <section className="rounded-[10px] border border-[#E2E6EF] bg-white p-[15px]">
-        <div className="mb-[13px] flex items-center gap-[7px] text-[12.5px] font-semibold text-[#0F1724]">
-          <svg viewBox="0 0 24 24" fill="none" className="h-[14px] w-[14px] text-[#2563EB]" aria-hidden="true">
-            <path
-              d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
+      {/* Lista prévia */}
+      <section className="rounded-[14px] border border-line/80 bg-white p-4">
+        <div className="mb-3 flex items-center gap-2">
+          <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 text-accent" aria-hidden="true">
+            <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          Itens da Licitacao
+          <span className="font-['Manrope'] text-[13px] font-bold text-ink">Itens da Licitacao</span>
         </div>
 
         {visibleItems.length === 0 ? (
-          <div className="rounded-[7px] border border-dashed border-[#E2E6EF] bg-[#F5F7FB] px-4 py-6 text-[12px] text-[#5A6478]">
+          <div className="rounded-xl border border-dashed border-line bg-panel/50 px-4 py-6 text-center font-['Plus_Jakarta_Sans'] text-[13px] text-slate/70">
             Nenhum item extraido ainda.
           </div>
         ) : (
-          <>
-            {visibleItems.map((item, index) => (
-              <ItemRow key={item.id} item={item} expanded={index < 2} onOpen={() => setSelectedItemId(item.id)} />
-            ))}
-            <div className="pt-[10px] text-center text-[11px] text-[#9AA3B5]">
-              Exibindo {visibleItems.length} de {items.length} itens -{" "}
-              <button type="button" className="font-medium text-[#2563EB]" onClick={() => setSelectedItemId(items[0]?.id ?? null)}>
-                Ver todos
+          <div className="space-y-1.5">
+            {visibleItems.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => openModal(item.id)}
+                className="w-full overflow-hidden rounded-xl border border-line/80 bg-white text-left transition hover:border-accent/30 hover:shadow-card"
+              >
+                <div className="flex items-center gap-3 px-3.5 py-2.5">
+                  <span className="shrink-0 font-['Manrope'] text-[11px] font-bold text-slate/50">
+                    {String(item.numero_item).padStart(2, "0")}
+                  </span>
+                  <span className="flex-1 truncate font-['Plus_Jakarta_Sans'] text-[13px] font-medium text-ink">
+                    {item.descricao}
+                  </span>
+                  <span className="shrink-0 font-['Plus_Jakarta_Sans'] text-[11px] text-slate/60">
+                    {formatQuantity(item.quantidade, item.unidade)}
+                  </span>
+                  <StatusBadge status={item.status_pesquisa} />
+                </div>
               </button>
-            </div>
-          </>
+            ))}
+
+            {items.length > 5 ? (
+              <div className="pt-1 text-center">
+                <button
+                  type="button"
+                  onClick={() => openModal()}
+                  className="font-['Plus_Jakarta_Sans'] text-[12px] font-semibold text-accent hover:text-accentDark"
+                >
+                  Ver todos os {items.length} itens →
+                </button>
+              </div>
+            ) : (
+              <div className="pt-1 text-center">
+                <button
+                  type="button"
+                  onClick={() => openModal()}
+                  className="font-['Plus_Jakarta_Sans'] text-[12px] font-semibold text-accent hover:text-accentDark"
+                >
+                  Ver detalhes completos →
+                </button>
+              </div>
+            )}
+          </div>
         )}
       </section>
 
-      <Modal
-        isOpen={selectedItem !== null}
-        onClose={() => setSelectedItemId(null)}
-        title="Detalhes dos itens da licitacao"
-        eyebrow="Itens da licitacao"
-        widthClassName="max-w-5xl"
-      >
-        <div className="space-y-4 pr-1">
-          {modalItems.map((item) => (
-            <ItemDetailCard key={item.id} item={item} />
-          ))}
-        </div>
-      </Modal>
+      <ItensModal
+        isOpen={modalOpen}
+        items={items}
+        onClose={() => setModalOpen(false)}
+        initialItemId={selectedItemId}
+      />
     </>
   );
 }
