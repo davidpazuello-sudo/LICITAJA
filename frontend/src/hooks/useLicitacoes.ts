@@ -35,8 +35,10 @@ export function useLicitacoes() {
   useEffect(() => {
     let isCancelled = false;
 
-    const timeoutId = window.setTimeout(async () => {
-      setStatus("loading");
+    const load = async (showLoading = false) => {
+      if (showLoading) {
+        setStatus("loading");
+      }
 
       try {
         const nextResponse = await listarLicitacoes({
@@ -63,11 +65,20 @@ export function useLicitacoes() {
             : "Nao foi possivel carregar as licitacoes salvas.",
         );
       }
+    };
+
+    const timeoutId = window.setTimeout(() => {
+      void load(true);
     }, 250);
+
+    const intervalId = window.setInterval(() => {
+      void load();
+    }, 30000);
 
     return () => {
       isCancelled = true;
       window.clearTimeout(timeoutId);
+      window.clearInterval(intervalId);
     };
   }, [searchTerm, statusFilter]);
 

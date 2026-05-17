@@ -2,7 +2,9 @@ import { apiRequest } from "./api";
 import type { ChatConversationResponseType } from "../types/chat.types";
 import type {
   AtualizarLicitacaoPayload,
+  JobType,
   LicitacaoDetailType,
+  LicitacaoMonitoramentoType,
   LicitacoesListResponseType,
   LicitacaoType,
   MinhasLicitacoesStatusFilter,
@@ -36,6 +38,24 @@ export async function excluirLicitacao(licitacaoId: number): Promise<void> {
 
 export async function obterLicitacao(licitacaoId: number): Promise<LicitacaoDetailType> {
   return apiRequest<LicitacaoDetailType>(`/licitacoes/${licitacaoId}`);
+}
+
+export async function obterMonitoramentoLicitacao(
+  licitacaoId: number,
+): Promise<LicitacaoMonitoramentoType> {
+  return apiRequest<LicitacaoMonitoramentoType>(`/licitacoes/${licitacaoId}/monitoramento`);
+}
+
+export async function obterJobMonitoramentoLicitacao(
+  licitacaoId: number,
+): Promise<JobType | null> {
+  return apiRequest<JobType | null>(`/licitacoes/${licitacaoId}/monitoramento/job`);
+}
+
+export async function monitorarLicitacaoAgora(licitacaoId: number): Promise<JobType> {
+  return apiRequest<JobType>(`/licitacoes/${licitacaoId}/monitorar-agora`, {
+    method: "POST",
+  });
 }
 
 export async function atualizarLicitacao(

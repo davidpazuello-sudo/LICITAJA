@@ -7,6 +7,7 @@ from app.core.database import get_db_session
 from app.models.chat_message import ChatMessageModel
 from app.models.licitacao import LicitacaoModel
 from app.schemas.chat import ChatConversationResponse, ChatMessageCreate, ChatMessageRead
+from app.schemas.job import JobRead
 from app.schemas.licitacao import (
     LicitacaoCreate,
     LicitacaoDetail,
@@ -15,8 +16,13 @@ from app.schemas.licitacao import (
     LicitacoesListResponse,
     LicitacaoUpdate,
 )
+from app.schemas.monitoramento import LicitacaoMonitoramentoRead
 from app.services.ia_service import ExtracaoItensError, IaService
 from app.services.job_service import criar_job_processamento, processar_licitacao_salva_em_segundo_plano
+from app.services.monitoramento_service import (
+    MonitoramentoService,
+    executar_monitoramento_leve_em_segundo_plano,
+)
 from app.models.item import ItemModel
 from app.models.processamento_job import ProcessamentoJobModel
 
@@ -31,7 +37,11 @@ async def listar_licitacoes(
     q: str | None = Query(default=None),
     db: Session = Depends(get_db_session),
 ) -> LicitacoesListResponse:
-    licitacoes = db.scalars(select(LicitacaoModel).order_by(LicitacaoModel.created_at.desc())).all()
+    licitacoes = db.scalars(
+        select(LicitacaoModel)
+        .options(selectinload(LicitacaoModel.monitoramento))
+        .order_by(LicitacaoModel.created_at.desc()),
+    ).all()
 
     filtered_by_text = [
         licitacao
@@ -68,11 +78,13 @@ async def salvar_licitacao(
     response: Response,
     db: Session = Depends(get_db_session),
 ) -> LicitacaoRead:
+    monitoramento_service = MonitoramentoService(db)
     existing = db.scalar(
         select(LicitacaoModel).where(LicitacaoModel.numero_controle == payload.numero_controle),
     )
 
     if existing is not None:
+        monitoramento_service.ensure_monitoramento(existing)
         _agendar_processamento_automatico(db, background_tasks, existing)
         response.status_code = status.HTTP_200_OK
         return LicitacaoRead.model_validate(existing)
@@ -90,6 +102,7 @@ async def salvar_licitacao(
             detail="Nao foi possivel salvar a licitacao.",
         )
 
+    monitoramento_service.ensure_monitoramento(licitacao)
     _agendar_processamento_automatico(db, background_tasks, licitacao)
     return LicitacaoRead.model_validate(licitacao)
 
@@ -97,14 +110,81 @@ async def salvar_licitacao(
 @router.get("/licitacoes/{licitacao_id}", response_model=LicitacaoDetail)
 async def obter_licitacao(
     licitacao_id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db_session),
 ) -> LicitacaoDetail:
-    licitacao = db.get(LicitacaoModel, licitacao_id)
+    licitacao = db.scalar(
+        select(LicitacaoModel)
+        .options(
+            selectinload(LicitacaoModel.itens),
+            selectinload(LicitacaoModel.editais),
+            selectinload(LicitacaoModel.monitoramento),
+            selectinload(LicitacaoModel.eventos_monitoramento),
+        )
+        .where(LicitacaoModel.id == licitacao_id),
+    )
 
     if licitacao is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Licitacao nao encontrada.")
 
+    monitoramento_service = MonitoramentoService(db)
+    monitor = monitoramento_service.ensure_monitoramento(licitacao)
+    if monitoramento_service.monitoramento_deve_rodar(licitacao, monitor):
+        job = monitoramento_service.criar_job_monitoramento(licitacao)
+        background_tasks.add_task(executar_monitoramento_leve_em_segundo_plano, job.id, licitacao.id)
+
     return LicitacaoDetail.model_validate(licitacao)
+
+
+@router.get("/licitacoes/{licitacao_id}/monitoramento", response_model=LicitacaoMonitoramentoRead)
+async def obter_monitoramento_licitacao(
+    licitacao_id: int,
+    db: Session = Depends(get_db_session),
+) -> LicitacaoMonitoramentoRead:
+    licitacao = db.get(LicitacaoModel, licitacao_id)
+    if licitacao is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Licitacao nao encontrada.")
+
+    monitoramento_service = MonitoramentoService(db)
+    monitor = monitoramento_service.ensure_monitoramento(licitacao)
+    return LicitacaoMonitoramentoRead.model_validate(monitor)
+
+
+@router.get("/licitacoes/{licitacao_id}/monitoramento/job", response_model=JobRead | None)
+async def obter_job_monitoramento_licitacao(
+    licitacao_id: int,
+    db: Session = Depends(get_db_session),
+) -> JobRead | None:
+    licitacao = db.get(LicitacaoModel, licitacao_id)
+    if licitacao is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Licitacao nao encontrada.")
+
+    job = db.scalar(
+        select(ProcessamentoJobModel)
+        .where(
+            ProcessamentoJobModel.licitacao_id == licitacao_id,
+            ProcessamentoJobModel.tipo == "licitacao_monitoramento_leve",
+        )
+        .order_by(ProcessamentoJobModel.id.desc()),
+    )
+    return JobRead.model_validate(job) if job is not None else None
+
+
+@router.post("/licitacoes/{licitacao_id}/monitorar-agora", response_model=JobRead, status_code=status.HTTP_202_ACCEPTED)
+async def monitorar_licitacao_agora(
+    licitacao_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db_session),
+) -> JobRead:
+    licitacao = db.get(LicitacaoModel, licitacao_id)
+    if licitacao is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Licitacao nao encontrada.")
+
+    monitoramento_service = MonitoramentoService(db)
+    monitoramento_service.ensure_monitoramento(licitacao)
+    job = monitoramento_service.criar_job_monitoramento(licitacao)
+    background_tasks.add_task(executar_monitoramento_leve_em_segundo_plano, job.id, licitacao.id)
+    return JobRead.model_validate(job)
 
 
 @router.get("/licitacoes/{licitacao_id}/chat", response_model=ChatConversationResponse)

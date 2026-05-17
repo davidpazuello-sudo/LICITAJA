@@ -42,3 +42,15 @@ class LicitacaoModel(Base):
     editais = relationship("EditalModel", back_populates="licitacao", cascade="all, delete-orphan")
     itens = relationship("ItemModel", back_populates="licitacao", cascade="all, delete-orphan")
     chat_messages = relationship("ChatMessageModel", back_populates="licitacao", cascade="all, delete-orphan")
+    monitoramento = relationship(
+        "LicitacaoMonitoramentoModel",
+        back_populates="licitacao",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+    eventos_monitoramento = relationship(
+        "LicitacaoEventoModel",
+        back_populates="licitacao",
+        cascade="all, delete-orphan",
+        order_by="LicitacaoEventoModel.id.desc()",
+    )

@@ -119,11 +119,53 @@ export interface LicitacaoType {
   dados_brutos: string | null;
   created_at: string;
   updated_at: string;
+  monitoramento?: LicitacaoMonitoramentoType | null;
 }
 
 export interface LicitacaoDetailType extends LicitacaoType {
   itens: ItemType[];
   editais: EditalType[];
+  eventos_monitoramento: LicitacaoEventoType[];
+}
+
+export interface LicitacaoMonitoramentoType {
+  id: number;
+  licitacao_id: number;
+  monitoramento_ativo: boolean;
+  status_remoto: string | null;
+  ultima_verificacao_em: string | null;
+  proxima_verificacao_em: string | null;
+  ultima_mudanca_detectada_em: string | null;
+  ultimo_hash_dados: string | null;
+  ultimo_hash_editais: string | null;
+  ultimo_erro_monitoramento: string | null;
+  resumo_ultima_mudanca: string | null;
+  tentativas_consecutivas_erro: number;
+  criado_em: string;
+  atualizado_em: string;
+}
+
+export interface LicitacaoEventoType {
+  id: number;
+  licitacao_id: number;
+  tipo_evento: string;
+  origem: string | null;
+  titulo: string;
+  descricao: string | null;
+  payload_json: string | null;
+  criado_em: string;
+}
+
+export interface JobType {
+  id: number;
+  licitacao_id: number | null;
+  tipo: string;
+  status: string;
+  mensagem: string | null;
+  criado_em: string;
+  iniciado_em: string | null;
+  finalizado_em: string | null;
+  atualizado_em: string;
 }
 
 export interface LicitacoesListCountsType {

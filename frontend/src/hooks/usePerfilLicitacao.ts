@@ -5,9 +5,10 @@ import {
   atualizarLicitacao,
   excluirLicitacao,
   gerarResumoIALicitacao,
+  obterJobMonitoramentoLicitacao,
   obterLicitacao,
 } from "../services/licitacoes.service";
-import type { LicitacaoDetailType } from "../types/licitacao.types";
+import type { JobType, LicitacaoDetailType } from "../types/licitacao.types";
 
 type PerfilStatus = "loading" | "success" | "error";
 type SaveIndicator = "idle" | "saving" | "saved";
@@ -21,6 +22,7 @@ export function usePerfilLicitacao(licitacaoId: number | null) {
   const [saveIndicator, setSaveIndicator] = useState<SaveIndicator>("idle");
   const [isRemoving, setIsRemoving] = useState(false);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+  const [monitoramentoJob, setMonitoramentoJob] = useState<JobType | null>(null);
 
   useEffect(() => {
     if (!licitacaoId) {
@@ -44,6 +46,10 @@ export function usePerfilLicitacao(licitacaoId: number | null) {
         setObservacoes(response.observacoes ?? "");
         setStatus("success");
         setErrorMessage("");
+        const latestJob = await obterJobMonitoramentoLicitacao(licitacaoId);
+        if (!isCancelled) {
+          setMonitoramentoJob(latestJob);
+        }
       } catch (error) {
         if (isCancelled) {
           return;
@@ -73,7 +79,47 @@ export function usePerfilLicitacao(licitacaoId: number | null) {
     const response = await obterLicitacao(licitacaoId);
     setPerfil(response);
     setObservacoes(response.observacoes ?? "");
+    const latestJob = await obterJobMonitoramentoLicitacao(licitacaoId);
+    setMonitoramentoJob(latestJob);
   }, [licitacaoId]);
+
+  useEffect(() => {
+    if (!licitacaoId || !monitoramentoJob || !["queued", "processing"].includes(monitoramentoJob.status)) {
+      return;
+    }
+
+    let cancelled = false;
+    const intervalId = window.setInterval(async () => {
+      try {
+        const [latestJob, latestPerfil] = await Promise.all([
+          obterJobMonitoramentoLicitacao(licitacaoId),
+          obterLicitacao(licitacaoId),
+        ]);
+        if (cancelled) {
+          return;
+        }
+
+        setMonitoramentoJob(latestJob);
+        setPerfil(latestPerfil);
+        setObservacoes((current) =>
+          current === (perfil?.observacoes ?? "") ? (latestPerfil.observacoes ?? "") : current,
+        );
+
+        if (latestJob && !["queued", "processing"].includes(latestJob.status)) {
+          window.clearInterval(intervalId);
+        }
+      } catch {
+        if (cancelled) {
+          return;
+        }
+      }
+    }, 8000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [licitacaoId, monitoramentoJob, perfil?.observacoes]);
 
   useEffect(() => {
     if (!perfil || observacoes === (perfil.observacoes ?? "")) {
@@ -175,6 +221,7 @@ export function usePerfilLicitacao(licitacaoId: number | null) {
     isRemoving,
     observacoes,
     perfil,
+    monitoramentoJob,
     reloadPerfil,
     removePerfil,
     saveIndicator,

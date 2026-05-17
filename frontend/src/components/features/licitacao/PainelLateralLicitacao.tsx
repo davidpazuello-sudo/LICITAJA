@@ -1,9 +1,11 @@
 import type { ReactNode } from "react";
 
-import type { LicitacaoDetailType } from "../../../types/licitacao.types";
+import type { JobType, LicitacaoDetailType } from "../../../types/licitacao.types";
+import { formatDateTime, formatRelativeTime } from "../../../utils/formatters";
 
 interface PainelLateralLicitacaoProps {
   perfil: LicitacaoDetailType;
+  monitoramentoJob: JobType | null;
   isRemoving: boolean;
   totalItens: number;
   pesquisados: number;
@@ -113,6 +115,7 @@ function PipelineStep({
 
 function PainelLateralLicitacao({
   perfil,
+  monitoramentoJob,
   isRemoving,
   totalItens,
   pesquisados,
@@ -128,6 +131,23 @@ function PainelLateralLicitacao({
   const resumoCurto = perfil.resumo_ia
     ? perfil.resumo_ia.split("\n").join(" ").slice(0, 190)
     : "";
+  const monitoramento = perfil.monitoramento;
+  const monitoramentoRodando = monitoramentoJob?.status === "queued" || monitoramentoJob?.status === "processing";
+  const monitoramentoStatusLabel = monitoramento?.ultimo_erro_monitoramento
+    ? "Falha recente no monitoramento"
+    : monitoramentoRodando
+      ? "Atualizando a licitacao agora"
+      : monitoramento?.status_remoto
+        ? `Portal informa: ${monitoramento.status_remoto}`
+        : "Monitoramento ativo";
+  const monitoramentoHelper = monitoramentoRodando
+    ? monitoramentoJob?.mensagem || "Comparando os dados da licitacao com a fonte original."
+    : monitoramento?.ultima_verificacao_em
+      ? `Ultima verificacao ${formatRelativeTime(monitoramento.ultima_verificacao_em)}`
+      : "A primeira verificacao ainda sera executada.";
+  const ultimaMudanca = monitoramento?.ultima_mudanca_detectada_em
+    ? `Mudanca detectada em ${formatDateTime(monitoramento.ultima_mudanca_detectada_em)}`
+    : null;
 
   return (
     <aside className="h-full min-w-[268px] border-l border-[#E2E6EF] bg-white">
@@ -224,6 +244,28 @@ function PainelLateralLicitacao({
       </section>
 
       <section className="border-b border-[#E2E6EF] px-[15px] py-[15px]">
+        <div className="mb-[11px] text-[10px] font-semibold uppercase tracking-[0.07em] text-[#9AA3B5]">
+          Monitoramento
+        </div>
+        <div className="mb-[14px] rounded-[10px] border border-[#E2E6EF] bg-[#F8FAFC] px-[12px] py-[11px]">
+          <div className={`text-[12px] font-semibold ${monitoramento?.ultimo_erro_monitoramento ? "text-[#DC2626]" : "text-[#2563EB]"}`}>
+            {monitoramentoStatusLabel}
+          </div>
+          <div className="mt-1 text-[11px] leading-[1.5] text-[#5A6478]">
+            {monitoramentoHelper}
+          </div>
+          {ultimaMudanca ? (
+            <div className="mt-2 text-[10px] text-[#9AA3B5]">
+              {ultimaMudanca}
+            </div>
+          ) : null}
+          {monitoramento?.resumo_ultima_mudanca ? (
+            <div className="mt-2 text-[10.5px] text-[#5A6478]">
+              {monitoramento.resumo_ultima_mudanca}
+            </div>
+          ) : null}
+        </div>
+
         <div className="mb-[11px] text-[10px] font-semibold uppercase tracking-[0.07em] text-[#9AA3B5]">
           Status do Processamento
         </div>

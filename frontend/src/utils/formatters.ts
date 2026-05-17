@@ -41,3 +41,29 @@ export function formatDateTime(value: string | null | undefined): string {
   }).format(parsed);
 }
 
+export function formatRelativeTime(value: string | null | undefined): string {
+  if (!value) {
+    return "Sem verificacao";
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  const diffMs = parsed.getTime() - Date.now();
+  const diffMinutes = Math.round(diffMs / 60000);
+  const rtf = new Intl.RelativeTimeFormat("pt-BR", { numeric: "auto" });
+
+  if (Math.abs(diffMinutes) < 60) {
+    return rtf.format(diffMinutes, "minute");
+  }
+
+  const diffHours = Math.round(diffMinutes / 60);
+  if (Math.abs(diffHours) < 24) {
+    return rtf.format(diffHours, "hour");
+  }
+
+  const diffDays = Math.round(diffHours / 24);
+  return rtf.format(diffDays, "day");
+}

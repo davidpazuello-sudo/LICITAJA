@@ -19,6 +19,7 @@ function PerfilLicitacao() {
     gerarResumoIA,
     isGeneratingSummary,
     isRemoving,
+    monitoramentoJob,
     observacoes,
     perfil,
     reloadPerfil,
@@ -169,6 +170,7 @@ function PerfilLicitacao() {
               <div>
                 <PainelLateralLicitacao
                   perfil={perfil}
+                  monitoramentoJob={monitoramentoJob}
                   isRemoving={isRemoving}
                   totalItens={resumo.total}
                   pesquisados={resumo.pesquisados}

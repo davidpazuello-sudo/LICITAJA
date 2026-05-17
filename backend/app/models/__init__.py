@@ -3,7 +3,9 @@ from app.models.configuracao import ConfiguracaoModel
 from app.models.cotacao import CotacaoModel
 from app.models.edital import EditalModel
 from app.models.item import ItemModel
+from app.models.licitacao_evento import LicitacaoEventoModel
 from app.models.licitacao import LicitacaoModel
+from app.models.licitacao_monitoramento import LicitacaoMonitoramentoModel
 from app.models.portal_integracao import PortalIntegracaoModel
 from app.models.processamento_job import ProcessamentoJobModel
 
@@ -13,7 +15,9 @@ __all__ = [
     "CotacaoModel",
     "EditalModel",
     "ItemModel",
+    "LicitacaoEventoModel",
     "LicitacaoModel",
+    "LicitacaoMonitoramentoModel",
     "PortalIntegracaoModel",
     "ProcessamentoJobModel",
 ]

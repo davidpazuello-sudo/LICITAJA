@@ -2,6 +2,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.edital import EditalRead
 from app.schemas.item import ItemRead
+from app.schemas.monitoramento import LicitacaoEventoRead, LicitacaoMonitoramentoRead
 
 
 class LicitacaoBase(BaseModel):
@@ -44,6 +45,8 @@ class LicitacaoRead(LicitacaoBase):
 class LicitacaoDetail(LicitacaoRead):
     itens: list[ItemRead] = Field(default_factory=list)
     editais: list[EditalRead] = Field(default_factory=list)
+    monitoramento: LicitacaoMonitoramentoRead | None = None
+    eventos_monitoramento: list[LicitacaoEventoRead] = Field(default_factory=list)
 
 
 class LicitacoesListCounts(BaseModel):
