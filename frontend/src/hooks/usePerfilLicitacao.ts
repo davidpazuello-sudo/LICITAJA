@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { useAppNotifications } from "../contexts/AppNotificationsContext";
 import {
@@ -65,7 +65,7 @@ export function usePerfilLicitacao(licitacaoId: number | null) {
     };
   }, [licitacaoId]);
 
-  const reloadPerfil = async () => {
+  const reloadPerfil = useCallback(async () => {
     if (!licitacaoId) {
       return;
     }
@@ -73,7 +73,7 @@ export function usePerfilLicitacao(licitacaoId: number | null) {
     const response = await obterLicitacao(licitacaoId);
     setPerfil(response);
     setObservacoes(response.observacoes ?? "");
-  };
+  }, [licitacaoId]);
 
   useEffect(() => {
     if (!perfil || observacoes === (perfil.observacoes ?? "")) {

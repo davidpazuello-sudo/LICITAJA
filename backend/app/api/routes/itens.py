@@ -318,6 +318,26 @@ async def obter_job_enriquecimento_marcas(
     return JobRead.model_validate(job) if job is not None else None
 
 
+@router.get("/licitacoes/{licitacao_id}/jobs/auto-pipeline", response_model=JobRead | None)
+async def obter_job_pipeline_automatico(
+    licitacao_id: int,
+    db: Session = Depends(get_db_session),
+) -> JobRead | None:
+    licitacao = db.get(LicitacaoModel, licitacao_id)
+    if licitacao is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Licitacao nao encontrada.")
+
+    job = db.scalar(
+        select(ProcessamentoJobModel)
+        .where(
+            ProcessamentoJobModel.licitacao_id == licitacao_id,
+            ProcessamentoJobModel.tipo == "licitacao_auto_pipeline",
+        )
+        .order_by(ProcessamentoJobModel.id.desc())
+    )
+    return JobRead.model_validate(job) if job is not None else None
+
+
 @router.post("/itens/{item_id}/pesquisar", response_model=ItemRead)
 async def pesquisar_item(
     item_id: int,

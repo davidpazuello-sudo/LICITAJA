@@ -6,6 +6,7 @@ import {
   exportarPropostasPorItem,
   extrairItens,
   listarItens,
+  obterJobAutoPipeline,
   obterJobEnriquecimentoMarcas,
   pesquisarItem,
   pesquisarMercado,
@@ -97,6 +98,62 @@ export function useItens(params: {
       isCancelled = true;
     };
   }, [licitacaoId]);
+
+  useEffect(() => {
+    if (!licitacaoId || !perfil) {
+      return;
+    }
+
+    const hasPendingItemSearch = items.some((item) =>
+      ["aguardando", "pesquisando"].includes(item.status_pesquisa),
+    );
+    const shouldPollAutomaticPipeline =
+      perfil.status === "em_analise" ||
+      (perfil.status === "itens_extraidos" && (items.length === 0 || hasPendingItemSearch));
+
+    if (!shouldPollAutomaticPipeline) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    const syncPipeline = async () => {
+      try {
+        try {
+          const autoJob = await obterJobAutoPipeline(licitacaoId);
+          if (isCancelled) {
+            return;
+          }
+
+          if (autoJob) {
+            setBackgroundJob(autoJob);
+          }
+        } catch {
+          // O backend publicado pode ainda nao ter a rota do job automatico.
+          // Mesmo assim, a UI continua sincronizando pelo perfil e pela lista de itens.
+        }
+
+        await onRefreshPerfil();
+        if (isCancelled) {
+          return;
+        }
+
+        await refreshItemsSilently(licitacaoId);
+      } catch {
+        return;
+      }
+    };
+
+    void syncPipeline();
+    const intervalId = window.setInterval(() => {
+      void syncPipeline();
+    }, 4000);
+
+    return () => {
+      isCancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [items, licitacaoId, onRefreshPerfil, perfil]);
 
   const latestEdital: EditalType | null = useMemo(() => {
     if (!perfil?.editais?.length) {
