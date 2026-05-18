@@ -148,6 +148,22 @@ class PropostasExtraidasWrapper(BaseModel):
     resultado: PropostasExtraidasPayload
 
 
+class PropostaComercialPayload(BaseModel):
+    titulo: str
+    destinatario: str
+    abertura: str
+    escopo: str
+    aderencia_tecnica: str
+    itens_destaque: list[str] = Field(default_factory=list)
+    documentacao_tecnica: str
+    observacoes: str
+    fechamento: str
+
+
+class PropostaComercialWrapper(BaseModel):
+    proposta: PropostaComercialPayload
+
+
 # Limite de caracteres para o texto do edital enviado a IA.
 # ~120k chars = aprox. 30k tokens — margem segura para todos os provedores suportados.
 _TEXTO_MAX_CHARS = 120_000
@@ -176,6 +192,14 @@ _PROPOSTAS_CONTEXT_CONFIG = {
     "groq": {"max_chars": 3_500, "max_chunks": 2},
     "anthropic": {"max_chars": 8_000, "max_chunks": 3},
     "gemini": {"max_chars": 5_000, "max_chunks": 3},
+}
+
+_PROPOSTA_CONTEXT_CONFIG = {
+    "openai": {"max_chars": 9_000, "max_chunks": 4},
+    "deepseek": {"max_chars": 7_000, "max_chunks": 4},
+    "groq": {"max_chars": 4_000, "max_chunks": 3},
+    "anthropic": {"max_chars": 9_000, "max_chunks": 4},
+    "gemini": {"max_chars": 6_000, "max_chunks": 4},
 }
 
 _CHAT_DOCUMENT_CHUNK_SIZE = 4_500
@@ -664,6 +688,20 @@ class IaService:
         if not resultado.itens:
             raise ExtracaoItensError("A IA nao conseguiu identificar itens com propostas nesta licitacao.")
         return resultado
+
+    async def gerar_proposta_comercial(self, licitacao: LicitacaoModel) -> PropostaComercialPayload:
+        if self.db is None:
+            raise ExtracaoItensError("Servico de IA sem acesso ao banco para gerar a proposta comercial.")
+
+        provider_id, provider = resolve_ai_agent_runtime_config(self.db, "criacao_proposta", self.settings)
+        if not provider["api_key"]:
+            raise ExtracaoItensError(
+                f"A chave da IA configurada para este agente ({provider['nome']}) nao esta disponivel."
+            )
+
+        contexto = await self._build_proposta_comercial_context(licitacao, provider_id)
+        prompt = self._build_proposta_comercial_prompt(provider["prompt_extracao"], contexto)
+        return await self._extract_proposta_comercial_payload(provider_id, provider, prompt)
 
     async def gerar_texto_estruturado(self, prompt: str, system_instruction: str) -> str:
         if self.db is None:
@@ -1303,6 +1341,35 @@ class IaService:
 
         raise ExtracaoItensError(f"IA ativa nao suportada: {provider['nome']}.")
 
+    async def _extract_proposta_comercial_payload(
+        self,
+        provider_id: str,
+        provider: dict[str, str],
+        prompt: str,
+    ) -> PropostaComercialPayload:
+        if provider_id == "openai":
+            return self._extract_proposta_comercial_with_openai(provider, prompt)
+        if provider_id == "deepseek":
+            return self._extract_proposta_comercial_with_openai_compatible(
+                provider,
+                prompt,
+                base_url="https://api.deepseek.com/v1",
+            )
+        if provider_id == "groq":
+            return self._extract_proposta_comercial_with_openai_compatible(
+                provider,
+                prompt,
+                base_url="https://api.groq.com/openai/v1",
+            )
+        if provider_id == "anthropic":
+            raw = await self._generate_text_anthropic(provider, prompt, _CHAT_SYSTEM_INSTRUCTION)
+            return self._parse_proposta_comercial_payload_from_text(raw, provider["nome"])
+        if provider_id == "gemini":
+            raw = await self._generate_text_gemini(provider, prompt, _CHAT_SYSTEM_INSTRUCTION)
+            return self._parse_proposta_comercial_payload_from_text(raw, provider["nome"])
+
+        raise ExtracaoItensError(f"IA ativa nao suportada: {provider['nome']}.")
+
     def _extract_propostas_with_openai(self, provider: dict[str, str], prompt: str) -> PropostasExtraidasPayload:
         client = OpenAI(api_key=provider["api_key"])
         prompt_com_instrucao = (
@@ -1326,6 +1393,34 @@ class IaService:
         if parsed is None or not parsed.resultado.itens:
             raise ExtracaoItensError(f"A IA ativa ({provider['nome']}) nao retornou propostas validas.")
         return parsed.resultado
+
+    def _extract_proposta_comercial_with_openai(
+        self,
+        provider: dict[str, str],
+        prompt: str,
+    ) -> PropostaComercialPayload:
+        client = OpenAI(api_key=provider["api_key"])
+        prompt_com_instrucao = (
+            prompt
+            + "\n\nIMPORTANTE: retorne um objeto JSON com a chave 'proposta' contendo o conteudo estruturado."
+        )
+
+        try:
+            response = client.responses.parse(
+                model=provider["modelo"],
+                input=[
+                    {"role": "system", "content": _CHAT_SYSTEM_INSTRUCTION},
+                    {"role": "user", "content": prompt_com_instrucao},
+                ],
+                text_format=PropostaComercialWrapper,
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise ExtracaoItensError(f"Nao foi possivel gerar a proposta com {provider['nome']}: {exc}") from exc
+
+        parsed = response.output_parsed
+        if parsed is None:
+            raise ExtracaoItensError(f"A IA ativa ({provider['nome']}) nao retornou uma proposta valida.")
+        return parsed.proposta
 
     def _extract_propostas_with_openai_compatible(
         self,
@@ -1356,6 +1451,36 @@ class IaService:
         if not content:
             raise ExtracaoItensError(f"A IA ativa ({provider['nome']}) retornou uma resposta vazia.")
         return self._parse_propostas_payload_from_text(content, provider["nome"])
+
+    def _extract_proposta_comercial_with_openai_compatible(
+        self,
+        provider: dict[str, str],
+        prompt: str,
+        *,
+        base_url: str,
+    ) -> PropostaComercialPayload:
+        client = OpenAI(api_key=provider["api_key"], base_url=base_url)
+        prompt_com_instrucao = (
+            prompt
+            + "\n\nIMPORTANTE: voce deve retornar EXCLUSIVAMENTE um objeto JSON valido com a chave 'proposta'."
+        )
+
+        try:
+            response = client.chat.completions.create(
+                model=provider["modelo"],
+                messages=[
+                    {"role": "system", "content": _CHAT_SYSTEM_INSTRUCTION},
+                    {"role": "user", "content": prompt_com_instrucao},
+                ],
+                response_format={"type": "json_object"},
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise ExtracaoItensError(f"Nao foi possivel gerar a proposta com {provider['nome']}: {exc}") from exc
+
+        content = response.choices[0].message.content if response.choices else ""
+        if not content:
+            raise ExtracaoItensError(f"A IA ativa ({provider['nome']}) retornou uma resposta vazia.")
+        return self._parse_proposta_comercial_payload_from_text(content, provider["nome"])
 
     def _parse_propostas_payload_from_text(self, raw_text: str, provider_name: str) -> PropostasExtraidasPayload:
         cleaned = raw_text.strip()
@@ -1393,6 +1518,34 @@ class IaService:
         if not parsed.resultado.itens:
             raise ExtracaoItensError(f"A IA ativa ({provider_name}) nao retornou itens validos com propostas.")
         return parsed.resultado
+
+    def _parse_proposta_comercial_payload_from_text(self, raw_text: str, provider_name: str) -> PropostaComercialPayload:
+        cleaned = raw_text.strip()
+        if cleaned.startswith("```"):
+            cleaned = cleaned.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+
+        try:
+            payload = json.loads(cleaned)
+        except json.JSONDecodeError:
+            start = cleaned.find("{")
+            end = cleaned.rfind("}")
+            if start == -1 or end == -1:
+                raise ExtracaoItensError(
+                    f"A IA ativa ({provider_name}) nao retornou um JSON valido para a proposta comercial."
+                ) from None
+            payload = json.loads(cleaned[start : end + 1])
+
+        if isinstance(payload, dict) and "proposta" not in payload:
+            payload = {"proposta": payload}
+
+        try:
+            parsed = PropostaComercialWrapper.model_validate(payload)
+        except Exception as exc:  # noqa: BLE001
+            raise ExtracaoItensError(
+                f"A IA ativa ({provider_name}) retornou a proposta em formato inesperado: {exc}"
+            ) from exc
+
+        return parsed.proposta
 
     async def _build_propostas_item_context(self, licitacao: LicitacaoModel, provider_id: str) -> str:
         partes = [
@@ -1435,9 +1588,69 @@ class IaService:
         contexto = "\n".join(parte for parte in partes if parte)
         return self._compress_propostas_context(contexto, provider_id)
 
+    async def _build_proposta_comercial_context(self, licitacao: LicitacaoModel, provider_id: str) -> str:
+        partes = [
+            "DADOS GERAIS DA LICITACAO",
+            f"Portal/Fonte: {licitacao.fonte}",
+            f"Orgao: {licitacao.orgao}",
+            f"Numero de controle: {licitacao.numero_controle}",
+            f"Numero do processo: {licitacao.numero_processo or '[NAO INFORMADO]'}",
+            f"Modalidade: {licitacao.modalidade or '[NAO INFORMADO]'}",
+            f"Objeto: {licitacao.objeto}",
+            f"Data de abertura: {licitacao.data_abertura or '[NAO INFORMADO]'}",
+            f"Cidade/Estado: {' - '.join([parte for parte in [licitacao.cidade, licitacao.estado] if parte]) or '[NAO INFORMADO]'}",
+            f"Valor estimado: {licitacao.valor_estimado if licitacao.valor_estimado is not None else '[NAO INFORMADO]'}",
+            f"Resumo atual: {licitacao.resumo_ia or '[NAO INFORMADO]'}",
+            f"Atestados tecnicos: {licitacao.atestados_capacidade_tecnica or '[NAO INFORMADO]'}",
+        ]
+
+        itens_existentes = self.db.scalars(
+            select(ItemModel)
+            .where(ItemModel.licitacao_id == licitacao.id)
+            .order_by(ItemModel.numero_item.asc(), ItemModel.id.asc())
+        ).all()
+        if itens_existentes:
+            partes.append("\nITENS JA EXTRAIDOS NO SISTEMA")
+            for item in itens_existentes[:30]:
+                quantidade = item.quantidade if item.quantidade is not None else "[NAO INFORMADO]"
+                unidade = item.unidade or ""
+                me_epp = "SIM" if item.exclusivo_me_epp else "NAO"
+                partes.append(
+                    f"- Item {item.numero_item}: {item.descricao} | Quantidade: {quantidade} {unidade} | Exclusivo ME/EPP: {me_epp}".strip()
+                )
+
+        texto_edital = await self._load_latest_edital_text_for_licitacao(licitacao)
+        if texto_edital:
+            partes.append("\nTEXTO DO EDITAL E ANEXOS")
+            partes.append(texto_edital)
+
+        contexto = "\n".join(parte for parte in partes if parte)
+        return self._compress_proposta_context(contexto, provider_id)
+
     def _build_propostas_item_prompt(self, template: str, contexto: str) -> str:
         return (
             f"{template}\n\n"
+            "CONTEXTO DA LICITACAO E DAS FONTES COLETADAS:\n"
+            f"{contexto}"
+        )
+
+    def _build_proposta_comercial_prompt(self, template: str, contexto: str) -> str:
+        return (
+            f"{template}\n\n"
+            "FORMATO DE SAIDA JSON:\n"
+            "{\n"
+            '  "proposta": {\n'
+            '    "titulo": "...",\n'
+            '    "destinatario": "...",\n'
+            '    "abertura": "...",\n'
+            '    "escopo": "...",\n'
+            '    "aderencia_tecnica": "...",\n'
+            '    "itens_destaque": ["..."],\n'
+            '    "documentacao_tecnica": "...",\n'
+            '    "observacoes": "...",\n'
+            '    "fechamento": "..."\n'
+            "  }\n"
+            "}\n\n"
             "CONTEXTO DA LICITACAO E DAS FONTES COLETADAS:\n"
             f"{contexto}"
         )
@@ -1528,6 +1741,15 @@ class IaService:
 
     def _compress_propostas_context(self, contexto: str, provider_id: str) -> str:
         config = _PROPOSTAS_CONTEXT_CONFIG.get(provider_id, {"max_chars": 5_000, "max_chunks": 3})
+        blocos = self._prepare_text_chunks(
+            contexto,
+            max_chars=int(config["max_chars"]),
+            max_chunks=int(config["max_chunks"]),
+        )
+        return "\n\n".join(blocos)
+
+    def _compress_proposta_context(self, contexto: str, provider_id: str) -> str:
+        config = _PROPOSTA_CONTEXT_CONFIG.get(provider_id, {"max_chars": 5_000, "max_chunks": 3})
         blocos = self._prepare_text_chunks(
             contexto,
             max_chars=int(config["max_chars"]),

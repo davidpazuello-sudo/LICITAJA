@@ -1,4 +1,4 @@
-import { apiRequest } from "./api";
+import { API_BASE_URL, apiRequest } from "./api";
 import type { ChatConversationResponseType } from "../types/chat.types";
 import type {
   AtualizarLicitacaoPayload,
@@ -72,6 +72,30 @@ export async function gerarResumoIALicitacao(licitacaoId: number): Promise<Licit
   return apiRequest<LicitacaoType>(`/licitacoes/${licitacaoId}/resumo-ia`, {
     method: "POST",
   });
+}
+
+export async function gerarPropostaComercialLicitacao(
+  licitacaoId: number,
+): Promise<{ blob: Blob; fileName: string }> {
+  const response = await fetch(`${API_BASE_URL}/licitacoes/${licitacaoId}/proposta-comercial`, {
+    method: "POST",
+  });
+
+  if (!response.ok) {
+    let detail = "Nao foi possivel gerar a proposta comercial agora.";
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      detail = payload.detail || detail;
+    } catch {
+      // ignore parse error
+    }
+    throw new Error(detail);
+  }
+
+  const contentDisposition = response.headers.get("content-disposition") || "";
+  const match = contentDisposition.match(/filename="?([^"]+)"?/i);
+  const fileName = match?.[1] || `proposta_licitacao_${licitacaoId}.pdf`;
+  return { blob: await response.blob(), fileName };
 }
 
 export async function listarChatLicitacao(licitacaoId: number): Promise<ChatConversationResponseType> {

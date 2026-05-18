@@ -58,3 +58,8 @@ class LicitacaoModel(Base):
         cascade="all, delete-orphan",
         order_by="LicitacaoEventoModel.id.desc()",
     )
+    jobs_processamento = relationship(
+        "ProcessamentoJobModel",
+        cascade="all, delete-orphan",
+        order_by="ProcessamentoJobModel.id.desc()",
+    )

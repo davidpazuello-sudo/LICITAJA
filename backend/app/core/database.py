@@ -107,6 +107,23 @@ def _add_column_if_missing(connection: object, table: str, column: str, col_type
         connection.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"))  # type: ignore[union-attr]
 
 
+def _sync_item_me_epp_column(connection: object) -> None:
+    cols = _get_table_columns(connection, "itens")
+    has_new = "exclusivo_me_epp" in cols
+    has_old = "me_epp_exclusivo" in cols
+
+    if not has_new:
+        connection.execute(text("ALTER TABLE itens ADD COLUMN exclusivo_me_epp BOOLEAN DEFAULT 0"))  # type: ignore[union-attr]
+
+    if has_old:
+        connection.execute(  # type: ignore[union-attr]
+            text(
+                "UPDATE itens "
+                "SET exclusivo_me_epp = COALESCE(exclusivo_me_epp, me_epp_exclusivo, 0)"
+            )
+        )
+
+
 def _ensure_schema_updates() -> None:
     with engine.begin() as connection:
         # ── licitacoes ────────────────────────────────────────────────────────
@@ -118,7 +135,7 @@ def _ensure_schema_updates() -> None:
         _add_column_if_missing(connection, "licitacoes", "informacao_complementar", "TEXT")
         # ── itens ─────────────────────────────────────────────────────────────
         _add_column_if_missing(connection, "itens", "marcas_fabricantes", "TEXT")
-        _add_column_if_missing(connection, "itens", "me_epp_exclusivo", "BOOLEAN")
+        _sync_item_me_epp_column(connection)
         # ── cotacoes ──────────────────────────────────────────────────────────
         _add_column_if_missing(connection, "cotacoes", "fornecedor_tipo", "TEXT")
         _add_column_if_missing(connection, "cotacoes", "fornecedor_estado", "TEXT")

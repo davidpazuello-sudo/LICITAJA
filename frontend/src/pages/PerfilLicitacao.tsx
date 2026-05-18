@@ -16,7 +16,9 @@ function PerfilLicitacao() {
   const licitacaoId = id ? Number(id) : null;
   const {
     errorMessage,
+    gerarPropostaComercial,
     gerarResumoIA,
+    isGeneratingProposal,
     isGeneratingSummary,
     isRemoving,
     monitoramentoJob,
@@ -75,6 +77,7 @@ function PerfilLicitacao() {
   const isPageBusy =
     status === "loading" ||
     saveIndicator === "saving" ||
+    isGeneratingProposal ||
     isGeneratingSummary ||
     isRemoving ||
     isExtracting ||
@@ -172,9 +175,11 @@ function PerfilLicitacao() {
                   perfil={perfil}
                   monitoramentoJob={monitoramentoJob}
                   isRemoving={isRemoving}
+                  isGeneratingProposal={isGeneratingProposal}
                   totalItens={resumo.total}
                   pesquisados={resumo.pesquisados}
                   onOpenRemove={() => setShowRemoveModal(true)}
+                  onGerarProposta={gerarPropostaComercial}
                   onExportarItens={exportarTabela}
                   onPesquisarTodos={pesquisarTodos}
                   onOpenIA={() => setActiveTab("ia")}

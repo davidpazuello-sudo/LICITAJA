@@ -86,6 +86,20 @@ DEFAULT_PROMPT_PROPOSTAS_ITEM = (
     "Se o sistema solicitar colunas, mantenha a ordem e os nomes definidos pelo fluxo chamador."
 )
 
+DEFAULT_PROMPT_CRIACAO_PROPOSTA = (
+    "Voce e um agente especialista em elaborar minutas de propostas comerciais para licitacoes publicas brasileiras.\n"
+    "Use somente as informacoes fornecidas pelo sistema sobre a licitacao, seus itens, resumo tecnico e exigencias relevantes.\n"
+    "Crie um texto profissional, objetivo e reaproveitavel como rascunho de proposta.\n\n"
+    "REGRAS:\n"
+    "- escreva em portugues do Brasil\n"
+    "- nao invente razao social, CNPJ, endereco, assinatura, valor final ou prazo comercial da empresa proponente\n"
+    "- quando uma informacao da empresa nao existir, use linguagem neutra e campos genericos\n"
+    "- destaque objeto, escopo de fornecimento, aderencia tecnica, documentacao relevante e observacoes importantes\n"
+    "- se houver atestados de capacidade tecnica, mencione a exigencia de forma objetiva\n"
+    "- nao use markdown\n"
+    "- responda em JSON valido no formato solicitado pelo sistema"
+)
+
 SUPPORTED_IA_PROVIDERS = {
     "openai": {
         "id": "openai",
@@ -169,6 +183,14 @@ SUPPORTED_IA_AGENTS = {
         "provider_padrao": "groq",
         "modelo_padrao": "llama-3.3-70b-versatile",
         "prompt_padrao": DEFAULT_PROMPT_PROPOSTAS_ITEM,
+    },
+    "criacao_proposta": {
+        "id": "criacao_proposta",
+        "nome": "Criacao de proposta comercial",
+        "descricao": "Monta um rascunho timbrado de proposta comercial com base no contexto da licitacao.",
+        "provider_padrao": "groq",
+        "modelo_padrao": "llama-3.3-70b-versatile",
+        "prompt_padrao": DEFAULT_PROMPT_CRIACAO_PROPOSTA,
     },
 }
 

@@ -1,14 +1,17 @@
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response, status
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, selectinload
 import unicodedata
 
 from app.core.database import get_db_session
 from app.models.chat_message import ChatMessageModel
+from app.models.cotacao import CotacaoModel
 from app.models.licitacao import LicitacaoModel
 from app.models.licitacao_evento import LicitacaoEventoModel
+from app.models.edital import EditalModel
+from app.models.licitacao_monitoramento import LicitacaoMonitoramentoModel
 from app.schemas.chat import ChatConversationResponse, ChatMessageCreate, ChatMessageRead
 from app.schemas.job import JobRead
 from app.schemas.licitacao import (
@@ -25,6 +28,10 @@ from app.services.job_service import criar_job_processamento, processar_licitaca
 from app.services.monitoramento_service import (
     MonitoramentoService,
     executar_monitoramento_leve_em_segundo_plano,
+)
+from app.services.proposta_comercial_pdf_service import (
+    build_proposta_comercial_filename,
+    build_proposta_comercial_pdf,
 )
 from app.models.item import ItemModel
 from app.models.processamento_job import ProcessamentoJobModel
@@ -286,6 +293,40 @@ async def gerar_resumo_ia_licitacao(
     return LicitacaoRead.model_validate(licitacao)
 
 
+@router.post("/licitacoes/{licitacao_id}/proposta-comercial")
+async def gerar_proposta_comercial_pdf(
+    licitacao_id: int,
+    db: Session = Depends(get_db_session),
+) -> Response:
+    licitacao = db.scalar(
+        select(LicitacaoModel)
+        .options(selectinload(LicitacaoModel.itens), selectinload(LicitacaoModel.editais))
+        .where(LicitacaoModel.id == licitacao_id),
+    )
+
+    if licitacao is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Licitacao nao encontrada.")
+
+    service = IaService(db)
+    try:
+        proposta = await service.gerar_proposta_comercial(licitacao)
+    except ExtracaoItensError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    pdf_bytes = build_proposta_comercial_pdf(
+        orgao=licitacao.orgao,
+        numero_controle=licitacao.numero_controle,
+        numero_processo=licitacao.numero_processo,
+        modalidade=licitacao.modalidade,
+        proposta=proposta,
+    )
+    nome_arquivo = build_proposta_comercial_filename(licitacao.orgao, licitacao.numero_controle)
+    headers = {
+        "Content-Disposition": f'attachment; filename="{nome_arquivo}"',
+    }
+    return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
+
+
 @router.post("/licitacoes/{licitacao_id}/chat", response_model=ChatConversationResponse)
 async def enviar_mensagem_chat_licitacao(
     licitacao_id: int,
@@ -353,7 +394,24 @@ async def remover_licitacao(
     if licitacao is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Licitacao nao encontrada.")
 
-    db.delete(licitacao)
+    item_ids = db.scalars(
+        select(ItemModel.id).where(ItemModel.licitacao_id == licitacao_id),
+    ).all()
+
+    if item_ids:
+        db.execute(delete(CotacaoModel).where(CotacaoModel.item_id.in_(item_ids)))
+
+    db.execute(delete(ChatMessageModel).where(ChatMessageModel.licitacao_id == licitacao_id))
+    db.execute(delete(LicitacaoEventoModel).where(LicitacaoEventoModel.licitacao_id == licitacao_id))
+    db.execute(
+        delete(LicitacaoMonitoramentoModel).where(
+            LicitacaoMonitoramentoModel.licitacao_id == licitacao_id,
+        ),
+    )
+    db.execute(delete(ProcessamentoJobModel).where(ProcessamentoJobModel.licitacao_id == licitacao_id))
+    db.execute(delete(ItemModel).where(ItemModel.licitacao_id == licitacao_id))
+    db.execute(delete(EditalModel).where(EditalModel.licitacao_id == licitacao_id))
+    db.execute(delete(LicitacaoModel).where(LicitacaoModel.id == licitacao_id))
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

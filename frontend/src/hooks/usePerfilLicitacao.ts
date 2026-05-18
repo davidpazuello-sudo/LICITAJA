@@ -4,6 +4,7 @@ import { useAppNotifications } from "../contexts/AppNotificationsContext";
 import {
   atualizarLicitacao,
   excluirLicitacao,
+  gerarPropostaComercialLicitacao,
   gerarResumoIALicitacao,
   obterJobMonitoramentoLicitacao,
   obterLicitacao,
@@ -22,6 +23,7 @@ export function usePerfilLicitacao(licitacaoId: number | null) {
   const [saveIndicator, setSaveIndicator] = useState<SaveIndicator>("idle");
   const [isRemoving, setIsRemoving] = useState(false);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+  const [isGeneratingProposal, setIsGeneratingProposal] = useState(false);
   const [monitoramentoJob, setMonitoramentoJob] = useState<JobType | null>(null);
 
   useEffect(() => {
@@ -214,9 +216,52 @@ export function usePerfilLicitacao(licitacaoId: number | null) {
     }
   };
 
+  const gerarPropostaComercial = async () => {
+    if (!perfil) {
+      return;
+    }
+
+    setIsGeneratingProposal(true);
+    try {
+      const { blob, fileName } = await gerarPropostaComercialLicitacao(perfil.id);
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = fileName;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(url);
+
+      notifySuccess({
+        title: "Proposta criada com sucesso",
+        message: "O PDF timbrado da proposta foi gerado e o download foi iniciado.",
+        action: {
+          label: "Abrir perfil da licitacao",
+          to: `/licitacoes/${perfil.id}`,
+        },
+      });
+    } catch (error) {
+      notifyError({
+        title: "Falha ao criar proposta",
+        message:
+          error instanceof Error ? error.message : "Nao foi possivel gerar a proposta comercial agora.",
+        action: {
+          label: "Voltar ao perfil",
+          to: `/licitacoes/${perfil.id}`,
+        },
+      });
+      throw error;
+    } finally {
+      setIsGeneratingProposal(false);
+    }
+  };
+
   return {
     errorMessage,
+    gerarPropostaComercial,
     gerarResumoIA,
+    isGeneratingProposal,
     isGeneratingSummary,
     isRemoving,
     observacoes,

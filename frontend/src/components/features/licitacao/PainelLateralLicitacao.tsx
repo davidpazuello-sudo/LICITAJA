@@ -7,9 +7,11 @@ interface PainelLateralLicitacaoProps {
   perfil: LicitacaoDetailType;
   monitoramentoJob: JobType | null;
   isRemoving: boolean;
+  isGeneratingProposal: boolean;
   totalItens: number;
   pesquisados: number;
   onOpenRemove: () => void;
+  onGerarProposta: () => void;
   onExportarItens: () => void;
   onPesquisarTodos: () => void;
   onOpenIA: () => void;
@@ -117,9 +119,11 @@ function PainelLateralLicitacao({
   perfil,
   monitoramentoJob,
   isRemoving,
+  isGeneratingProposal,
   totalItens,
   pesquisados,
   onOpenRemove,
+  onGerarProposta,
   onExportarItens,
   onPesquisarTodos,
   onOpenIA,
@@ -192,6 +196,24 @@ function PainelLateralLicitacao({
             Baixar edital
           </ActionButton>
         ) : null}
+
+        <ActionButton
+          onClick={onGerarProposta}
+          disabled={isGeneratingProposal}
+          icon={
+            <svg viewBox="0 0 24 24" fill="none" className="h-[13px] w-[13px]" aria-hidden="true">
+              <path
+                d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5ZM14 3v5h5M9 13h6M9 17h6M9 9h1"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          }
+        >
+          {isGeneratingProposal ? "Criando proposta..." : "Criar proposta"}
+        </ActionButton>
 
         <ActionButton
           onClick={onExportarItens}

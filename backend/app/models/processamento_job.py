@@ -31,4 +31,4 @@ class ProcessamentoJobModel(Base):
         onupdate=lambda: datetime.now(UTC).isoformat(),
     )
 
-    licitacao = relationship("LicitacaoModel")
+    licitacao = relationship("LicitacaoModel", back_populates="jobs_processamento")
