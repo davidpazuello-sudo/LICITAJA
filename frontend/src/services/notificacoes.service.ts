@@ -3,7 +3,7 @@ import { apiRequest } from "./api";
 export interface NotificacaoItemType {
   id: string;
   tipo: "sucesso" | "erro" | "info" | "alerta";
-  categoria: "monitoramento" | "pipeline" | "prazo" | "status" | "chat" | "situacao" | "pregoeiro";
+  categoria: string;
   titulo: string;
   descricao: string;
   licitacao_id: number | null;

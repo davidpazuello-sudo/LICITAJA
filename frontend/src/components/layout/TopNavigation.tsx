@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { useAppNotifications } from "../../contexts/AppNotificationsContext";
 import { usePageLoading } from "../../contexts/PageLoadingContext";
 import { cn } from "../../utils/cn";
+import { NotificationPanel } from "./NotificationPanel";
+import { useSystemNotificationCount } from "../../hooks/useSystemNotifications";
 
 interface TopNavigationProps {
   pageTitle: string;
@@ -12,15 +13,27 @@ interface TopNavigationProps {
 
 function TopNavigation({ pageTitle, sidebarCollapsed, onToggleSidebar }: TopNavigationProps) {
   const [searchOpen, setSearchOpen] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const { clearNotifications, notificationCount } = useAppNotifications();
   const isPageLoading = usePageLoading();
+  const { unreadCount, resetCount } = useSystemNotificationCount();
 
   useEffect(() => {
     if (searchOpen) {
       inputRef.current?.focus();
     }
   }, [searchOpen]);
+
+  const handleBellClick = useCallback(() => {
+    setPanelOpen((open) => {
+      if (!open) resetCount();
+      return !open;
+    });
+  }, [resetCount]);
+
+  const handlePanelClose = useCallback(() => {
+    setPanelOpen(false);
+  }, []);
 
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-[#F4F6FB]">
@@ -141,27 +154,38 @@ function TopNavigation({ pageTitle, sidebarCollapsed, onToggleSidebar }: TopNavi
             </svg>
           </button>
 
-          <button
-            type="button"
-            aria-label="Notificacoes"
-            onClick={clearNotifications}
-            className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-line bg-white text-slate transition hover:border-accent/30 hover:text-accent focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent/15"
-          >
-            {notificationCount > 0 ? (
-              <span className='absolute -right-1 -top-1 inline-flex min-w-[20px] items-center justify-center rounded-full bg-accent px-1.5 py-0.5 font-["DM_Mono"] text-[10px] text-white'>
-                {notificationCount}
-              </span>
-            ) : null}
-            <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
-              <path
-                d="M15 17H5.5a1.5 1.5 0 0 1-1.2-2.4L6 12.4V10a6 6 0 1 1 12 0v2.4l1.7 2.2A1.5 1.5 0 0 1 18.5 17H15Zm0 0a3 3 0 1 1-6 0"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
+          {/* Sino + Painel */}
+          <div className="relative">
+            <button
+              type="button"
+              aria-label="Notificações"
+              aria-expanded={panelOpen}
+              onClick={handleBellClick}
+              className={cn(
+                "relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border bg-white text-slate transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent/15",
+                panelOpen
+                  ? "border-accent/40 text-accent shadow-inner"
+                  : "border-line hover:border-accent/30 hover:text-accent",
+              )}
+            >
+              {unreadCount > 0 ? (
+                <span className='absolute -right-1 -top-1 inline-flex min-w-[20px] items-center justify-center rounded-full bg-accent px-1.5 py-0.5 font-["DM_Mono"] text-[10px] text-white'>
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              ) : null}
+              <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
+                <path
+                  d="M15 17H5.5a1.5 1.5 0 0 1-1.2-2.4L6 12.4V10a6 6 0 1 1 12 0v2.4l1.7 2.2A1.5 1.5 0 0 1 18.5 17H15Zm0 0a3 3 0 1 1-6 0"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+
+            <NotificationPanel isOpen={panelOpen} onClose={handlePanelClose} />
+          </div>
         </div>
       </div>
     </header>

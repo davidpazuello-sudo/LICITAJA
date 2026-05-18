@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useAppNotifications } from "../contexts/AppNotificationsContext";
 import { listarNotificacoes, type NotificacaoItemType } from "../services/notificacoes.service";
@@ -59,6 +59,38 @@ function buildAction(notif: NotificacaoItemType) {
   return undefined;
 }
 
+// ── Hook de contagem (para o badge do sino) ───────────────────────────────────
+
+let _unreadCount = 0;
+const _listeners = new Set<(count: number) => void>();
+
+function setUnreadCount(count: number) {
+  _unreadCount = count;
+  _listeners.forEach((fn) => fn(count));
+}
+
+function incrementUnread(by: number) {
+  setUnreadCount(_unreadCount + by);
+}
+
+/** Retorna a contagem de notificações não lidas e uma função para zerá-la. */
+export function useSystemNotificationCount() {
+  const [count, setCount] = useState(_unreadCount);
+
+  useEffect(() => {
+    _listeners.add(setCount);
+    return () => { _listeners.delete(setCount); };
+  }, []);
+
+  const resetCount = useCallback(() => {
+    setUnreadCount(0);
+  }, []);
+
+  return { unreadCount: count, resetCount };
+}
+
+// ── Hook de polling (toasts) ──────────────────────────────────────────────────
+
 /** Faz polling a cada 60s e exibe toasts para eventos novos do backend. */
 export function useSystemNotifications() {
   const { notifySuccess, notifyError } = useAppNotifications();
@@ -81,6 +113,9 @@ export function useSystemNotifications() {
       const maisRecente = novas[0].criado_em;
       setLastChecked(maisRecente);
       markSeen(novas.map((n) => n.id));
+
+      // Incrementa badge do sino
+      incrementUnread(novas.length);
 
       // Exibe até 3 toasts para não sobrecarregar
       const paraExibir = novas.slice(0, 3);
