@@ -81,42 +81,51 @@ def init_database() -> None:
     )
 
     Base.metadata.create_all(bind=engine)
-    if is_sqlite_url(settings.database_url):
-        _ensure_schema_updates()
+    _ensure_schema_updates()
     _seed_default_configurations()
+
+
+def _get_table_columns(connection: object, table_name: str) -> set[str]:
+    """Retorna o conjunto de colunas de uma tabela, compatível com SQLite e PostgreSQL."""
+    if is_sqlite_url(settings.database_url):
+        rows = connection.execute(text(f"PRAGMA table_info({table_name})")).fetchall()  # type: ignore[union-attr]
+        return {row[1] for row in rows}
+    else:
+        rows = connection.execute(  # type: ignore[union-attr]
+            text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name = :table AND table_schema = 'public'"
+            ),
+            {"table": table_name},
+        ).fetchall()
+        return {row[0] for row in rows}
+
+
+def _add_column_if_missing(connection: object, table: str, column: str, col_type: str) -> None:
+    cols = _get_table_columns(connection, table)
+    if column not in cols:
+        connection.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"))  # type: ignore[union-attr]
 
 
 def _ensure_schema_updates() -> None:
     with engine.begin() as connection:
-        licitacao_columns = {
-            row[1]
-            for row in connection.execute(text("PRAGMA table_info(licitacoes)")).fetchall()
-        }
-        item_columns = {
-            row[1]
-            for row in connection.execute(text("PRAGMA table_info(itens)")).fetchall()
-        }
-        cotacao_columns = {
-            row[1]
-            for row in connection.execute(text("PRAGMA table_info(cotacoes)")).fetchall()
-        }
-
-        if "resumo_ia" not in licitacao_columns:
-            connection.execute(text("ALTER TABLE licitacoes ADD COLUMN resumo_ia TEXT"))
-        if "marcas_fabricantes" not in item_columns:
-            connection.execute(text("ALTER TABLE itens ADD COLUMN marcas_fabricantes TEXT"))
-        if "fornecedor_tipo" not in cotacao_columns:
-            connection.execute(text("ALTER TABLE cotacoes ADD COLUMN fornecedor_tipo TEXT"))
-        if "fornecedor_estado" not in cotacao_columns:
-            connection.execute(text("ALTER TABLE cotacoes ADD COLUMN fornecedor_estado TEXT"))
-        if "fornecedor_cidade" not in cotacao_columns:
-            connection.execute(text("ALTER TABLE cotacoes ADD COLUMN fornecedor_cidade TEXT"))
-        if "evidencia_item" not in cotacao_columns:
-            connection.execute(text("ALTER TABLE cotacoes ADD COLUMN evidencia_item TEXT"))
-        if "fornecedor_telefone" not in cotacao_columns:
-            connection.execute(text("ALTER TABLE cotacoes ADD COLUMN fornecedor_telefone TEXT"))
-        if "fornecedor_email_comercial" not in cotacao_columns:
-            connection.execute(text("ALTER TABLE cotacoes ADD COLUMN fornecedor_email_comercial TEXT"))
+        # ── licitacoes ────────────────────────────────────────────────────────
+        _add_column_if_missing(connection, "licitacoes", "resumo_ia", "TEXT")
+        _add_column_if_missing(connection, "licitacoes", "atestados_capacidade_tecnica", "TEXT")
+        _add_column_if_missing(connection, "licitacoes", "uasg", "VARCHAR")
+        _add_column_if_missing(connection, "licitacoes", "data_encerramento", "VARCHAR")
+        _add_column_if_missing(connection, "licitacoes", "situacao_compra", "VARCHAR")
+        _add_column_if_missing(connection, "licitacoes", "informacao_complementar", "TEXT")
+        # ── itens ─────────────────────────────────────────────────────────────
+        _add_column_if_missing(connection, "itens", "marcas_fabricantes", "TEXT")
+        _add_column_if_missing(connection, "itens", "me_epp_exclusivo", "BOOLEAN")
+        # ── cotacoes ──────────────────────────────────────────────────────────
+        _add_column_if_missing(connection, "cotacoes", "fornecedor_tipo", "TEXT")
+        _add_column_if_missing(connection, "cotacoes", "fornecedor_estado", "TEXT")
+        _add_column_if_missing(connection, "cotacoes", "fornecedor_cidade", "TEXT")
+        _add_column_if_missing(connection, "cotacoes", "evidencia_item", "TEXT")
+        _add_column_if_missing(connection, "cotacoes", "fornecedor_telefone", "TEXT")
+        _add_column_if_missing(connection, "cotacoes", "fornecedor_email_comercial", "TEXT")
 
 
 def _seed_default_configurations() -> None:
