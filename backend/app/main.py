@@ -9,6 +9,7 @@ from app.api.routes.busca import router as busca_router
 from app.api.routes.configuracoes import router as configuracoes_router
 from app.api.routes.itens import router as itens_router
 from app.api.routes.licitacoes import router as licitacoes_router
+from app.api.routes.notificacoes import router as notificacoes_router
 from app.core.config import get_settings
 from app.core.database import init_database
 
@@ -52,3 +53,4 @@ app.include_router(busca_router, prefix=settings.api_prefix)
 app.include_router(configuracoes_router, prefix=settings.api_prefix)
 app.include_router(itens_router, prefix=settings.api_prefix)
 app.include_router(licitacoes_router, prefix=settings.api_prefix)
+app.include_router(notificacoes_router, prefix=settings.api_prefix)

@@ -5,6 +5,7 @@ import { Sidebar } from "./components/layout/Sidebar";
 import { TopNavigation } from "./components/layout/TopNavigation";
 import { AppNotificationsProvider } from "./contexts/AppNotificationsContext";
 import { PageLoadingProvider } from "./contexts/PageLoadingContext";
+import { useSystemNotifications } from "./hooks/useSystemNotifications";
 import { AreaEmpresasDetalhe } from "./pages/AreaEmpresasDetalhe";
 import { AreasEmpresas } from "./pages/AreasEmpresas";
 import { BuscarLicitacoes } from "./pages/BuscarLicitacoes";
@@ -31,6 +32,11 @@ function resolvePageTitle(pathname: string) {
   return "LicitaAI";
 }
 
+function SystemNotificationsWatcher() {
+  useSystemNotifications();
+  return null;
+}
+
 function AppShell() {
   const location = useLocation();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -39,6 +45,7 @@ function AppShell() {
   return (
     <PageLoadingProvider>
     <AppNotificationsProvider>
+      <SystemNotificationsWatcher />
       <div className="h-screen overflow-hidden bg-app">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(47,111,237,0.15),_transparent_34%),radial-gradient(circle_at_bottom_left,_rgba(15,23,42,0.09),_transparent_28%)]" />
         <div className="relative flex h-screen">
