@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db_session
+from app.models.chat_message import ChatMessageModel
 from app.models.licitacao import LicitacaoModel
 from app.models.licitacao_evento import LicitacaoEventoModel
 from app.models.processamento_job import ProcessamentoJobModel
@@ -19,6 +20,8 @@ EVENTO_TIPOS_NOTIFICAVEIS = {
     "licitacao_atualizada",
     "novo_edital_detectado",
     "erro_monitoramento",
+    "status_alterado",
+    "status_concluida",
 }
 
 # Tipos de job que viram notificações (apenas completed/failed)
@@ -27,11 +30,19 @@ JOB_TIPOS_NOTIFICAVEIS = {
     "brand_enrichment",
 }
 
+STATUS_LABELS: dict[str, str] = {
+    "em_analise": "Em análise",
+    "itens_extraidos": "Itens extraídos",
+    "fornecedores_encontrados": "Fornecedores encontrados",
+    "concluida": "Concluída",
+    "nova": "Nova",
+}
+
 
 class NotificacaoItem(BaseModel):
     id: str
     tipo: str          # "sucesso" | "erro" | "info" | "alerta"
-    categoria: str     # "monitoramento" | "pipeline" | "prazo"
+    categoria: str     # "monitoramento" | "pipeline" | "prazo" | "status" | "chat"
     titulo: str
     descricao: str
     licitacao_id: int | None = None
@@ -46,7 +57,7 @@ def listar_notificacoes(
     db: Session = Depends(get_db_session),
 ) -> list[NotificacaoItem]:
     """
-    Retorna eventos recentes de monitoramento e jobs para alimentar
+    Retorna eventos recentes de monitoramento, jobs, status e chat para alimentar
     o painel de notificações do frontend.
     """
     # Janela padrão: últimas 24h se `since` não for informado
@@ -61,7 +72,19 @@ def listar_notificacoes(
     since_str = since_dt.isoformat()
     notificacoes: list[NotificacaoItem] = []
 
-    # ── 1. Eventos de monitoramento ──────────────────────────────────────────
+    # Mapa compartilhado de licitacoes para evitar queries repetidas
+    licitacoes_map: dict[int, LicitacaoModel] = {}
+
+    def _enrich_licitacoes(ids: set[int]) -> None:
+        missing = ids - licitacoes_map.keys()
+        if missing:
+            rows = db.scalars(
+                select(LicitacaoModel).where(LicitacaoModel.id.in_(missing)),
+            ).all()
+            for lic in rows:
+                licitacoes_map[lic.id] = lic
+
+    # ── 1. Eventos de monitoramento e status ─────────────────────────────────
     eventos = db.scalars(
         select(LicitacaoEventoModel)
         .where(
@@ -72,13 +95,7 @@ def listar_notificacoes(
         .limit(limit),
     ).all()
 
-    licitacao_ids_evento = {e.licitacao_id for e in eventos if e.licitacao_id}
-    licitacoes_map: dict[int, LicitacaoModel] = {}
-    if licitacao_ids_evento:
-        rows = db.scalars(
-            select(LicitacaoModel).where(LicitacaoModel.id.in_(licitacao_ids_evento)),
-        ).all()
-        licitacoes_map = {l.id: l for l in rows}
+    _enrich_licitacoes({e.licitacao_id for e in eventos if e.licitacao_id})
 
     for evento in eventos:
         lic = licitacoes_map.get(evento.licitacao_id) if evento.licitacao_id else None
@@ -108,13 +125,7 @@ def listar_notificacoes(
         .limit(limit),
     ).all()
 
-    licitacao_ids_job = {j.licitacao_id for j in jobs if j.licitacao_id}
-    if licitacao_ids_job:
-        rows = db.scalars(
-            select(LicitacaoModel).where(LicitacaoModel.id.in_(licitacao_ids_job)),
-        ).all()
-        for l in rows:
-            licitacoes_map[l.id] = l
+    _enrich_licitacoes({j.licitacao_id for j in jobs if j.licitacao_id})
 
     for job in jobs:
         lic = licitacoes_map.get(job.licitacao_id) if job.licitacao_id else None
@@ -133,7 +144,36 @@ def listar_notificacoes(
                 )
             )
 
-    # ── 3. Prazos urgentes (licitações abrindo em ≤3 dias) ──────────────────
+    # ── 3. Respostas da IA no chat ────────────────────────────────────────────
+    chat_msgs = db.scalars(
+        select(ChatMessageModel)
+        .where(
+            ChatMessageModel.role == "assistant",
+            ChatMessageModel.created_at >= since_str,
+        )
+        .order_by(ChatMessageModel.created_at.desc())
+        .limit(limit),
+    ).all()
+
+    _enrich_licitacoes({m.licitacao_id for m in chat_msgs})
+
+    for msg in chat_msgs:
+        lic = licitacoes_map.get(msg.licitacao_id)
+        orgao_prefix = f"{lic.orgao[:40]} — " if lic else ""
+        notificacoes.append(
+            NotificacaoItem(
+                id=f"chat-{msg.id}",
+                tipo="info",
+                categoria="chat",
+                titulo="IA respondeu sua pergunta",
+                descricao=f"{orgao_prefix}{msg.content[:80]}",
+                licitacao_id=msg.licitacao_id,
+                licitacao_orgao=lic.orgao if lic else None,
+                criado_em=msg.created_at,
+            )
+        )
+
+    # ── 4. Prazos urgentes (licitações abrindo em ≤3 dias) ───────────────────
     hoje = datetime.now(UTC).date()
     licitacoes_abertas = db.scalars(
         select(LicitacaoModel).where(
@@ -174,6 +214,8 @@ def _classify_evento(tipo_evento: str) -> tuple[str, str]:
         "licitacao_atualizada": ("sucesso", "monitoramento"),
         "novo_edital_detectado": ("info", "monitoramento"),
         "erro_monitoramento": ("erro", "monitoramento"),
+        "status_alterado": ("info", "status"),
+        "status_concluida": ("sucesso", "status"),
     }
     return mapping.get(tipo_evento, ("info", "monitoramento"))
 

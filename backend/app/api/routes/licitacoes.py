@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
@@ -6,6 +8,7 @@ import unicodedata
 from app.core.database import get_db_session
 from app.models.chat_message import ChatMessageModel
 from app.models.licitacao import LicitacaoModel
+from app.models.licitacao_evento import LicitacaoEventoModel
 from app.schemas.chat import ChatConversationResponse, ChatMessageCreate, ChatMessageRead
 from app.schemas.job import JobRead
 from app.schemas.licitacao import (
@@ -218,6 +221,7 @@ async def atualizar_licitacao(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Licitacao nao encontrada.")
 
     updates = payload.model_dump(exclude_unset=True)
+    old_status = licitacao.status
 
     for field, value in updates.items():
         setattr(licitacao, field, value)
@@ -225,6 +229,29 @@ async def atualizar_licitacao(
     db.add(licitacao)
     db.commit()
     db.refresh(licitacao)
+
+    # Registra evento quando status muda manualmente
+    if "status" in updates and updates["status"] != old_status:
+        new_status = updates["status"]
+        _STATUS_LABELS = {
+            "em_analise": "Em análise",
+            "itens_extraidos": "Itens extraídos",
+            "fornecedores_encontrados": "Fornecedores encontrados",
+            "concluida": "Concluída",
+            "nova": "Nova",
+        }
+        tipo_evento = "status_concluida" if new_status == "concluida" else "status_alterado"
+        label = _STATUS_LABELS.get(new_status, new_status)
+        evento = LicitacaoEventoModel(
+            licitacao_id=licitacao_id,
+            tipo_evento=tipo_evento,
+            titulo=label,
+            descricao=f"Status atualizado para \"{label}\" em {licitacao.orgao or 'licitação'}.",
+            criado_em=datetime.now(UTC).isoformat(),
+        )
+        db.add(evento)
+        db.commit()
+
     return LicitacaoRead.model_validate(licitacao)
 
 
