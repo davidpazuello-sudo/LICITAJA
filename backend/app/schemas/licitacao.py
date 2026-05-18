@@ -20,6 +20,7 @@ class LicitacaoBase(BaseModel):
     link_site: str | None = None
     observacoes: str | None = None
     resumo_ia: str | None = None
+    atestados_capacidade_tecnica: str | None = None
     status: str = "nova"
     fonte: str = "pncp"
     dados_brutos: str | None = None

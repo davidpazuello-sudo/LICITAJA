@@ -5,10 +5,8 @@ import type { BackgroundJobType, ItemType } from "../../../types/item.types";
 import { cn } from "../../../utils/cn";
 import { formatCurrency } from "../../../utils/formatters";
 
-/* ─── helpers ──────────────────────────────────────────────── */
-
 function formatQuantity(value: number | null, unidade: string | null) {
-  const qty = value === null ? "–" : new Intl.NumberFormat("pt-BR").format(value);
+  const qty = value === null ? "-" : new Intl.NumberFormat("pt-BR").format(value);
   const unit = unidade ? ` ${unidade.toUpperCase()}` : "";
   return `${qty}${unit}`;
 }
@@ -29,15 +27,13 @@ function parseReferenceBrands(item: ItemType): string[] {
     const parsed = JSON.parse(item.marcas_fabricantes) as Array<string | { nome?: string }>;
     if (!Array.isArray(parsed)) return [];
     return parsed
-      .map((e) => (typeof e === "string" ? e : e?.nome ?? ""))
-      .map((e) => e.trim())
+      .map((entry) => (typeof entry === "string" ? entry : entry?.nome ?? ""))
+      .map((entry) => entry.trim())
       .filter(Boolean);
   } catch {
     return [];
   }
 }
-
-/* ─── status badge ──────────────────────────────────────────── */
 
 function StatusBadge({ status }: { status: string }) {
   if (status === "encontrado") {
@@ -61,9 +57,15 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-/* ─── summary badges ────────────────────────────────────────── */
-
-function SummaryBadge({ count, label, tone = "default" }: { count: number; label: string; tone?: "default" | "green" | "amber" }) {
+function SummaryBadge({
+  count,
+  label,
+  tone = "default",
+}: {
+  count: number;
+  label: string;
+  tone?: "default" | "green" | "amber";
+}) {
   const colors =
     tone === "green"
       ? "bg-emerald-50 text-emerald-700 ring-emerald-100"
@@ -120,7 +122,7 @@ function EmptyItemsState({
   if (isExtractingNow) {
     return (
       <div className="rounded-xl border border-accent/15 bg-[#EEF4FF] px-4 py-6 text-center">
-        <div className="mx-auto mb-3 flex h-8 w-8 items-center justify-center rounded-full border-2 border-accent/20 border-t-accent animate-spin" />
+        <div className="mx-auto mb-3 flex h-8 w-8 animate-spin items-center justify-center rounded-full border-2 border-accent/20 border-t-accent" />
         <p className="font-['Manrope'] text-[15px] font-bold text-ink">
           A IA esta lendo o edital e extraindo os itens
         </p>
@@ -138,36 +140,30 @@ function EmptyItemsState({
   );
 }
 
-/* ─── item list row (left panel) ────────────────────────────── */
-
-function ItemListRow({ item, isActive, onClick }: { item: ItemType; isActive: boolean; onClick: () => void }) {
+function ItemListRow({
+  item,
+  isActive,
+  onClick,
+}: {
+  item: ItemType;
+  isActive: boolean;
+  onClick: () => void;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
         "w-full rounded-xl border px-3 py-2.5 text-left transition-all duration-150",
-        isActive
-          ? "border-accent/30 bg-[#EEF4FF] shadow-sm"
-          : "border-transparent hover:border-line hover:bg-panel/70",
+        isActive ? "border-accent/30 bg-[#EEF4FF] shadow-sm" : "border-transparent hover:border-line hover:bg-panel/70",
       )}
     >
       <div className="flex items-start gap-2.5">
-        <span
-          className={cn(
-            "mt-0.5 shrink-0 font-['Manrope'] text-[11px] font-bold",
-            isActive ? "text-accent" : "text-slate/60",
-          )}
-        >
+        <span className={cn("mt-0.5 shrink-0 font-['Manrope'] text-[11px] font-bold", isActive ? "text-accent" : "text-slate/60")}>
           {String(item.numero_item).padStart(2, "0")}
         </span>
         <div className="min-w-0 flex-1 space-y-1">
-          <p
-            className={cn(
-              "line-clamp-2 font-['Plus_Jakarta_Sans'] text-[12.5px] font-medium leading-snug",
-              isActive ? "text-ink" : "text-ink/80",
-            )}
-          >
+          <p className={cn("line-clamp-2 font-['Plus_Jakarta_Sans'] text-[12.5px] font-medium leading-snug", isActive ? "text-ink" : "text-ink/80")}>
             {item.descricao}
           </p>
           <div className="flex items-center justify-between gap-2">
@@ -182,15 +178,12 @@ function ItemListRow({ item, isActive, onClick }: { item: ItemType; isActive: bo
   );
 }
 
-/* ─── item detail panel (right panel) ──────────────────────── */
-
 function ItemDetail({ item }: { item: ItemType }) {
   const especificacoes = parseSpecifications(item);
   const marcas = parseReferenceBrands(item);
 
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto pr-1">
-      {/* Header */}
       <div className="flex flex-wrap items-start gap-3">
         <div className="flex items-center gap-2">
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#EEF4FF] font-['Manrope'] text-[13px] font-bold text-accent">
@@ -203,7 +196,6 @@ function ItemDetail({ item }: { item: ItemType }) {
         </h3>
       </div>
 
-      {/* Métricas */}
       <div className="grid grid-cols-3 gap-3">
         <div className="rounded-xl border border-line/80 bg-panel/50 px-4 py-3">
           <p className="font-['Plus_Jakarta_Sans'] text-[10.5px] font-semibold uppercase tracking-[0.1em] text-slate/70">
@@ -218,7 +210,7 @@ function ItemDetail({ item }: { item: ItemType }) {
             Melhor cotacao
           </p>
           <p className={cn("mt-1 font-['Manrope'] text-[15px] font-bold", item.preco_medio !== null ? "text-emerald-600" : "text-slate/50")}>
-            {item.preco_medio !== null ? formatCurrency(item.preco_medio) : "–"}
+            {item.preco_medio !== null ? formatCurrency(item.preco_medio) : "-"}
           </p>
         </div>
         <div className="rounded-xl border border-line/80 bg-panel/50 px-4 py-3">
@@ -226,12 +218,22 @@ function ItemDetail({ item }: { item: ItemType }) {
             Marca ref.
           </p>
           <p className="mt-1 font-['Manrope'] text-[15px] font-bold text-ink">
-            {marcas[0] ?? "–"}
+            {marcas[0] ?? "-"}
           </p>
         </div>
       </div>
 
-      {/* Especificações */}
+      <div className="grid grid-cols-1 gap-3">
+        <div className="rounded-xl border border-line/80 bg-panel/50 px-4 py-3">
+          <p className="font-['Plus_Jakarta_Sans'] text-[10.5px] font-semibold uppercase tracking-[0.1em] text-slate/70">
+            Exclusivo para ME/EPP
+          </p>
+          <p className={cn("mt-1 font-['Manrope'] text-[15px] font-bold", item.exclusivo_me_epp ? "text-emerald-600" : "text-ink")}>
+            {item.exclusivo_me_epp ? "Sim" : "Nao"}
+          </p>
+        </div>
+      </div>
+
       <div className="rounded-xl border border-line/80 bg-white px-4 py-4">
         <p className="mb-2.5 font-['Plus_Jakarta_Sans'] text-[10.5px] font-semibold uppercase tracking-[0.1em] text-slate/70">
           Especificacoes tecnicas
@@ -250,7 +252,6 @@ function ItemDetail({ item }: { item: ItemType }) {
         )}
       </div>
 
-      {/* Marcas */}
       <div className="rounded-xl border border-line/80 bg-white px-4 py-4">
         <p className="mb-2.5 font-['Plus_Jakarta_Sans'] text-[10.5px] font-semibold uppercase tracking-[0.1em] text-slate/70">
           Marcas e fabricantes
@@ -276,8 +277,6 @@ function ItemDetail({ item }: { item: ItemType }) {
   );
 }
 
-/* ─── modal de itens ────────────────────────────────────────── */
-
 function ItensModal({
   isOpen,
   items,
@@ -291,20 +290,20 @@ function ItensModal({
 }) {
   const [activeId, setActiveId] = useState<number | null>(initialItemId);
 
-  // trava scroll do body enquanto modal está aberto
   useEffect(() => {
     if (!isOpen) return undefined;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prev; };
+    return () => {
+      document.body.style.overflow = prev;
+    };
   }, [isOpen]);
 
-  // sync quando modal abre com novo item
   useMemo(() => {
     if (isOpen && initialItemId !== null) setActiveId(initialItemId);
   }, [isOpen, initialItemId]);
 
-  const activeItem = useMemo(() => items.find((i) => i.id === activeId) ?? items[0] ?? null, [items, activeId]);
+  const activeItem = useMemo(() => items.find((item) => item.id === activeId) ?? items[0] ?? null, [items, activeId]);
 
   if (!isOpen) return null;
 
@@ -313,8 +312,6 @@ function ItensModal({
       <button type="button" className="absolute inset-0 cursor-default" aria-label="Fechar" onClick={onClose} />
 
       <div className="relative z-10 flex h-[calc(100vh-48px)] w-full max-w-5xl flex-col overflow-hidden rounded-[28px] border border-line/80 bg-white shadow-soft">
-
-        {/* Header */}
         <div className="flex shrink-0 items-center justify-between gap-4 border-b border-line px-6 py-4">
           <div>
             <p className="font-['Plus_Jakarta_Sans'] text-[11px] font-semibold uppercase tracking-[0.18em] text-accent/80">
@@ -336,17 +333,14 @@ function ItensModal({
           </button>
         </div>
 
-        {/* Body: two columns */}
         <div className="flex min-h-0 flex-1">
-
-          {/* Left — lista de itens */}
           <div className="flex w-[280px] shrink-0 flex-col border-r border-line/80 bg-panel/40">
-            <div className="shrink-0 px-3 pt-3 pb-2">
+            <div className="shrink-0 px-3 pb-2 pt-3">
               <p className="font-['Plus_Jakarta_Sans'] text-[11px] font-semibold uppercase tracking-[0.1em] text-slate/60">
                 {items.length} {items.length === 1 ? "item" : "itens"}
               </p>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3 space-y-0.5">
+            <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 pb-3">
               {items.map((item) => (
                 <ItemListRow
                   key={item.id}
@@ -358,7 +352,6 @@ function ItensModal({
             </div>
           </div>
 
-          {/* Right — detalhe do item */}
           <div className="min-w-0 flex-1 overflow-hidden px-6 py-5">
             {activeItem ? (
               <ItemDetail item={activeItem} />
@@ -373,8 +366,6 @@ function ItensModal({
     </div>
   );
 }
-
-/* ─── tab principal ─────────────────────────────────────────── */
 
 function TabItensLicitacao({
   items,
@@ -419,7 +410,6 @@ function TabItensLicitacao({
 
   return (
     <>
-      {/* Resumo */}
       <section className="rounded-[14px] border border-line/80 bg-white px-4 py-4">
         <div className="mb-3 flex items-center gap-2">
           <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 text-accent" aria-hidden="true">
@@ -458,7 +448,6 @@ function TabItensLicitacao({
         </div>
       </section>
 
-      {/* Lista prévia */}
       <section className="rounded-[14px] border border-line/80 bg-white p-4">
         <div className="mb-3 flex items-center gap-2">
           <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 text-accent" aria-hidden="true">
@@ -499,27 +488,15 @@ function TabItensLicitacao({
               </button>
             ))}
 
-            {items.length > 5 ? (
-              <div className="pt-1 text-center">
-                <button
-                  type="button"
-                  onClick={() => openModal()}
-                  className="font-['Plus_Jakarta_Sans'] text-[12px] font-semibold text-accent hover:text-accentDark"
-                >
-                  Ver todos os {items.length} itens →
-                </button>
-              </div>
-            ) : (
-              <div className="pt-1 text-center">
-                <button
-                  type="button"
-                  onClick={() => openModal()}
-                  className="font-['Plus_Jakarta_Sans'] text-[12px] font-semibold text-accent hover:text-accentDark"
-                >
-                  Ver detalhes completos →
-                </button>
-              </div>
-            )}
+            <div className="pt-1 text-center">
+              <button
+                type="button"
+                onClick={() => openModal()}
+                className="font-['Plus_Jakarta_Sans'] text-[12px] font-semibold text-accent hover:text-accentDark"
+              >
+                {items.length > 5 ? `Ver todos os ${items.length} itens ->` : "Ver detalhes completos ->"}
+              </button>
+            </div>
           </div>
         )}
       </section>

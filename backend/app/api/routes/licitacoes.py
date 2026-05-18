@@ -248,6 +248,11 @@ async def gerar_resumo_ia_licitacao(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     licitacao.resumo_ia = resumo
+    if not licitacao.atestados_capacidade_tecnica:
+        try:
+            licitacao.atestados_capacidade_tecnica = await service.extrair_atestados_capacidade_tecnica(licitacao)
+        except ExtracaoItensError:
+            pass
     db.add(licitacao)
     db.commit()
     db.refresh(licitacao)

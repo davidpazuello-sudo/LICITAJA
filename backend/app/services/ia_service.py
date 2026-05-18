@@ -27,6 +27,12 @@ _SUMMARY_SYSTEM_INSTRUCTION = (
     "Resuma a oportunidade em portugues do Brasil, de forma objetiva, clara e util para decisao."
 )
 
+_TECHNICAL_CERT_SYSTEM_INSTRUCTION = (
+    "Voce e um analista de licitacoes publicas brasileiras focado em habilitacao tecnica. "
+    "Leia o contexto da licitacao e identifique apenas quais atestados de capacidade tecnica sao exigidos. "
+    "Responda em portugues do Brasil, de forma objetiva, sem inventar informacoes ausentes."
+)
+
 _CHAT_SYSTEM_INSTRUCTION = (
     "Voce e um assistente especialista em licitacoes publicas brasileiras. "
     "Responda em portugues do Brasil, de forma pratica, objetiva e fiel ao contexto da licitacao. "
@@ -60,6 +66,19 @@ DADOS DA LICITACAO:
 {contexto}
 """
 
+_TECHNICAL_CERT_PROMPT_TEMPLATE = """Analise esta licitacao e identifique se o edital exige atestados de capacidade tecnica.
+
+Regras:
+- responda em portugues do Brasil
+- descreva somente os atestados de capacidade tecnica exigidos
+- se houver percentual minimo, quantitativo minimo, necessidade de registro, CAT ou conselho profissional, inclua isso
+- se nao houver exigencia clara ou a informacao nao estiver disponivel, responda exatamente: Nao informado
+- nao use markdown, nao use bullets, nao invente informacoes ausentes
+
+DADOS DA LICITACAO:
+{contexto}
+"""
+
 
 class ExtracaoItensError(Exception):
     pass
@@ -76,6 +95,7 @@ class ItemExtraidoSchema(BaseModel):
     descricao: str
     quantidade: float | None = None
     unidade: str | None = None
+    exclusivo_me_epp: bool = False
     especificacoes: list[str] = Field(default_factory=list)
     marcas_fabricantes: list[str | BrandCandidateSchema] = Field(default_factory=list)
 
@@ -160,6 +180,9 @@ _PROPOSTAS_CONTEXT_CONFIG = {
 
 _CHAT_DOCUMENT_CHUNK_SIZE = 4_500
 _CHAT_MAX_CONTEXT_CHUNKS = 6
+_SUMMARY_DOCUMENT_CHUNK_SIZE = 5_500
+_SUMMARY_MAX_CONTEXT_CHUNKS = 8
+_SUPPORTING_DOCUMENT_MAX_PDFS = 6
 _INVALID_ITEM_PATTERNS = (
     r"\bdeclarac",
     r"\bproposta de prec",
@@ -475,6 +498,7 @@ class IaService:
                         descricao=item_model.descricao,
                         quantidade=item_model.quantidade,
                         unidade=item_model.unidade,
+                        exclusivo_me_epp=item_model.exclusivo_me_epp,
                         especificacoes=especificacoes if isinstance(especificacoes, list) else [],
                         marcas_fabricantes=[],
                     ),
@@ -520,7 +544,9 @@ class IaService:
             )
 
         contexto = self._build_licitacao_summary_context(licitacao)
-        prompt = _SUMMARY_PROMPT_TEMPLATE.format(contexto=contexto)
+        documentos = await self._load_licitacao_documents_for_summary(licitacao)
+        blocos_documentos = self._select_summary_context_chunks(documentos)
+        prompt = self._build_summary_prompt(contexto, blocos_documentos)
 
         if provider_id == "openai":
             return self._summarize_with_openai(provider, prompt)
@@ -534,6 +560,46 @@ class IaService:
             return await self._summarize_with_gemini(provider, prompt)
 
         raise ExtracaoItensError(f"IA ativa nao suportada: {provider['nome']}.")
+
+    async def extrair_atestados_capacidade_tecnica(self, licitacao: LicitacaoModel) -> str:
+        if self.db is None:
+            raise ExtracaoItensError("Servico de IA sem acesso ao banco para identificar atestados de capacidade tecnica.")
+
+        provider_id, provider = resolve_ai_agent_runtime_config(self.db, "resumo_licitacao", self.settings)
+        if not provider["api_key"]:
+            raise ExtracaoItensError(
+                f"A chave da IA ativa ({provider['nome']}) nao esta configurada. Configure-a antes de analisar os atestados tecnicos."
+            )
+
+        contexto = self._build_licitacao_summary_context(licitacao)
+        documentos = await self._load_licitacao_documents_for_summary(licitacao)
+        blocos_documentos = self._select_summary_context_chunks(documentos)
+        prompt = self._build_technical_cert_prompt(contexto, blocos_documentos)
+
+        if provider_id == "openai":
+            resposta = self._generate_text_openai(provider, prompt, _TECHNICAL_CERT_SYSTEM_INSTRUCTION)
+        elif provider_id == "deepseek":
+            resposta = self._generate_text_openai_compatible_chat(
+                provider,
+                prompt,
+                _TECHNICAL_CERT_SYSTEM_INSTRUCTION,
+                base_url="https://api.deepseek.com/v1",
+            )
+        elif provider_id == "groq":
+            resposta = self._generate_text_openai_compatible_chat(
+                provider,
+                prompt,
+                _TECHNICAL_CERT_SYSTEM_INSTRUCTION,
+                base_url="https://api.groq.com/openai/v1",
+            )
+        elif provider_id == "anthropic":
+            resposta = await self._generate_text_anthropic(provider, prompt, _TECHNICAL_CERT_SYSTEM_INSTRUCTION)
+        elif provider_id == "gemini":
+            resposta = await self._generate_text_gemini(provider, prompt, _TECHNICAL_CERT_SYSTEM_INSTRUCTION)
+        else:
+            raise ExtracaoItensError(f"IA ativa nao suportada: {provider['nome']}.")
+
+        return self._normalize_technical_cert_response(resposta)
 
     async def responder_chat_licitacao(
         self,
@@ -1129,6 +1195,7 @@ class IaService:
         }
         quantidade_aliases = {"qtd", "quant", "qty", "quantidade", "quantidade_total", "quantidade_solicitada"}
         unidade_aliases = {"un", "und", "unit", "unidade", "unidade_de_fornecimento"}
+        exclusivo_me_epp_aliases = {"exclusivo_me_epp", "me_epp", "exclusivo_para_me_epp", "tratamento_me_epp"}
         especificacoes_aliases = {"especificacoes", "specs"}
         marcas_aliases = {"marcas", "fabricantes", "brands", "marcas_fabricantes"}
 
@@ -1156,6 +1223,8 @@ class IaService:
                 normalized_result.setdefault('quantidade', value)
             elif normalized_key in unidade_aliases:
                 normalized_result.setdefault('unidade', value)
+            elif normalized_key in exclusivo_me_epp_aliases or ("me_epp" in normalized_key and "exclus" in normalized_key):
+                normalized_result.setdefault('exclusivo_me_epp', value)
             elif normalized_key in especificacoes_aliases:
                 normalized_result.setdefault('especificacoes', value)
             elif normalized_key in marcas_aliases:
@@ -1170,6 +1239,10 @@ class IaService:
             normalized_result['numero_item'] = numero_item
 
         normalized_result['quantidade'] = IaService._coerce_optional_number(normalized_result.get('quantidade'))
+        normalized_result["exclusivo_me_epp"] = IaService._coerce_boolean_like(
+            normalized_result.get("exclusivo_me_epp"),
+            default=False,
+        )
 
         if "unidade" in normalized_result and normalized_result["unidade"] is not None:
             unidade = str(normalized_result["unidade"]).strip()
@@ -1490,6 +1563,76 @@ class IaService:
 
         return "\n".join(linhas)
 
+    def _build_summary_prompt(self, contexto: str, blocos_documentos: list[str]) -> str:
+        linhas = [
+            "Crie um resumo executivo curto desta licitacao.",
+            "",
+            "Regras:",
+            "- escreva em portugues do Brasil",
+            "- use no maximo 8 linhas",
+            "- destaque objeto, escopo, principais itens ou servicos, quantidade relevante quando existir e data de abertura",
+            "- se houver risco, mudanca documental, requisito critico ou ponto de atencao evidente, mencione em uma linha",
+            "- nao invente informacoes ausentes",
+            "- leia primeiro o edital principal e, em seguida, use os documentos complementares para enriquecer a analise",
+            "",
+            "DADOS DA LICITACAO:",
+            contexto,
+            "",
+            "DOCUMENTOS ANALISADOS:",
+        ]
+
+        if blocos_documentos:
+            linhas.extend(blocos_documentos)
+        else:
+            linhas.append("Nenhum documento textual adicional foi encontrado para esta licitacao.")
+
+        return "\n".join(linhas)
+
+    def _build_technical_cert_prompt(self, contexto: str, blocos_documentos: list[str]) -> str:
+        linhas = [
+            "Analise esta licitacao e identifique quais atestados de capacidade tecnica sao exigidos.",
+            "",
+            "Regras:",
+            "- responda em portugues do Brasil",
+            "- descreva somente os atestados de capacidade tecnica exigidos",
+            "- se houver percentual minimo, quantitativo minimo, necessidade de registro, CAT ou conselho profissional, inclua isso",
+            "- se nao houver exigencia clara ou a informacao nao estiver disponivel, responda exatamente: Nao informado",
+            "- nao use markdown, nao use bullets, nao invente informacoes ausentes",
+            "- leia primeiro o edital principal e, em seguida, use os documentos complementares para enriquecer a analise",
+            "",
+            "DADOS DA LICITACAO:",
+            contexto,
+            "",
+            "DOCUMENTOS ANALISADOS:",
+        ]
+
+        if blocos_documentos:
+            linhas.extend(blocos_documentos)
+        else:
+            linhas.append("Nenhum documento textual adicional foi encontrado para esta licitacao.")
+
+        return "\n".join(linhas)
+
+    def _normalize_technical_cert_response(self, resposta: str) -> str:
+        texto = re.sub(r"\s+", " ", (resposta or "").strip())
+        if not texto:
+            return "Nao informado"
+
+        normalized = unicodedata.normalize("NFKD", texto)
+        normalized = "".join(char for char in normalized if not unicodedata.combining(char)).casefold()
+        invalids = {
+            "nao informado",
+            "nao ha",
+            "nao encontrado",
+            "nao consta",
+            "nao identificado",
+            "sem informacao",
+        }
+        if normalized in invalids:
+            return "Nao informado"
+
+        return texto
+
     def _build_chat_prompt(
         self,
         contexto: str,
@@ -1534,6 +1677,12 @@ class IaService:
         return "\n".join(linhas)
 
     async def _load_licitacao_documents_for_chat(self, licitacao: LicitacaoModel) -> list[tuple[str, str]]:
+        return await self._load_licitacao_documents(licitacao)
+
+    async def _load_licitacao_documents_for_summary(self, licitacao: LicitacaoModel) -> list[tuple[str, str]]:
+        return await self._load_licitacao_documents(licitacao)
+
+    async def _load_licitacao_documents(self, licitacao: LicitacaoModel) -> list[tuple[str, str]]:
         documentos: list[tuple[str, str]] = []
         editais = list(getattr(licitacao, "editais", []) or [])
 
@@ -1556,11 +1705,11 @@ class IaService:
             if texto_remoto.strip():
                 documentos.append(("Edital do portal", texto_remoto))
 
-        if licitacao.link_site and "e-compras.am.gov.br" in licitacao.link_site:
-            anexos = await self._collect_ecompras_am_annex_texts(licitacao.link_site, licitacao.link_edital)
+        if licitacao.link_site:
+            anexos = await self._collect_supporting_document_texts(licitacao.link_site, licitacao.link_edital)
             for nome, conteudo in anexos:
                 if conteudo.strip():
-                    documentos.append((f"Anexo: {nome}", conteudo))
+                    documentos.append((f"Documento complementar: {nome}", conteudo))
 
         return documentos
 
@@ -1592,6 +1741,26 @@ class IaService:
         blocos_scored.sort(key=lambda item: (-item[0], item[1]))
         selecionados = sorted(blocos_scored[:_CHAT_MAX_CONTEXT_CHUNKS], key=lambda item: item[1])
         return [bloco for _, _, bloco in selecionados]
+
+    def _select_summary_context_chunks(self, documentos: list[tuple[str, str]]) -> list[str]:
+        blocos: list[str] = []
+
+        for nome, conteudo in documentos:
+            nome_legivel = self._humanize_document_name(nome)
+            limite_por_documento = 2 if "EDITAL" in nome.upper() else 1
+            usados = 0
+
+            for bloco in self._split_text_into_chunks(conteudo, _SUMMARY_DOCUMENT_CHUNK_SIZE):
+                blocos.append(f"[DOCUMENTO: {nome_legivel}]\n{bloco}")
+                usados += 1
+
+                if len(blocos) >= _SUMMARY_MAX_CONTEXT_CHUNKS or usados >= limite_por_documento:
+                    break
+
+            if len(blocos) >= _SUMMARY_MAX_CONTEXT_CHUNKS:
+                break
+
+        return blocos
 
     def _score_chat_relevance(self, texto: str, pergunta: str) -> int:
         normalized_text = texto.lower()
@@ -1688,6 +1857,7 @@ class IaService:
                     descricao=descricao,
                     quantidade=quantidade,
                     unidade=item.unidade,
+                    exclusivo_me_epp=self._resolve_exclusivo_me_epp(item, texto_edital),
                     especificacoes=item.especificacoes,
                     marcas_fabricantes=self._normalize_brand_candidates(item.marcas_fabricantes),
                 )
@@ -1704,11 +1874,58 @@ class IaService:
                     descricao=item.descricao,
                     quantidade=item.quantidade,
                     unidade=item.unidade,
+                    exclusivo_me_epp=item.exclusivo_me_epp,
                     especificacoes=item.especificacoes,
                     marcas_fabricantes=item.marcas_fabricantes,
                 )
             )
         return renumerados
+
+    def _resolve_exclusivo_me_epp(self, item: ItemExtraidoSchema, texto_edital: str) -> bool:
+        if item.exclusivo_me_epp:
+            return True
+
+        texto_item = self._normalize_text_for_item_checks(" ".join([item.descricao, *item.especificacoes]))
+        if self._texto_indica_exclusividade_me_epp(texto_item):
+            return True
+        if self._texto_indica_nao_exclusividade(texto_item):
+            return False
+
+        numero_item = item.numero_item
+        texto_edital_normalizado = self._normalize_text_for_item_checks(texto_edital)
+        if numero_item:
+            if re.search(
+                rf"(item\s*0*{numero_item}\b[^.\n]{{0,220}}(?:exclusiv\w*|reservad\w*).{{0,80}}(?:me/?epp|microempresa|empresa de pequeno porte))",
+                texto_edital_normalizado,
+                re.I,
+            ):
+                return True
+            if re.search(
+                rf"(item\s*0*{numero_item}\b[^.\n]{{0,220}}(?:ampla concorrencia|nao exclusivo|n[aã]o exclusivo))",
+                texto_edital_normalizado,
+                re.I,
+            ):
+                return False
+
+        return False
+
+    def _texto_indica_exclusividade_me_epp(self, texto: str) -> bool:
+        patterns = (
+            r"exclusiv\w*.*me/?epp",
+            r"me/?epp.*exclusiv\w*",
+            r"microempresa.*empresa de pequeno porte",
+            r"exclusiv\w*.*microempresa",
+        )
+        return any(re.search(pattern, texto, re.I) for pattern in patterns)
+
+    def _texto_indica_nao_exclusividade(self, texto: str) -> bool:
+        patterns = (
+            r"ampla concorrencia",
+            r"nao exclusivo",
+            r"n[aã]o exclusivo",
+            r"nao se aplica me/?epp",
+        )
+        return any(re.search(pattern, texto, re.I) for pattern in patterns)
 
     def _normalize_brand_candidates(
         self,
@@ -1766,6 +1983,24 @@ class IaService:
             return None
         return ItemExtraidoSchema.BrandCandidateSchema(nome=cleaned)
 
+    @staticmethod
+    def _coerce_boolean_like(value: object, *, default: bool = False) -> bool:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return bool(value)
+        if value is None:
+            return default
+
+        normalized = IaService._normalize_text_for_item_checks(str(value))
+        if normalized in {"sim", "s", "true", "1", "yes"}:
+            return True
+        if normalized in {"nao", "não", "n", "false", "0", "no"}:
+            return False
+        if "exclusiv" in normalized and "me" in normalized:
+            return True
+        return default
+
     async def _enrich_items_with_web_brand_candidates(
         self,
         itens: list[ItemExtraidoSchema],
@@ -1790,6 +2025,7 @@ class IaService:
                         descricao=item.descricao,
                         quantidade=item.quantidade,
                         unidade=item.unidade,
+                        exclusivo_me_epp=item.exclusivo_me_epp,
                         especificacoes=item.especificacoes,
                         marcas_fabricantes=merged_fallback,
                     )
@@ -1822,6 +2058,7 @@ class IaService:
                     descricao=item.descricao,
                     quantidade=item.quantidade,
                     unidade=item.unidade,
+                    exclusivo_me_epp=item.exclusivo_me_epp,
                     especificacoes=item.especificacoes,
                     marcas_fabricantes=existing,
                 )
@@ -1841,6 +2078,7 @@ class IaService:
                 descricao=item.descricao,
                 quantidade=item.quantidade,
                 unidade=item.unidade,
+                exclusivo_me_epp=item.exclusivo_me_epp,
                 especificacoes=item.especificacoes,
                 marcas_fabricantes=merged_brands,
             )
@@ -2421,21 +2659,18 @@ class IaService:
             return texto_base
 
         licitacao = self._find_licitacao_by_edital_path(arquivo_path)
-        if licitacao is None or not licitacao.link_site or "e-compras.am.gov.br" not in licitacao.link_site:
+        if licitacao is None or not licitacao.link_site:
             return texto_base
 
-        anexos = await self._collect_ecompras_am_annex_texts(licitacao.link_site, licitacao.link_edital)
+        anexos = await self._collect_supporting_document_texts(licitacao.link_site, licitacao.link_edital)
         if not anexos:
             return texto_base
 
-        # Colocamos os anexos primeiro porque, nesses editais, o detalhe dos
-        # itens costuma estar no Termo de Referencia e nao no corpo principal.
-        partes: list[str] = []
+        partes: list[str] = [f"[EDITAL PRINCIPAL]\n{texto_base}"]
         for nome, conteudo in anexos:
             if not conteudo.strip():
                 continue
-            partes.append(f"[ANEXO COMPLEMENTAR: {nome}]\n{conteudo}")
-        partes.append(texto_base)
+            partes.append(f"[DOCUMENTO COMPLEMENTAR: {nome}]\n{conteudo}")
 
         return "\n\n".join(partes)
 
@@ -2526,14 +2761,21 @@ class IaService:
         detail_url: str,
         main_pdf_url: str | None,
     ) -> list[tuple[str, str]]:
+        return await self._collect_supporting_document_texts(detail_url, main_pdf_url)
+
+    async def _collect_supporting_document_texts(
+        self,
+        detail_url: str,
+        main_pdf_url: str | None,
+    ) -> list[tuple[str, str]]:
         try:
             async with httpx.AsyncClient(timeout=45.0, follow_redirects=True) as client:
                 detail_response = await client.get(detail_url)
                 detail_response.raise_for_status()
                 html = detail_response.text
-                candidates = self._extract_ecompras_am_annex_candidates(html, detail_url, main_pdf_url)
+                candidates = self._extract_supporting_pdf_candidates(html, detail_url, main_pdf_url)
                 anexos: list[tuple[str, str]] = []
-                for nome, url in candidates[:3]:
+                for nome, url in candidates[:_SUPPORTING_DOCUMENT_MAX_PDFS]:
                     pdf_response = await client.get(url)
                     pdf_response.raise_for_status()
                     texto = self._extrair_texto_pdf_bytes(pdf_response.content)
@@ -2542,6 +2784,48 @@ class IaService:
                 return anexos
         except httpx.HTTPError:
             return []
+
+    def _extract_supporting_pdf_candidates(
+        self,
+        html: str,
+        base_url: str,
+        main_pdf_url: str | None,
+    ) -> list[tuple[str, str]]:
+        candidates: list[tuple[str, str]] = []
+        seen: set[str] = set()
+        main_url_normalized = (main_pdf_url or "").strip().lower()
+
+        def append_candidate(nome: str, url: str) -> None:
+            normalized_url = url.strip().lower()
+            if not normalized_url or normalized_url in seen:
+                return
+            if main_url_normalized and normalized_url == main_url_normalized:
+                return
+            seen.add(normalized_url)
+            candidates.append((nome, url))
+
+        if "e-compras.am.gov.br" in base_url:
+            for nome, url in self._extract_ecompras_am_annex_candidates(html, base_url, main_pdf_url):
+                append_candidate(nome, url)
+
+        for nome, url in self._extract_pdf_candidates_from_html(html, base_url):
+            append_candidate(nome, url)
+
+        def score(item: tuple[str, str]) -> tuple[int, str]:
+            nome = item[0].upper()
+            pontos = 0
+            if any(token in nome for token in ("TERMO", "REFERENCIA", "ANEXO", "ETP", "ESTUDO", "PROJETO")):
+                pontos += 5
+            if any(token in nome for token in ("MAPA", "PLANILHA", "MEMORIAL", "CADERNO", "CATALOGO")):
+                pontos += 4
+            if any(token in nome for token in ("ATA", "MINUTA", "OFICIO", "ESCLARECIMENTO", "ERRATA", "ADENDO")):
+                pontos += 3
+            if "EDITAL" in nome or "AVISO" in nome:
+                pontos += 1
+            return (-pontos, nome)
+
+        candidates.sort(key=score)
+        return candidates
 
     def _extract_ecompras_am_annex_candidates(
         self,

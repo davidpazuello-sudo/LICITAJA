@@ -15,6 +15,7 @@ export interface ItemType {
   descricao: string;
   quantidade: number | null;
   unidade: string | null;
+  exclusivo_me_epp: boolean;
   especificacoes: string | null;
   marcas_fabricantes: string | null;
   status_pesquisa: string;

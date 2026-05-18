@@ -114,6 +114,7 @@ export interface LicitacaoType {
   link_site: string | null;
   observacoes: string | null;
   resumo_ia: string | null;
+  atestados_capacidade_tecnica: string | null;
   status: string;
   fonte: string;
   dados_brutos: string | null;

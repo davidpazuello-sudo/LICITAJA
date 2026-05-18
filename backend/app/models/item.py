@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -19,6 +19,7 @@ class ItemModel(Base):
     descricao: Mapped[str] = mapped_column(Text, nullable=False)
     quantidade: Mapped[float | None] = mapped_column(Float, nullable=True)
     unidade: Mapped[str | None] = mapped_column(String, nullable=True)
+    exclusivo_me_epp: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
     especificacoes: Mapped[str | None] = mapped_column(Text, nullable=True)
     marcas_fabricantes: Mapped[str | None] = mapped_column(Text, nullable=True)
     status_pesquisa: Mapped[str] = mapped_column(String, nullable=False, default="aguardando")

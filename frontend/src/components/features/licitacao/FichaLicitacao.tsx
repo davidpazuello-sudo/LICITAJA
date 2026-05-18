@@ -202,6 +202,13 @@ function FichaLicitacao({ perfil }: { perfil: LicitacaoDetailType }) {
         <FichaField label={adaptiveRegistry.processLabel} value={adaptiveRegistry.processValue} mono />
       </FichaSection>
 
+      <FichaSection title="Habilitacao Tecnica">
+        <FichaField
+          label="Atestados de Capacidade Tecnica"
+          value={perfil.atestados_capacidade_tecnica ?? "Nao informado"}
+        />
+      </FichaSection>
+
       <FichaSection title="Datas e Valores">
         <FichaField label="Data de Abertura" value={formatMockDateTime(perfil.data_abertura)} />
         <FichaField label="Valor Estimado" value={formatCurrency(perfil.valor_estimado)} highlight />

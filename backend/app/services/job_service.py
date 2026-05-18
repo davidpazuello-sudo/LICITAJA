@@ -4,6 +4,7 @@ import asyncio
 from datetime import UTC, datetime
 
 from sqlalchemy import delete, select
+from sqlalchemy.orm import selectinload
 
 from app.core.database import SessionLocal
 from app.models.cotacao import CotacaoModel
@@ -148,12 +149,13 @@ def processar_licitacao_salva_em_segundo_plano(job_id: int, licitacao_id: int) -
             item_model = ItemModel(
                 licitacao_id=licitacao_id,
                 edital_id=edital.id,
-                numero_item=item_data.numero_item,
-                descricao=item_data.descricao,
-                quantidade=item_data.quantidade,
-                unidade=item_data.unidade,
-                especificacoes=item_data.especificacoes_json(),
-                marcas_fabricantes=item_data.marcas_fabricantes_json(),
+            numero_item=item_data.numero_item,
+            descricao=item_data.descricao,
+            quantidade=item_data.quantidade,
+            unidade=item_data.unidade,
+            exclusivo_me_epp=item_data.exclusivo_me_epp,
+            especificacoes=item_data.especificacoes_json(),
+            marcas_fabricantes=item_data.marcas_fabricantes_json(),
                 status_pesquisa="aguardando",
                 preco_medio=None,
             )
@@ -204,6 +206,32 @@ def processar_licitacao_salva_em_segundo_plano(job_id: int, licitacao_id: int) -
             db.commit()
 
         _atualizar_status_licitacao_pos_pesquisa(db, licitacao_id)
+
+        licitacao_completa = db.scalar(
+            select(LicitacaoModel)
+            .options(
+                selectinload(LicitacaoModel.itens),
+                selectinload(LicitacaoModel.editais),
+            )
+            .where(LicitacaoModel.id == licitacao_id),
+        )
+        if licitacao_completa is not None and not licitacao_completa.resumo_ia:
+            try:
+                licitacao_completa.resumo_ia = asyncio.run(service.gerar_resumo_licitacao(licitacao_completa))
+                db.add(licitacao_completa)
+                db.commit()
+            except Exception as resumo_exc:  # noqa: BLE001
+                print(f"Falha ao gerar resumo automatico da licitacao {licitacao_id}: {resumo_exc}")
+
+        if licitacao_completa is not None and not licitacao_completa.atestados_capacidade_tecnica:
+            try:
+                licitacao_completa.atestados_capacidade_tecnica = asyncio.run(
+                    service.extrair_atestados_capacidade_tecnica(licitacao_completa)
+                )
+                db.add(licitacao_completa)
+                db.commit()
+            except Exception as atestado_exc:  # noqa: BLE001
+                print(f"Falha ao extrair atestados tecnicos da licitacao {licitacao_id}: {atestado_exc}")
 
         job = db.get(ProcessamentoJobModel, job_id)
         if job is not None:

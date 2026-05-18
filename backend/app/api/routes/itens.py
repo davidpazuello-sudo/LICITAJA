@@ -268,6 +268,7 @@ async def extrair_itens_licitacao(
             descricao=item_data.descricao,
             quantidade=item_data.quantidade,
             unidade=item_data.unidade,
+            exclusivo_me_epp=item_data.exclusivo_me_epp,
             especificacoes=item_data.especificacoes_json(),
             marcas_fabricantes=item_data.marcas_fabricantes_json(),
             status_pesquisa="aguardando",

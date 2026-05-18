@@ -9,6 +9,7 @@ class ItemBase(BaseModel):
     descricao: str
     quantidade: float | None = None
     unidade: str | None = None
+    exclusivo_me_epp: bool = False
     especificacoes: str | None = None
     marcas_fabricantes: str | None = None
     status_pesquisa: str = "aguardando"
