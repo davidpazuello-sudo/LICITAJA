@@ -11,7 +11,7 @@ import {
   deriveAvailableEstados,
   type AdvancedFilters,
 } from "../components/features/licitacoes/FiltrosAvancados";
-import { Spinner } from "../components/ui/Spinner";
+import { useSetPageLoading } from "../contexts/PageLoadingContext";
 import { useLicitacoes } from "../hooks/useLicitacoes";
 import type { LicitacaoType } from "../types/licitacao.types";
 
@@ -65,6 +65,9 @@ function MinhasLicitacoes() {
   const availableEstados = useMemo(() => deriveAvailableEstados(items), [items]);
   const filteredItems = useMemo(() => applyAdvancedFilters(items, advancedFilters), [items, advancedFilters]);
   const activeFilterCount = useMemo(() => countActiveFilters(advancedFilters), [advancedFilters]);
+
+  // Sinaliza carregamento ao TopNavigation
+  useSetPageLoading(status === "loading");
 
   // limpa seleção ao sair do modo
   useEffect(() => {
@@ -223,17 +226,6 @@ function MinhasLicitacoes() {
               onClear={() => setAdvancedFilters(ADVANCED_FILTERS_DEFAULT)}
               activeCount={activeFilterCount}
             />
-          </div>
-        ) : null}
-
-        {/* Loading */}
-        {status === "loading" ? (
-          <div className="flex items-center gap-4 rounded-[26px] border border-line bg-white px-8 py-10 shadow-card">
-            <Spinner size="lg" className="text-accent" />
-            <div>
-              <p className="font-['Manrope'] text-base font-bold text-ink">Carregando suas licitacoes</p>
-              <p className="mt-0.5 font-['Plus_Jakarta_Sans'] text-sm text-slate">Organizando por status, prazo e urgencia.</p>
-            </div>
           </div>
         ) : null}
 
