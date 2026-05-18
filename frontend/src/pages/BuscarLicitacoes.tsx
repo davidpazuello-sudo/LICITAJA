@@ -5,7 +5,7 @@ import { ResultadoBusca } from "../components/features/busca/ResultadoBusca";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
-import { Spinner } from "../components/ui/Spinner";
+import { useSetPageLoading } from "../contexts/PageLoadingContext";
 import { useBusca } from "../hooks/useBusca";
 import { usePortalIntegracoes } from "../hooks/useConfiguracoes";
 import { resolvePortalFilterSupport, sanitizeFiltersByPortalSupport } from "../utils/portalFilterSupport";
@@ -136,6 +136,8 @@ function BuscarLicitacoes() {
     }),
     [response.items],
   );
+  useSetPageLoading(status === "loading");
+
   const currentPage = response.numero_pagina || filters.pagina || 1;
   const totalPages = Math.max(response.total_paginas || 1, 1);
   const showingFrom = response.total_registros === 0 ? 0 : (currentPage - 1) * 10 + 1;
@@ -306,19 +308,6 @@ function BuscarLicitacoes() {
                   Limpar filtros
                 </button>
               </div>
-            </div>
-          ) : null}
-
-          {status === "loading" ? (
-            <div className="flex flex-wrap items-center justify-between gap-3 px-1">
-              <div className="inline-flex items-center gap-3 rounded-full border border-line bg-white px-4 py-2 shadow-card">
-                <Spinner size="sm" className="text-accent" />
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-ink">Consultando os portais</span>
-                  <span className="hidden text-sm text-slate sm:inline">Carregando a pagina atual da busca</span>
-                </div>
-              </div>
-              <span className="text-xs font-medium uppercase tracking-[0.16em] text-slate/80">Busca em andamento</span>
             </div>
           ) : null}
 

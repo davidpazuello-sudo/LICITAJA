@@ -6,8 +6,8 @@ import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { Modal } from "../components/ui/Modal";
-import { Spinner } from "../components/ui/Spinner";
 import { Tabs } from "../components/ui/Tabs";
+import { useSetPageLoading } from "../contexts/PageLoadingContext";
 
 // Modelos predefinidos por provedor de IA.
 // Adicione novos modelos aqui conforme forem lançados.
@@ -333,16 +333,9 @@ function TabPortais() {
     }
   };
 
-  if (status === "loading") {
-    return (
-      <Card>
-        <div className="flex items-center gap-4 p-8">
-          <Spinner size="lg" className="text-accent" />
-          <p className="text-sm text-slate">Carregando configuracao...</p>
-        </div>
-      </Card>
-    );
-  }
+  useSetPageLoading(status === "loading");
+
+  if (status === "loading") return null;
 
   if (status === "error") {
     return (
@@ -950,16 +943,9 @@ function TabIA() {
   const { config, status, errorMessage, providerSaveIndicators, agentSaveIndicators, salvarProvider, salvarAgente, atualizarPromptAgente } =
     useConfiguracaoIA();
 
-  if (status === "loading") {
-    return (
-      <Card>
-        <div className="flex items-center gap-4 p-8">
-          <Spinner size="lg" className="text-accent" />
-          <p className="text-sm text-slate">Carregando configuracoes...</p>
-        </div>
-      </Card>
-    );
-  }
+  useSetPageLoading(status === "loading");
+
+  if (status === "loading") return null;
 
   if (status === "error") {
     return (

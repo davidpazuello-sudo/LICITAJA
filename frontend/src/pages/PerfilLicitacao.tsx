@@ -5,7 +5,7 @@ import { FichaLicitacao } from "../components/features/licitacao/FichaLicitacao"
 import { PainelLateralLicitacao } from "../components/features/licitacao/PainelLateralLicitacao";
 import { WorkspaceLicitacao } from "../components/features/licitacao/WorkspaceLicitacao";
 import { Card } from "../components/ui/Card";
-import { Spinner } from "../components/ui/Spinner";
+import { useSetPageLoading } from "../contexts/PageLoadingContext";
 import { useItens } from "../hooks/useItens";
 import { useLicitacaoChat } from "../hooks/useLicitacaoChat";
 import { usePerfilLicitacao } from "../hooks/usePerfilLicitacao";
@@ -85,6 +85,9 @@ function PerfilLicitacao() {
     chatStatus === "loading" ||
     isSendingChat;
 
+  // Sinaliza qualquer atividade ao spinner do TopNavigation
+  useSetPageLoading(isPageBusy);
+
   return (
     <div className="h-full">
       <div className='flex items-center gap-[8px] px-5 pt-6 text-[12px] font-medium text-[#9AA3B5] sm:px-6 lg:px-8 font-["Plus_Jakarta_Sans"]'>
@@ -93,24 +96,7 @@ function PerfilLicitacao() {
         </Link>
         <span className="mx-[5px] text-[#9AA3B5]">&gt;</span>
         <span className="text-[#0F1724]">{perfil ? perfil.orgao.slice(0, 64) : `Licitacao ${id ?? ""}`}</span>
-        {isPageBusy ? <Spinner size="sm" className="text-[#2563EB]" /> : null}
       </div>
-
-      {status === "loading" ? (
-        <div className="px-5 py-10 sm:px-6 lg:px-8">
-          <Card>
-            <div className="flex items-center gap-4 p-8">
-              <Spinner size="lg" className="text-accent" />
-              <div>
-                <h2 className="font-heading text-xl font-extrabold text-ink">Carregando perfil da licitacao</h2>
-                <p className="mt-1 text-sm text-slate">
-                  Estamos reunindo os dados gerais, os documentos e as areas operacionais desta oportunidade.
-                </p>
-              </div>
-            </div>
-          </Card>
-        </div>
-      ) : null}
 
       {status === "error" ? (
         <div className="px-5 py-10 sm:px-6 lg:px-8">
