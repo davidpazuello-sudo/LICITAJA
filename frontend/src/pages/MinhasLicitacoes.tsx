@@ -54,9 +54,11 @@ function MinhasLicitacoes() {
   } = useLicitacoes();
 
   const [pendingRemoval, setPendingRemoval] = useState<LicitacaoType | null>(null);
+  const [pendingRemovalError, setPendingRemovalError] = useState<string | null>(null);
+  const [confirmRemoving, setConfirmRemoving] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const [showBulkRemoveModal, setShowBulkRemoveModal] = useState(false);
+  const [bulkRemoving, setBulkRemoving] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [showFilters, setShowFilters] = useState(false);
@@ -66,21 +68,18 @@ function MinhasLicitacoes() {
   const filteredItems = useMemo(() => applyAdvancedFilters(items, advancedFilters), [items, advancedFilters]);
   const activeFilterCount = useMemo(() => countActiveFilters(advancedFilters), [advancedFilters]);
 
-  // Sinaliza carregamento ao TopNavigation
-  useSetPageLoading(status === "loading");
+  useSetPageLoading(status === "loading" || bulkRemoving || confirmRemoving);
 
-  // limpa seleção ao sair do modo
+  // Limpa seleção ao sair do modo
   useEffect(() => {
     if (!selectionMode) setSelectedIds([]);
   }, [selectionMode]);
 
   useEffect(() => {
-    if (searchOpen) {
-      searchInputRef.current?.focus();
-    }
+    if (searchOpen) searchInputRef.current?.focus();
   }, [searchOpen]);
 
-  // remove IDs que saíram da lista
+  // Remove IDs que saíram da lista
   useEffect(() => {
     setSelectedIds((cur) => cur.filter((id) => items.some((item) => item.id === id)));
   }, [items]);
@@ -99,11 +98,76 @@ function MinhasLicitacoes() {
     setSelectedIds([]);
   };
 
+  const handleBulkRemove = async () => {
+    if (selectedCount === 0 || bulkRemoving) return;
+    setBulkRemoving(true);
+    try {
+      await removeLicitacoes(selectedIds);
+      exitSelection();
+    } catch {
+      // erro já notificado via toast no hook
+    } finally {
+      setBulkRemoving(false);
+    }
+  };
+
   return (
     <div className="h-full">
-      <div className="px-6 py-6 sm:px-8">
+      <div className={`px-6 py-6 sm:px-8 ${selectionMode ? "pb-24" : ""}`}>
 
-        {/* Barra de controles */}
+        {/* ── Barra de seleção (aparece no topo quando selectionMode está ativo) ── */}
+        {selectionMode ? (
+          <div className="mb-5 flex items-center gap-3 rounded-2xl border border-line bg-white px-5 py-3 shadow-sm">
+            {/* Selecionar/desmarcar todas */}
+            <button
+              type="button"
+              onClick={toggleAll}
+              className="font-['Plus_Jakarta_Sans'] text-sm text-slate transition hover:text-ink"
+            >
+              {allSelected ? "Desmarcar todas" : "Selecionar todas"}
+            </button>
+
+            <div className="h-4 w-px bg-line" />
+
+            {/* Contagem */}
+            <span className="font-['Manrope'] text-sm font-bold text-ink">
+              {selectedCount} selecionada{selectedCount === 1 ? "" : "s"}
+            </span>
+
+            <div className="flex-1" />
+
+            {/* Cancelar */}
+            <button
+              type="button"
+              onClick={exitSelection}
+              className="font-['Plus_Jakarta_Sans'] text-sm text-slate transition hover:text-ink"
+            >
+              Cancelar
+            </button>
+
+            {/* Remover */}
+            <button
+              type="button"
+              disabled={selectedCount === 0 || bulkRemoving}
+              onClick={() => void handleBulkRemove()}
+              className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 font-['Plus_Jakarta_Sans'] text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {bulkRemoving ? (
+                <>
+                  <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Removendo...
+                </>
+              ) : (
+                `Remover ${selectedCount > 0 ? selectedCount : ""}`
+              )}
+            </button>
+          </div>
+        ) : null}
+
+        {/* ── Barra de controles ── */}
         <div className="mb-6 space-y-4">
           <FiltroStatus activeTab={statusFilter} items={tabs} onChange={setStatusFilter} />
 
@@ -133,9 +197,7 @@ function MinhasLicitacoes() {
                 type="button"
                 aria-label={searchOpen ? "Fechar pesquisa" : "Abrir pesquisa"}
                 onClick={() => {
-                  if (searchOpen && searchTerm) {
-                    setSearchTerm("");
-                  }
+                  if (searchOpen && searchTerm) setSearchTerm("");
                   setSearchOpen((current) => !current);
                 }}
                 className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-line bg-white text-slate transition hover:border-accent/30 hover:text-accent focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent/15"
@@ -294,16 +356,11 @@ function MinhasLicitacoes() {
         ) : null}
       </div>
 
-      {/* ── Barra flutuante de seleção ── */}
+      {/* ── Barra de seleção fixa no fundo (aparece ao selecionar itens) ── */}
       {selectionMode ? (
-        <div
-          className={
-            "fixed bottom-6 left-1/2 z-40 -translate-x-1/2 transition-all duration-300 " +
-            (selectedCount > 0 ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0 pointer-events-none")
-          }
-        >
-          <div className="flex items-center gap-3 rounded-2xl border border-line/80 bg-white px-5 py-3 shadow-soft">
-            {/* Selecionar todas */}
+        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-line bg-white/95 px-5 py-3 shadow-[0_-4px_24px_rgba(0,0,0,0.08)] backdrop-blur-sm sm:px-8">
+          <div className="mx-auto flex max-w-7xl items-center gap-3">
+            {/* Selecionar/desmarcar todas */}
             <button
               type="button"
               onClick={toggleAll}
@@ -319,7 +376,7 @@ function MinhasLicitacoes() {
               {selectedCount} selecionada{selectedCount === 1 ? "" : "s"}
             </span>
 
-            <div className="h-4 w-px bg-line" />
+            <div className="flex-1" />
 
             {/* Cancelar */}
             <button
@@ -333,10 +390,21 @@ function MinhasLicitacoes() {
             {/* Remover */}
             <button
               type="button"
-              onClick={() => setShowBulkRemoveModal(true)}
-              className="rounded-xl bg-rose-600 px-4 py-2 font-['Plus_Jakarta_Sans'] text-sm font-semibold text-white transition hover:bg-rose-700"
+              disabled={selectedCount === 0 || bulkRemoving}
+              onClick={() => void handleBulkRemove()}
+              className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 font-['Plus_Jakarta_Sans'] text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Remover {selectedCount}
+              {bulkRemoving ? (
+                <>
+                  <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Removendo...
+                </>
+              ) : (
+                `Remover ${selectedCount > 0 ? selectedCount : ""}`
+              )}
             </button>
           </div>
         </div>
@@ -350,65 +418,48 @@ function MinhasLicitacoes() {
             <p className="mt-3 font-['Plus_Jakarta_Sans'] text-base text-slate">
               Esta acao remove <strong className="text-ink">{pendingRemoval.orgao}</strong> de Minhas Licitacoes.
             </p>
+            {pendingRemovalError ? (
+              <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
+                <p className="font-['Plus_Jakarta_Sans'] text-sm text-rose-700">{pendingRemovalError}</p>
+              </div>
+            ) : null}
             <div className="mt-6 flex justify-end gap-3">
               <button
                 type="button"
-                className="rounded-2xl border border-line px-5 py-2.5 font-['Plus_Jakarta_Sans'] text-sm font-semibold text-slate transition hover:border-accent/20 hover:text-ink"
-                onClick={() => setPendingRemoval(null)}
+                disabled={confirmRemoving}
+                className="rounded-2xl border border-line px-5 py-2.5 font-['Plus_Jakarta_Sans'] text-sm font-semibold text-slate transition hover:border-accent/20 hover:text-ink disabled:opacity-50"
+                onClick={() => { setPendingRemoval(null); setPendingRemovalError(null); }}
               >
                 Cancelar
               </button>
               <button
                 type="button"
-                className="rounded-2xl bg-rose-600 px-5 py-2.5 font-['Plus_Jakarta_Sans'] text-sm font-semibold text-white transition hover:bg-rose-700"
+                disabled={confirmRemoving}
+                className="inline-flex items-center gap-2 rounded-2xl bg-rose-600 px-5 py-2.5 font-['Plus_Jakarta_Sans'] text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
                 onClick={async () => {
+                  setPendingRemovalError(null);
+                  setConfirmRemoving(true);
                   try {
                     await removeLicitacao(pendingRemoval.id);
                     setPendingRemoval(null);
-                  } catch {
-                    return;
+                  } catch (err) {
+                    setPendingRemovalError(
+                      err instanceof Error ? err.message : "Nao foi possivel remover. Tente novamente."
+                    );
+                  } finally {
+                    setConfirmRemoving(false);
                   }
                 }}
               >
-                Confirmar remocao
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {/* Modal remoção em massa */}
-      {showBulkRemoveModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/35 px-4">
-          <div className="w-full max-w-lg rounded-[28px] bg-white p-8 shadow-soft">
-            <p className="font-['Manrope'] text-2xl font-extrabold text-ink">
-              Remover {selectedCount} licitacao{selectedCount === 1 ? "" : "es"}?
-            </p>
-            <p className="mt-3 font-['Plus_Jakarta_Sans'] text-base text-slate">
-              Esta acao nao pode ser desfeita.
-            </p>
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                type="button"
-                className="rounded-2xl border border-line px-5 py-2.5 font-['Plus_Jakarta_Sans'] text-sm font-semibold text-slate transition hover:border-accent/20 hover:text-ink"
-                onClick={() => setShowBulkRemoveModal(false)}
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                className="rounded-2xl bg-rose-600 px-5 py-2.5 font-['Plus_Jakarta_Sans'] text-sm font-semibold text-white transition hover:bg-rose-700"
-                onClick={async () => {
-                  try {
-                    await removeLicitacoes(selectedIds);
-                    setShowBulkRemoveModal(false);
-                    exitSelection();
-                  } catch {
-                    return;
-                  }
-                }}
-              >
-                Confirmar remocao
+                {confirmRemoving ? (
+                  <>
+                    <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Removendo...
+                  </>
+                ) : "Confirmar remocao"}
               </button>
             </div>
           </div>
