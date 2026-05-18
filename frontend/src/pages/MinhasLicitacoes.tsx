@@ -11,6 +11,7 @@ import {
   deriveAvailableEstados,
   type AdvancedFilters,
 } from "../components/features/licitacoes/FiltrosAvancados";
+import { Modal } from "../components/ui/Modal";
 import { useSetPageLoading } from "../contexts/PageLoadingContext";
 import { useLicitacoes } from "../hooks/useLicitacoes";
 import type { LicitacaoType } from "../types/licitacao.types";
@@ -68,7 +69,7 @@ function MinhasLicitacoes() {
   const filteredItems = useMemo(() => applyAdvancedFilters(items, advancedFilters), [items, advancedFilters]);
   const activeFilterCount = useMemo(() => countActiveFilters(advancedFilters), [advancedFilters]);
 
-  useSetPageLoading(status === "loading" || bulkRemoving || confirmRemoving);
+  useSetPageLoading(status === "loading" || bulkRemoving);
 
   // Limpa seleção ao sair do modo
   useEffect(() => {
@@ -411,11 +412,20 @@ function MinhasLicitacoes() {
       ) : null}
 
       {/* Modal remoção individual */}
-      {pendingRemoval ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/35 px-4">
-          <div className="w-full max-w-lg rounded-[28px] bg-white p-8 shadow-soft">
-            <p className="font-['Manrope'] text-2xl font-extrabold text-ink">Remover licitacao?</p>
-            <p className="mt-3 font-['Plus_Jakarta_Sans'] text-base text-slate">
+      <Modal
+        isOpen={pendingRemoval !== null}
+        title="Remover licitacao?"
+        eyebrow="Minhas Licitacoes"
+        widthClassName="max-w-lg"
+        onClose={() => {
+          if (confirmRemoving) return;
+          setPendingRemoval(null);
+          setPendingRemovalError(null);
+        }}
+      >
+        {pendingRemoval ? (
+          <div>
+            <p className="font-['Plus_Jakarta_Sans'] text-base text-slate">
               Esta acao remove <strong className="text-ink">{pendingRemoval.orgao}</strong> de Minhas Licitacoes.
             </p>
             {pendingRemovalError ? (
@@ -428,7 +438,10 @@ function MinhasLicitacoes() {
                 type="button"
                 disabled={confirmRemoving}
                 className="rounded-2xl border border-line px-5 py-2.5 font-['Plus_Jakarta_Sans'] text-sm font-semibold text-slate transition hover:border-accent/20 hover:text-ink disabled:opacity-50"
-                onClick={() => { setPendingRemoval(null); setPendingRemovalError(null); }}
+                onClick={() => {
+                  setPendingRemoval(null);
+                  setPendingRemovalError(null);
+                }}
               >
                 Cancelar
               </button>
@@ -437,6 +450,7 @@ function MinhasLicitacoes() {
                 disabled={confirmRemoving}
                 className="inline-flex items-center gap-2 rounded-2xl bg-rose-600 px-5 py-2.5 font-['Plus_Jakarta_Sans'] text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
                 onClick={async () => {
+                  if (!pendingRemoval) return;
                   setPendingRemovalError(null);
                   setConfirmRemoving(true);
                   try {
@@ -463,8 +477,8 @@ function MinhasLicitacoes() {
               </button>
             </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
+      </Modal>
     </div>
   );
 }
