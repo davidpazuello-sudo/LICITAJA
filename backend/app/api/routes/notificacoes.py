@@ -17,9 +17,19 @@ router = APIRouter(tags=["notificacoes"])
 
 # Tipos de eventos do monitoramento que viram notificações
 EVENTO_TIPOS_NOTIFICAVEIS = {
+    # Monitoramento geral
     "licitacao_atualizada",
     "novo_edital_detectado",
     "erro_monitoramento",
+    # Situação do pregão no portal
+    "situacao_suspensa",
+    "situacao_revogada",
+    "situacao_homologada",
+    "situacao_encerrada",
+    "situacao_alterada",
+    # Mensagem do pregoeiro
+    "mensagem_pregoeiro",
+    # Status interno
     "status_alterado",
     "status_concluida",
 }
@@ -211,9 +221,19 @@ def listar_notificacoes(
 def _classify_evento(tipo_evento: str) -> tuple[str, str]:
     """Retorna (tipo_notificacao, categoria)."""
     mapping = {
+        # Monitoramento geral
         "licitacao_atualizada": ("sucesso", "monitoramento"),
         "novo_edital_detectado": ("info", "monitoramento"),
         "erro_monitoramento": ("erro", "monitoramento"),
+        # Situação do pregão
+        "situacao_suspensa": ("alerta", "situacao"),
+        "situacao_revogada": ("erro", "situacao"),
+        "situacao_homologada": ("sucesso", "situacao"),
+        "situacao_encerrada": ("info", "situacao"),
+        "situacao_alterada": ("info", "situacao"),
+        # Mensagem do pregoeiro
+        "mensagem_pregoeiro": ("info", "pregoeiro"),
+        # Status interno
         "status_alterado": ("info", "status"),
         "status_concluida": ("sucesso", "status"),
     }

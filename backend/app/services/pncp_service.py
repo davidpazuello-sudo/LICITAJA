@@ -890,6 +890,8 @@ class PncpService:
             "data_publicacao": item.get("dataPublicacaoPncp"),
             "estado": unidade.get("ufSigla"),
             "cidade": unidade.get("municipioNome"),
+            "situacao_compra": item.get("situacaoCompraNome") or None,
+            "informacao_complementar": item.get("informacaoComplementar") or None,
             "link_edital": item.get("linkSistemaOrigem"),
             "link_site": item.get("linkSistemaOrigem"),
             "fonte": "pncp",

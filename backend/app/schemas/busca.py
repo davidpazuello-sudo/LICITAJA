@@ -17,6 +17,8 @@ class BuscaLicitacaoItem(BaseModel):
     data_publicacao: str | None = None
     estado: str | None = None
     cidade: str | None = None
+    situacao_compra: str | None = None
+    informacao_complementar: str | None = None
     link_edital: str | None = None
     link_site: str | None = None
     fonte: str = "pncp"

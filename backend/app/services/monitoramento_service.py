@@ -279,6 +279,8 @@ class MonitoramentoService:
             "cidade": item.cidade,
             "sub_status": item.sub_status,
             "numero_processo": item.numero_processo,
+            "situacao_compra": item.situacao_compra,
+            "informacao_complementar": item.informacao_complementar,
         }
         edital_payload = {
             "link_edital": item.link_edital,
@@ -317,6 +319,8 @@ class MonitoramentoService:
             "link_site",
             "numero_processo",
             "dados_brutos",
+            "situacao_compra",
+            "informacao_complementar",
         ]:
             current_value = getattr(licitacao, field, None)
             snapshot_value = getattr(snapshot, field, None)
@@ -348,6 +352,26 @@ class MonitoramentoService:
                     "status_remoto": snapshot.sub_status,
                 },
             )
+            # Eventos específicos por tipo de mudança relevante
+            if "situacao_compra" in changed_fields and snapshot.situacao_compra:
+                tipo_ev, titulo_ev = self._classify_situacao_evento(snapshot.situacao_compra)
+                self._registrar_evento(
+                    licitacao.id,
+                    tipo_evento=tipo_ev,
+                    origem=licitacao.fonte,
+                    titulo=titulo_ev,
+                    descricao=f"Situação atualizada para \"{snapshot.situacao_compra}\" em {licitacao.orgao[:60]}.",
+                    payload={"situacao": snapshot.situacao_compra},
+                )
+            if "informacao_complementar" in changed_fields and snapshot.informacao_complementar:
+                self._registrar_evento(
+                    licitacao.id,
+                    tipo_evento="mensagem_pregoeiro",
+                    origem=licitacao.fonte,
+                    titulo="Informação complementar atualizada",
+                    descricao=(snapshot.informacao_complementar or "")[:200],
+                    payload={"conteudo": snapshot.informacao_complementar},
+                )
         elif previous_core_hash is None and previous_edital_hash is None:
             self._registrar_evento(
                 licitacao.id,
@@ -419,6 +443,19 @@ class MonitoramentoService:
         multiplier = min(max(attempts, 1), 8)
         return now + timedelta(minutes=base_minutes * multiplier)
 
+    def _classify_situacao_evento(self, situacao: str) -> tuple[str, str]:
+        """Retorna (tipo_evento, titulo) com base no valor da situação do portal."""
+        normalized = situacao.lower()
+        if any(token in normalized for token in ("suspens",)):
+            return "situacao_suspensa", "⚠️ Licitação suspensa"
+        if any(token in normalized for token in ("revog", "anulad", "cancel")):
+            return "situacao_revogada", "Licitação revogada/anulada"
+        if any(token in normalized for token in ("homolog",)):
+            return "situacao_homologada", "✅ Licitação homologada"
+        if any(token in normalized for token in ("encerr", "conclu")):
+            return "situacao_encerrada", "Licitação encerrada"
+        return "situacao_alterada", "Situação do pregão atualizada"
+
     def _build_change_summary(
         self,
         changed_fields: list[str],
@@ -439,6 +476,8 @@ class MonitoramentoService:
             "link_site": "link da plataforma",
             "numero_processo": "número do processo",
             "dados_brutos": "metadados da oportunidade",
+            "situacao_compra": "situação do pregão",
+            "informacao_complementar": "informação complementar do pregoeiro",
         }
         changes = [labels[field] for field in changed_fields if field in labels]
         if previous_edital_hash and previous_edital_hash != current_edital_hash:

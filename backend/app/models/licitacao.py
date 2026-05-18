@@ -26,6 +26,8 @@ class LicitacaoModel(Base):
     observacoes: Mapped[str | None] = mapped_column(Text, nullable=True)
     resumo_ia: Mapped[str | None] = mapped_column(Text, nullable=True)
     atestados_capacidade_tecnica: Mapped[str | None] = mapped_column(Text, nullable=True)
+    situacao_compra: Mapped[str | None] = mapped_column(String, nullable=True)
+    informacao_complementar: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String, nullable=False, default="nova")
     fonte: Mapped[str] = mapped_column(String, nullable=False, default="pncp")
     dados_brutos: Mapped[str | None] = mapped_column(Text, nullable=True)

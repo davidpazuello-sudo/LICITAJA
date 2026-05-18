@@ -116,6 +116,8 @@ export interface LicitacaoType {
   observacoes: string | null;
   resumo_ia: string | null;
   atestados_capacidade_tecnica: string | null;
+  situacao_compra: string | null;
+  informacao_complementar: string | null;
   status: string;
   fonte: string;
   dados_brutos: string | null;

@@ -35,6 +35,19 @@ function getModalidadeSigla(modalidade: string | null): string {
   return "LC";
 }
 
+function getSituacaoBadge(situacao: string | null): { label: string; variant: "amber" | "green" | "slate" | "neutral"; className?: string } | null {
+  if (!situacao) return null;
+  const n = situacao.toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "");
+  // Não exibir o status padrão (apenas "publicada no portal")
+  if (n.includes("divulgada") || n.includes("publicada")) return null;
+  if (n.includes("suspens")) return { label: situacao, variant: "amber" };
+  if (n.includes("revog") || n.includes("anulad") || n.includes("cancel"))
+    return { label: situacao, variant: "neutral", className: "!bg-rose-50 !text-rose-700 !ring-rose-100" };
+  if (n.includes("homolog")) return { label: situacao, variant: "green" };
+  if (n.includes("encerr") || n.includes("conclu")) return { label: situacao, variant: "slate" };
+  return { label: situacao, variant: "slate" };
+}
+
 function getDeadlineMeta(dataAbertura: string | null) {
   if (!dataAbertura) {
     return { label: "Prazo nao informado", variant: "slate" as const, dotClass: "bg-slate-300" };
@@ -94,6 +107,7 @@ function CardLicitacao({
   const modalidadeSigla = getModalidadeSigla(licitacao.modalidade);
   const statusMeta = STATUS_META[licitacao.status] ?? STATUS_META.nova;
   const deadlineMeta = getDeadlineMeta(licitacao.data_abertura);
+  const situacaoBadge = getSituacaoBadge(licitacao.situacao_compra);
   const local = [licitacao.cidade, licitacao.estado].filter(Boolean).join(" - ");
   const monitoramento = licitacao.monitoramento;
   const monitoramentoLabel = monitoramento?.ultimo_erro_monitoramento
@@ -157,6 +171,11 @@ function CardLicitacao({
               {licitacao.orgao}
             </span>
             <div className="ml-auto flex flex-wrap gap-1.5">
+              {situacaoBadge ? (
+                <Badge variant={situacaoBadge.variant} className={situacaoBadge.className}>
+                  {situacaoBadge.label}
+                </Badge>
+              ) : null}
               <Badge variant={statusMeta.variant}>{statusMeta.label}</Badge>
               <Badge variant={deadlineMeta.variant}>{deadlineMeta.label}</Badge>
             </div>
