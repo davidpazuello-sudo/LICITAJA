@@ -168,7 +168,10 @@ function CardLicitacao({
 
           <div className="flex flex-wrap gap-x-4 gap-y-1 font-['Plus_Jakarta_Sans'] text-[13px] text-slate">
             {licitacao.data_abertura ? (
-              <span className="flex items-center gap-1"><span>📅</span>{formatDate(licitacao.data_abertura)}</span>
+              <span className="flex items-center gap-1" title="Abertura"><span>📅</span>{formatDate(licitacao.data_abertura)}</span>
+            ) : null}
+            {licitacao.data_encerramento ? (
+              <span className="flex items-center gap-1 text-rose-500/80" title="Encerramento"><span>🔒</span>{formatDate(licitacao.data_encerramento)}</span>
             ) : null}
             <span className="flex items-center gap-1"><span>💰</span>{formatCurrency(licitacao.valor_estimado)}</span>
             {local ? (

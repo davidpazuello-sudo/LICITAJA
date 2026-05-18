@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import threading
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -18,7 +19,7 @@ from app.models.processamento_job import ProcessamentoJobModel
 from app.schemas.busca import BuscaLicitacaoItem
 from app.services.busca.aggregator import BuscaAggregator
 from app.services.busca.contracts import SearchQuery
-from app.services.job_service import criar_job_processamento
+from app.services.job_service import criar_job_processamento, processar_licitacao_salva_em_segundo_plano
 
 MONITORAMENTO_JOB_TYPE = "licitacao_monitoramento_leve"
 ACTIVE_PIPELINE_STATUSES = {"nova", "em_analise", "itens_extraidos", "fornecedores_encontrados"}
@@ -268,6 +269,7 @@ class MonitoramentoService:
         core_payload = {
             "numero_controle": item.numero_controle,
             "orgao": item.orgao,
+            "uasg": item.uasg,
             "objeto": item.objeto,
             "modalidade": item.modalidade,
             "valor_estimado": item.valor_estimado,
@@ -303,10 +305,12 @@ class MonitoramentoService:
         changed_fields: list[str] = []
         for field in [
             "orgao",
+            "uasg",
             "objeto",
             "modalidade",
             "valor_estimado",
             "data_abertura",
+            "data_encerramento",
             "estado",
             "cidade",
             "link_edital",
@@ -314,9 +318,9 @@ class MonitoramentoService:
             "numero_processo",
             "dados_brutos",
         ]:
-            current_value = getattr(licitacao, field)
-            snapshot_value = getattr(snapshot, field)
-            if current_value != snapshot_value:
+            current_value = getattr(licitacao, field, None)
+            snapshot_value = getattr(snapshot, field, None)
+            if current_value != snapshot_value and snapshot_value is not None:
                 setattr(licitacao, field, snapshot_value)
                 changed_fields.append(field)
 
@@ -358,7 +362,7 @@ class MonitoramentoService:
         self.db.commit()
         self.db.refresh(licitacao)
         self.db.refresh(monitor)
-        return has_changed, monitor.resumo_ultima_mudanca
+        return has_changed, monitor.resumo_ultima_mudanca, changed_fields
 
     def registrar_erro(
         self,
@@ -423,10 +427,12 @@ class MonitoramentoService:
     ) -> str:
         labels = {
             "orgao": "órgão",
+            "uasg": "UASG",
             "objeto": "objeto",
             "modalidade": "modalidade",
             "valor_estimado": "valor estimado",
             "data_abertura": "data de abertura",
+            "data_encerramento": "data de encerramento",
             "estado": "UF",
             "cidade": "cidade",
             "link_edital": "link do edital",
@@ -463,7 +469,7 @@ def executar_monitoramento_leve_em_segundo_plano(job_id: int, licitacao_id: int)
         if snapshot is None:
             raise RuntimeError("Nao foi possivel reencontrar a licitacao na fonte original nesta verificacao.")
 
-        changed, summary = service.aplicar_snapshot(licitacao, monitor, snapshot)
+        changed, summary, changed_fields = service.aplicar_snapshot(licitacao, monitor, snapshot)
         job = db.get(ProcessamentoJobModel, job_id)
         if job is not None:
             job.status = "completed"
@@ -471,6 +477,31 @@ def executar_monitoramento_leve_em_segundo_plano(job_id: int, licitacao_id: int)
             job.mensagem = summary if changed and summary else "Monitoramento concluido sem mudancas relevantes."
             db.add(job)
             db.commit()
+
+        # Se o edital mudou, re-extrair itens e atestados em segundo plano
+        edital_mudou = "link_edital" in changed_fields
+        if edital_mudou:
+            try:
+                novo_job = criar_job_processamento(
+                    licitacao_id,
+                    "licitacao_auto_pipeline",
+                    mensagem="Novo edital detectado pelo monitoramento. Re-extraindo itens, atestados e fornecedores.",
+                )
+                service._registrar_evento(
+                    licitacao_id,
+                    tipo_evento="novo_edital_detectado",
+                    origem=licitacao.fonte,
+                    titulo="Novo edital detectado — re-extração iniciada",
+                    descricao="O link do edital foi atualizado na fonte original. Os itens e atestados serão re-extraídos automaticamente.",
+                )
+                t = threading.Thread(
+                    target=processar_licitacao_salva_em_segundo_plano,
+                    args=(novo_job.id, licitacao_id),
+                    daemon=True,
+                )
+                t.start()
+            except Exception as reextract_exc:  # noqa: BLE001
+                print(f"Falha ao agendar re-extracao pos monitoramento da licitacao {licitacao_id}: {reextract_exc}")
     except Exception as exc:  # noqa: BLE001
         job = db.get(ProcessamentoJobModel, job_id)
         licitacao = db.get(LicitacaoModel, licitacao_id)

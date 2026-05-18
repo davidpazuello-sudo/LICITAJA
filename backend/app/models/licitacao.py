@@ -18,6 +18,7 @@ class LicitacaoModel(Base):
     modalidade: Mapped[str | None] = mapped_column(String, nullable=True)
     valor_estimado: Mapped[float | None] = mapped_column(Float, nullable=True)
     data_abertura: Mapped[str | None] = mapped_column(String, nullable=True)
+    data_encerramento: Mapped[str | None] = mapped_column(String, nullable=True)
     estado: Mapped[str | None] = mapped_column(String, nullable=True)
     cidade: Mapped[str | None] = mapped_column(String, nullable=True)
     link_edital: Mapped[str | None] = mapped_column(Text, nullable=True)

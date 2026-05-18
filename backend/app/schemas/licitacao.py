@@ -14,6 +14,7 @@ class LicitacaoBase(BaseModel):
     modalidade: str | None = None
     valor_estimado: float | None = None
     data_abertura: str | None = None
+    data_encerramento: str | None = None
     estado: str | None = None
     cidade: str | None = None
     link_edital: str | None = None

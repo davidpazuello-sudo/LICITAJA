@@ -108,6 +108,7 @@ export interface LicitacaoType {
   modalidade: string | null;
   valor_estimado: number | null;
   data_abertura: string | null;
+  data_encerramento: string | null;
   estado: string | null;
   cidade: string | null;
   link_edital: string | null;
