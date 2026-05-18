@@ -1,8 +1,16 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { CardLicitacao } from "../components/features/licitacoes/CardLicitacao";
 import { FiltroStatus } from "../components/features/licitacoes/FiltroStatus";
+import {
+  ADVANCED_FILTERS_DEFAULT,
+  FiltrosAvancados,
+  applyAdvancedFilters,
+  countActiveFilters,
+  deriveAvailableEstados,
+  type AdvancedFilters,
+} from "../components/features/licitacoes/FiltrosAvancados";
 import { Spinner } from "../components/ui/Spinner";
 import { useLicitacoes } from "../hooks/useLicitacoes";
 import type { LicitacaoType } from "../types/licitacao.types";
@@ -51,6 +59,12 @@ function MinhasLicitacoes() {
   const [showBulkRemoveModal, setShowBulkRemoveModal] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
+  const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilters>(ADVANCED_FILTERS_DEFAULT);
+
+  const availableEstados = useMemo(() => deriveAvailableEstados(items), [items]);
+  const filteredItems = useMemo(() => applyAdvancedFilters(items, advancedFilters), [items, advancedFilters]);
+  const activeFilterCount = useMemo(() => countActiveFilters(advancedFilters), [advancedFilters]);
 
   // limpa seleção ao sair do modo
   useEffect(() => {
@@ -69,13 +83,13 @@ function MinhasLicitacoes() {
   }, [items]);
 
   const selectedCount = selectedIds.length;
-  const allSelected = items.length > 0 && items.every((item) => selectedIds.includes(item.id));
+  const allSelected = filteredItems.length > 0 && filteredItems.every((item) => selectedIds.includes(item.id));
 
   const toggleItem = (id: number, checked: boolean) =>
     setSelectedIds((cur) => (checked ? [...new Set([...cur, id])] : cur.filter((x) => x !== id)));
 
   const toggleAll = () =>
-    setSelectedIds(allSelected ? [] : items.map((item) => item.id));
+    setSelectedIds(allSelected ? [] : filteredItems.map((item) => item.id));
 
   const exitSelection = () => {
     setSelectionMode(false);
@@ -125,17 +139,49 @@ function MinhasLicitacoes() {
               >
                 <SearchIcon />
               </button>
+
+              {/* Botão Filtros */}
+              {status === "success" && items.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setShowFilters((v) => !v)}
+                  className={
+                    "relative inline-flex h-11 items-center gap-2 rounded-2xl border px-4 font-['Plus_Jakarta_Sans'] text-sm font-medium transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent/15 " +
+                    (showFilters || activeFilterCount > 0
+                      ? "border-accent/40 bg-[#EEF4FF] text-accent"
+                      : "border-line bg-white text-slate hover:border-accent/30 hover:text-ink")
+                  }
+                  aria-label="Filtros avançados"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 shrink-0" aria-hidden="true">
+                    <path d="M3 6h18M7 12h10M11 18h2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                  </svg>
+                  <span>Filtros</span>
+                  {activeFilterCount > 0 ? (
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-accent font-['Manrope'] text-[11px] font-bold text-white">
+                      {activeFilterCount}
+                    </span>
+                  ) : null}
+                </button>
+              ) : null}
             </div>
 
             <div className="flex shrink-0 items-center gap-3">
-              {status === "success" && total > 0 ? (
+              {status === "success" && items.length > 0 ? (
                 <p className="font-['Plus_Jakarta_Sans'] text-sm text-slate">
-                  <span className="font-semibold text-ink">{total}</span> resultado{total === 1 ? "" : "s"}
+                  {activeFilterCount > 0 ? (
+                    <>
+                      <span className="font-semibold text-ink">{filteredItems.length}</span>
+                      <span className="text-slate/50"> de {total}</span>
+                    </>
+                  ) : (
+                    <><span className="font-semibold text-ink">{total}</span> resultado{total === 1 ? "" : "s"}</>
+                  )}
                 </p>
               ) : null}
 
               {/* Botão modo seleção */}
-              {items.length > 0 && status === "success" ? (
+              {filteredItems.length > 0 && status === "success" ? (
                 <button
                   type="button"
                   onClick={() => setSelectionMode((v) => !v)}
@@ -166,6 +212,19 @@ function MinhasLicitacoes() {
             </div>
           </div>
         </div>
+
+        {/* Painel de filtros avançados */}
+        {showFilters && status === "success" && items.length > 0 ? (
+          <div className="mb-4">
+            <FiltrosAvancados
+              filters={advancedFilters}
+              onChange={setAdvancedFilters}
+              availableEstados={availableEstados}
+              onClear={() => setAdvancedFilters(ADVANCED_FILTERS_DEFAULT)}
+              activeCount={activeFilterCount}
+            />
+          </div>
+        ) : null}
 
         {/* Loading */}
         {status === "loading" ? (
@@ -207,10 +266,28 @@ function MinhasLicitacoes() {
           </div>
         ) : null}
 
+        {/* Sem resultados após filtro avançado */}
+        {status === "success" && items.length > 0 && filteredItems.length === 0 ? (
+          <div className="rounded-[26px] border border-dashed border-line bg-panel/70 px-8 py-10 text-center">
+            <div className="mb-3 text-3xl">🔍</div>
+            <p className="font-['Manrope'] text-base font-bold text-ink">Nenhuma licitacao com esses filtros</p>
+            <p className="mt-1.5 font-['Plus_Jakarta_Sans'] text-sm text-slate">
+              Tente remover alguns filtros para ver mais resultados.
+            </p>
+            <button
+              type="button"
+              onClick={() => setAdvancedFilters(ADVANCED_FILTERS_DEFAULT)}
+              className="mt-4 inline-flex items-center gap-2 rounded-xl border border-line bg-white px-4 py-2 font-['Plus_Jakarta_Sans'] text-sm font-medium text-slate transition hover:border-accent/30 hover:text-ink"
+            >
+              Limpar filtros
+            </button>
+          </div>
+        ) : null}
+
         {/* Lista de cards */}
-        {items.length > 0 ? (
+        {filteredItems.length > 0 ? (
           <div className="space-y-4">
-            {items.map((licitacao) => (
+            {filteredItems.map((licitacao) => (
               <CardLicitacao
                 key={licitacao.id}
                 licitacao={licitacao}
